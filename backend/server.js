@@ -285,6 +285,19 @@ app.post('/api/quizzes/sync', authenticateToken, async (req, res) => {
   }
 });
 
+const { ExpressPeerServer } = require('peer');
+
+// Start Server
+const server = app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+// Initialize and mount PeerJS server (must be mounted BEFORE the static catch-all route)
+const peerServer = ExpressPeerServer(server, {
+  path: '/'
+});
+app.use('/peerjs', peerServer);
+
 // --- SERVE STATIC FRONTEND IN PRODUCTION ---
 const angularBuildPath = path.join(__dirname, '../dist/jeopardy-app/browser');
 app.use(express.static(angularBuildPath));
@@ -293,16 +306,3 @@ app.use(express.static(angularBuildPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(angularBuildPath, 'index.html'));
 });
-
-const { ExpressPeerServer } = require('peer');
-
-// Start Server
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
-// Initialize and mount PeerJS server
-const peerServer = ExpressPeerServer(server, {
-  path: '/'
-});
-app.use('/peerjs', peerServer);
