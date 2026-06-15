@@ -119,12 +119,12 @@ export class P2pService {
             credential: 'openrelayproject'
           },
           {
-            urls: 'turn:openrelay.metered.ca:443',
+            urls: 'turns:openrelay.metered.ca:443',
             username: 'openrelayproject',
             credential: 'openrelayproject'
           },
           {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            urls: 'turns:openrelay.metered.ca:443?transport=tcp',
             username: 'openrelayproject',
             credential: 'openrelayproject'
           }
@@ -619,14 +619,14 @@ export class P2pService {
       reject(err);
     });
 
-    // Timeout if Host does not respond within 6 seconds
+    // Timeout if Host does not respond within 15 seconds
     setTimeout(() => {
       if (this.connectionState() === 'connecting') {
         this.disconnect();
         this.errorMessage.set('Spielraum antwortet nicht oder existiert nicht.');
         reject(new Error('Timeout connecting to host'));
       }
-    }, 6000);
+    }, 15000);
   }
 
   /**
