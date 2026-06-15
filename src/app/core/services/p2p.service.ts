@@ -101,15 +101,8 @@ export class P2pService {
   });
 
   private getPeerOptions(): any {
-    const host = window.location.hostname;
-    const port = window.location.port ? parseInt(window.location.port, 10) : (window.location.protocol === 'https:' ? 443 : 80);
-    const secure = window.location.protocol === 'https:';
-
     return {
-      host: host,
-      port: port,
       path: '/peerjs',
-      secure: secure,
       debug: 1,
       config: {
         iceServers: [
@@ -120,6 +113,7 @@ export class P2pService {
       }
     };
   }
+
 
   constructor() {
     // Attempt session restoration if there is a saved session
