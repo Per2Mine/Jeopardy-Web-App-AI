@@ -207,8 +207,14 @@ export class QuizCreatorComponent implements OnInit {
     }));
 
     try {
-      this.quizService.saveQuiz(this.quizName(), finalCategories, email, this.editingId() || undefined);
-      this.router.navigate(['/']);
+      this.quizService.saveQuiz(this.quizName(), finalCategories, email, this.editingId() || undefined).subscribe({
+        next: () => {
+          this.router.navigate(['/']);
+        },
+        error: (err: any) => {
+          this.errorMessage.set(err.error?.error || err.message || 'Speichern fehlgeschlagen.');
+        }
+      });
     } catch (err: any) {
       this.errorMessage.set(err.message || 'Speichern fehlgeschlagen.');
     }

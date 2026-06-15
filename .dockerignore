@@ -1,0 +1,9 @@
+.angular
+node_modules
+dist
+backend/node_modules
+backend/database.sqlite
+.git
+.vscode
+Dockerfile
+.dockerignore

@@ -120,11 +120,18 @@ export class StartPageComponent {
   onDeleteQuiz(id: string, event: Event) {
     event.stopPropagation();
     if (confirm('Möchtest du diese Quiz-Vorlage wirklich löschen?')) {
-      this.quizService.deleteQuiz(id);
-      if (this.selectedTemplate() === id) {
-        this.selectedTemplate.set('general');
-      }
-      this.refreshTrigger.update(n => n + 1);
+      this.quizService.deleteQuiz(id).subscribe({
+        next: () => {
+          if (this.selectedTemplate() === id) {
+            this.selectedTemplate.set('general');
+          }
+          this.refreshTrigger.update(n => n + 1);
+        },
+        error: (err) => {
+          console.error('Failed to delete quiz:', err);
+          alert('Fehler beim Löschen des Quizzes.');
+        }
+      });
     }
   }
 

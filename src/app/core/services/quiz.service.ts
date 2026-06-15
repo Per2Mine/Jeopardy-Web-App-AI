@@ -1,4 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal, effect, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { AuthService } from './auth.service';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 
 export interface Question {
   text: string;
@@ -23,7 +27,13 @@ export interface QuizTemplate {
   providedIn: 'root'
 })
 export class QuizService {
+  private http = inject(HttpClient);
+  private authService = inject(AuthService);
+
   private QUIZZES_KEY = 'jeopardy_custom_quizzes';
+
+  // Custom quizzes fetched from backend
+  customQuizzes = signal<QuizTemplate[]>([]);
 
   // Default system templates
   private defaultTemplates: QuizTemplate[] = [
@@ -159,7 +169,7 @@ export class QuizService {
         {
           name: 'Pop-Giganten 🎤',
           questions: [
-            { text: 'Er wird als der unangefochtene "King of Pop" bezeichnet und erfand den Moonwalk.', answer: 'Michael Jackson', value: 100 },
+            { text: 'Er wird als the unangefochtene "King of Pop" bezeichnet und erfand den Moonwalk.', answer: 'Michael Jackson', value: 100 },
             { text: 'Diese US-Sängerin feierte Hits wie "Like a Virgin" und gilt als die erfolgreichste Sängerin aller Zeiten.', answer: 'Madonna', value: 200 },
             { text: 'Diese schwedische Popgruppe gewann 1974 den Eurovision Song Contest mit dem Song "Waterloo".', answer: 'ABBA', value: 300 },
             { text: 'Diese moderne US-Sängerin bricht mit ihrer "Eras Tour" weltweit alle Rekorde.', answer: 'Taylor Swift', value: 400 },
@@ -200,17 +210,62 @@ export class QuizService {
     }
   ];
 
-  constructor() {}
+  constructor() {
+    effect(() => {
+      const user = this.authService.currentUser();
+      if (user) {
+        this.loadQuizzes();
+        this.syncLegacyQuizzes();
+      } else {
+        this.customQuizzes.set([]);
+      }
+    });
+  }
+
+  loadQuizzes() {
+    this.http.get<QuizTemplate[]>('/api/quizzes').subscribe({
+      next: (quizzes) => {
+        this.customQuizzes.set(quizzes);
+      },
+      error: (err) => {
+        console.error('Failed to load custom quizzes from backend:', err);
+      }
+    });
+  }
+
+  private syncLegacyQuizzes() {
+    const quizzesStr = localStorage.getItem(this.QUIZZES_KEY);
+    if (!quizzesStr) return;
+
+    try {
+      const legacyQuizzes = JSON.parse(quizzesStr) || [];
+      if (legacyQuizzes.length > 0) {
+        this.http.post('/api/quizzes/sync', { quizzes: legacyQuizzes }).subscribe({
+          next: () => {
+            console.log('Legacy custom quizzes successfully migrated to backend.');
+            localStorage.removeItem(this.QUIZZES_KEY);
+            this.loadQuizzes();
+          },
+          error: (err) => {
+            console.error('Failed to sync legacy quizzes to backend:', err);
+          }
+        });
+      } else {
+        localStorage.removeItem(this.QUIZZES_KEY);
+      }
+    } catch (e) {
+      localStorage.removeItem(this.QUIZZES_KEY);
+    }
+  }
 
   /**
    * Get all templates available to a user (defaults + their custom ones)
    */
   getTemplates(userEmail?: string): QuizTemplate[] {
-    if (userEmail) {
-      this.associateLegacyQuizzes(userEmail);
+    if (!userEmail) {
+      return this.defaultTemplates;
     }
-    const customQuizzes = this.getCustomQuizzes(userEmail);
-    return [...this.defaultTemplates, ...customQuizzes];
+    return [...this.defaultTemplates, ...this.customQuizzes()];
   }
 
   /**
@@ -222,9 +277,9 @@ export class QuizService {
   }
 
   /**
-   * Save a new custom quiz
+   * Save a new custom quiz via Express API. Returns Observable.
    */
-  saveQuiz(name: string, categories: Category[], userEmail: string, id?: string): void {
+  saveQuiz(name: string, categories: Category[], userEmail: string, id?: string): Observable<any> {
     if (!name.trim()) {
       throw new Error('Bitte gib der Quiz-Vorlage einen Namen.');
     }
@@ -253,79 +308,26 @@ export class QuizService {
       });
     });
 
-    const allCustom = this.getAllCustomQuizzes();
-    
-    if (id) {
-      const index = allCustom.findIndex(q => q.id === id && q.userEmail === userEmail);
-      if (index === -1) {
-        throw new Error('Quiz-Vorlage nicht gefunden oder keine Berechtigung.');
-      }
-      allCustom[index] = {
-        ...allCustom[index],
-        name: name.trim(),
-        categories
-      };
-    } else {
-      const newQuiz: QuizTemplate = {
-        id: 'custom_' + Date.now().toString(),
-        name: name.trim(),
-        icon: '📝',
-        userEmail,
-        categories
-      };
-      allCustom.push(newQuiz);
-    }
+    const body = { name: name.trim(), categories };
+    const request$ = id 
+      ? this.http.put<any>(`/api/quizzes/${id}`, body)
+      : this.http.post<any>('/api/quizzes', body);
 
-    localStorage.setItem(this.QUIZZES_KEY, JSON.stringify(allCustom));
+    return request$.pipe(
+      tap(() => {
+        this.loadQuizzes();
+      })
+    );
   }
 
   /**
-   * Delete a custom quiz
+   * Delete a custom quiz via Express API. Returns Observable.
    */
-  deleteQuiz(id: string): void {
-    const allCustom = this.getAllCustomQuizzes();
-    const filtered = allCustom.filter(q => q.id !== id);
-    localStorage.setItem(this.QUIZZES_KEY, JSON.stringify(filtered));
-  }
-
-  private getCustomQuizzes(userEmail?: string): QuizTemplate[] {
-    if (!userEmail || !userEmail.trim()) return [];
-    const all = this.getAllCustomQuizzes();
-    return all.filter(q => q.userEmail === userEmail);
-  }
-
-  /**
-   * Associate any legacy quizzes (without userEmail) with the logged-in user's email
-   */
-  private associateLegacyQuizzes(userEmail: string): void {
-    const allCustom = this.getAllCustomQuizzes();
-    let updated = false;
-    
-    const migrated = allCustom.map(q => {
-      if (!q.userEmail) {
-        updated = true;
-        return {
-          ...q,
-          userEmail
-        };
-      }
-      return q;
-    });
-
-    if (updated) {
-      localStorage.setItem(this.QUIZZES_KEY, JSON.stringify(migrated));
-    }
-  }
-
-  private getAllCustomQuizzes(): QuizTemplate[] {
-    const quizzesStr = localStorage.getItem(this.QUIZZES_KEY);
-    if (quizzesStr) {
-      try {
-        return JSON.parse(quizzesStr) || [];
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
+  deleteQuiz(id: string): Observable<any> {
+    return this.http.delete<any>(`/api/quizzes/${id}`).pipe(
+      tap(() => {
+        this.loadQuizzes();
+      })
+    );
   }
 }

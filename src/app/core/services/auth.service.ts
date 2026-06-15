@@ -1,19 +1,27 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
 export interface User {
   username: string;
   email: string;
 }
 
+interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private http = inject(HttpClient);
+
   // Current logged in user signal
   currentUser = signal<User | null>(null);
 
-  private USERS_KEY = 'jeopardy_users';
-  private SESSION_KEY = 'jeopardy_session';
+  private TOKEN_KEY = 'jeopardy_token';
 
   constructor() {
     this.restoreSession();
@@ -36,25 +44,19 @@ export class AuthService {
       throw new Error('Das Passwort muss mindestens 6 Zeichen lang sein.');
     }
 
-    const users = this.getStoredUsers();
-    
-    // Check if email already exists
-    const emailExists = users.some(u => u.email === formattedEmail);
-    if (emailExists) {
-      throw new Error('Ein Konto mit dieser E-Mail-Adresse existiert bereits.');
+    try {
+      const res = await firstValueFrom(
+        this.http.post<AuthResponse>('/api/auth/register', {
+          username: formattedUsername,
+          email: formattedEmail,
+          password
+        })
+      );
+      this.handleAuthSuccess(res);
+    } catch (err: any) {
+      const errorMsg = err.error?.error || 'Registrierung fehlgeschlagen.';
+      throw new Error(errorMsg);
     }
-
-    // Add user
-    const newUser = {
-      username: formattedUsername,
-      email: formattedEmail,
-      password: password // In a real app this would be hashed
-    };
-    users.push(newUser);
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-
-    // Automatically log in
-    this.setCurrentSession({ username: formattedUsername, email: formattedEmail });
   }
 
   /**
@@ -67,21 +69,25 @@ export class AuthService {
       throw new Error('Bitte fülle alle Felder aus.');
     }
 
-    const users = this.getStoredUsers();
-    const user = users.find(u => u.email === formattedEmail && u.password === password);
-
-    if (!user) {
-      throw new Error('Ungültige E-Mail-Adresse oder Passwort.');
+    try {
+      const res = await firstValueFrom(
+        this.http.post<AuthResponse>('/api/auth/login', {
+          email: formattedEmail,
+          password
+        })
+      );
+      this.handleAuthSuccess(res);
+    } catch (err: any) {
+      const errorMsg = err.error?.error || 'Ungültige E-Mail-Adresse oder Passwort.';
+      throw new Error(errorMsg);
     }
-
-    this.setCurrentSession({ username: user.username, email: user.email });
   }
 
   /**
    * Log out current user
    */
   logout() {
-    localStorage.removeItem(this.SESSION_KEY);
+    localStorage.removeItem(this.TOKEN_KEY);
     this.currentUser.set(null);
   }
 
@@ -99,64 +105,40 @@ export class AuthService {
       throw new Error('Kein Benutzer angemeldet.');
     }
 
-    const users = this.getStoredUsers();
-    const userIndex = users.findIndex(u => u.email === currentUser.email);
-    if (userIndex === -1) {
-      throw new Error('Benutzer nicht gefunden.');
-    }
-
-    // Update username in users database
-    users[userIndex].username = formattedUsername;
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-
-    // Update active session
-    const updatedUser = { ...currentUser, username: formattedUsername };
-    this.setCurrentSession(updatedUser);
-  }
-
-
-  private restoreSession() {
-    const sessionStr = localStorage.getItem(this.SESSION_KEY);
-    if (sessionStr) {
-      try {
-        const data = JSON.parse(sessionStr);
-        // Gracefully handle both old format (direct User) and new format ({ user, lastActive })
-        const user = data.user ? (data.user as User) : (data as User);
-        const lastActive = data.lastActive ? (data.lastActive as number) : Date.now();
-        
-        const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-        if (Date.now() - lastActive > oneWeekMs) {
-          // Session expired after 1 week of inactivity
-          this.logout();
-        } else {
-          // Session valid: restore and refresh activity timestamp
-          this.currentUser.set(user);
-          this.setCurrentSession(user);
-        }
-      } catch (e) {
-        localStorage.removeItem(this.SESSION_KEY);
-      }
+    try {
+      await firstValueFrom(
+        this.http.put<{ success: boolean; username: string }>('/api/auth/username', {
+          username: formattedUsername
+        })
+      );
+      // Update active user state
+      this.currentUser.set({
+        ...currentUser,
+        username: formattedUsername
+      });
+    } catch (err: any) {
+      const errorMsg = err.error?.error || 'Aktualisierung fehlgeschlagen.';
+      throw new Error(errorMsg);
     }
   }
 
-  private setCurrentSession(user: User) {
-    const sessionData = {
-      user,
-      lastActive: Date.now()
-    };
-    localStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionData));
-    this.currentUser.set(user);
+  private async restoreSession() {
+    const token = localStorage.getItem(this.TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const res = await firstValueFrom(
+        this.http.get<{ user: User }>('/api/auth/me')
+      );
+      this.currentUser.set(res.user);
+    } catch (e) {
+      // If token expired or invalid, log out
+      this.logout();
+    }
   }
 
-  private getStoredUsers(): any[] {
-    const usersStr = localStorage.getItem(this.USERS_KEY);
-    if (usersStr) {
-      try {
-        return JSON.parse(usersStr) || [];
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
+  private handleAuthSuccess(res: AuthResponse) {
+    localStorage.setItem(this.TOKEN_KEY, res.token);
+    this.currentUser.set(res.user);
   }
 }

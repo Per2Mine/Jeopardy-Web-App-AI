@@ -1,4 +1,4 @@
-import { Component, inject, computed, OnInit } from '@angular/core';
+import { Component, inject, computed, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { P2pService, Player, GameState } from '../../core/services/p2p.service';
@@ -24,6 +24,15 @@ interface TeamScoreInfo {
 export class GamePageComponent implements OnInit {
   p2pService = inject(P2pService);
   private router = inject(Router);
+
+  constructor() {
+    effect(() => {
+      const state = this.p2pService.connectionState();
+      if (state === 'disconnected' || state === 'error') {
+        this.router.navigate(['/']);
+      }
+    });
+  }
 
   // Jeopardy Categories loaded dynamically from game state
   get categories(): Category[] {
@@ -143,8 +152,9 @@ export class GamePageComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Redirect guard: if not connected, force send back to lobby
-    if (this.p2pService.connectionState() !== 'connected' || !this.p2pService.gameState()) {
+    // Redirect guard: if not connected and not trying to connect, force send back to lobby
+    const state = this.p2pService.connectionState();
+    if (state === 'disconnected' || state === 'error') {
       this.p2pService.disconnect();
       this.router.navigate(['/']);
     }

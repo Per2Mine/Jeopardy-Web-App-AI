@@ -360,7 +360,7 @@
                     <span class="text-xs text-white/30 italic text-center py-2">Dieses Team ist noch leer.</span>
                   } @else {
                     @for (player of teamPlayers; track player.id) {
-                      <div class="flex items-center justify-between gap-2 p-1.5 bg-black/10 rounded-lg">
+                      <div class="flex items-center justify-between gap-2 p-1.5 bg-black/10 rounded-lg" [class.opacity-40]="player.isOffline">
                         <div class="flex items-center gap-2 min-w-0">
                           <div 
                             [style.background-color]="player.color"
@@ -369,7 +369,7 @@
                             {{ player.name.slice(0, 2).toUpperCase() }}
                           </div>
                           <span class="text-xs font-semibold text-white truncate">
-                            {{ player.name }} {{ player.id === p2pService.myPlayerId() ? ' (Du)' : '' }}
+                            {{ player.name }} {{ player.id === p2pService.myPlayerId() ? ' (Du)' : '' }}{{ player.isOffline ? ' (Offline)' : '' }}
                           </span>
                         </div>
                         
@@ -448,7 +448,7 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             @for (player of p2pService.players(); track player.id) {
-              <div class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
+              <div class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300" [class.opacity-40]="player.isOffline">
                 <!-- Avatar Circle -->
                 <div 
                   [style.background-color]="player.color"
@@ -459,7 +459,7 @@
                 
                 <!-- Player info -->
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-bold text-white truncate">{{ player.name }}</p>
+                  <p class="text-sm font-bold text-white truncate">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</p>
                   <p class="text-[9px] uppercase tracking-wider text-white/40 font-bold mt-0.5">
                     {{ player.isHost ? 'Host' : 'Spieler' }}
                     {{ player.id === p2pService.myPlayerId() ? ' (Du)' : '' }}

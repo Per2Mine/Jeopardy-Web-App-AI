@@ -262,14 +262,14 @@
                   <!-- Team Members List -->
                   <div class="flex flex-wrap gap-2.5 p-1">
                     @for (player of team.players; track player.id) {
-                      <div class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/5">
+                      <div class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/5" [class.opacity-40]="player.isOffline">
                         <div 
                           [style.background-color]="player.color"
                           class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm shrink-0"
                           [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
                           {{ player.name.slice(0, 2).toUpperCase() }}
                         </div>
-                        <span class="text-xs font-bold text-white/90 truncate max-w-[100px]">{{ player.name }}</span>
+                        <span class="text-xs font-bold text-white/90 truncate max-w-[100px]">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</span>
                         <span class="text-[10px] font-black text-jeopardy-gold/70">({{ player.score }} $)</span>
                       </div>
                     }
@@ -281,7 +281,8 @@
               @for (player of sortedPlayers(); track player.id; let index = $index) {
                 <div 
                   [class]="'flex items-center gap-4 p-4 border rounded-2xl transition-all duration-300 ' + 
-                           (index === 0 ? 'bg-jeopardy-gold/15 border-jeopardy-gold shadow-lg shadow-jeopardy-gold/5 scale-105' : 'bg-white/[0.01] border-white/10')">
+                           (index === 0 ? 'bg-jeopardy-gold/15 border-jeopardy-gold shadow-lg shadow-jeopardy-gold/5 scale-105' : 'bg-white/[0.01] border-white/10') + 
+                           (player.isOffline ? ' opacity-40' : '')">
                   
                   <!-- Rank Badge -->
                   <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
@@ -299,7 +300,7 @@
 
                   <!-- Profile -->
                   <div class="flex-1 min-w-0">
-                    <span class="text-sm font-bold text-white truncate block">{{ player.name }}</span>
+                    <span class="text-sm font-bold text-white truncate block">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</span>
                     <span class="text-[9px] uppercase tracking-wider text-white/40 font-bold">
                       {{ player.isHost ? 'Host' : 'Spieler' }}
                     </span>
@@ -368,8 +369,8 @@
               <!-- Members list -->
               <div class="flex flex-col gap-1 pl-4">
                 @for (player of team.players; track player.id) {
-                  <div class="flex items-center justify-between gap-1.5">
-                    <span class="text-[10px] font-semibold text-white/75 truncate max-w-[120px]">{{ player.name }}</span>
+                  <div class="flex items-center justify-between gap-1.5" [class.opacity-40]="player.isOffline">
+                    <span class="text-[10px] font-semibold text-white/75 truncate max-w-[120px]">{{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}</span>
                     <span class="text-[9px] font-bold text-white/40">{{ player.score }} $</span>
                   </div>
                 }
@@ -380,7 +381,7 @@
         } @else {
           <!-- SOLO MODE SIDEBAR LIST -->
           @for (player of sortedPlayers(); track player.id; let index = $index) {
-            <div class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
+            <div class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300" [class.opacity-40]="player.isOffline">
               <!-- Position -->
               <span class="text-[10px] font-bold text-white/35 w-3.5">#{{ index + 1 }}</span>
               
@@ -394,7 +395,7 @@
 
               <!-- Profile Name -->
               <div class="flex-1 min-w-0">
-                <span class="text-xs font-bold text-white truncate block">{{ player.name }}</span>
+                <span class="text-xs font-bold text-white truncate block">{{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}</span>
               </div>
 
               <!-- Score -->

@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { Peer, DataConnection } from 'peerjs';
 import { Category } from './quiz.service';
@@ -10,6 +10,7 @@ export interface Player {
   isHost: boolean;
   score: number;
   teamId?: number; // 1-indexed team identifier
+  isOffline?: boolean;
 }
 
 export type GamePhase = 'LOBBY' | 'BOARD' | 'QUESTION' | 'SUMMARY';
@@ -59,7 +60,9 @@ export class P2pService {
   // State Signals
   roomCode = signal<string | null>(null);
   isHost = signal<boolean>(false);
-  connectionState = signal<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
+  connectionState = signal<'disconnected' | 'connecting' | 'connected' | 'error'>(
+    sessionStorage.getItem('jeopardy_p2p_session') ? 'connecting' : 'disconnected'
+  );
   players = signal<Player[]>([]);
   errorMessage = signal<string>('');
   wasKicked = signal<boolean>(false);
@@ -97,7 +100,183 @@ export class P2pService {
     return this.players().find(p => p.id === myId) || null;
   });
 
-  constructor() {}
+  constructor() {
+    // Attempt session restoration if there is a saved session
+    if (sessionStorage.getItem('jeopardy_p2p_session')) {
+      this.tryRestoreSession();
+    }
+
+    // Automatically save session state whenever relevant signals change
+    effect(() => {
+      const state = this.connectionState();
+      const code = this.roomCode();
+      const isHost = this.isHost();
+      const myId = this.myPlayerId();
+      const playersList = this.players();
+      const gState = this.gameState();
+      const tMode = this.teamMode();
+      const maxTeams = this.maxTeamsLimit();
+      const maxPerTeam = this.maxPlayersPerTeam();
+
+      if (state === 'connected' && code) {
+        const me = playersList.find(p => p.id === myId) || null;
+        const sessionData = {
+          role: isHost ? 'host' : 'client',
+          roomCode: code,
+          playerName: me ? me.name : (isHost ? 'Host' : 'Spieler'),
+          playerColor: me ? me.color : '#f1b814',
+          myPlayerId: myId,
+          teamMode: tMode,
+          maxPlayers: this.maxPlayersLimit,
+          maxTeamsLimit: maxTeams,
+          maxPlayersPerTeam: maxPerTeam,
+          players: playersList,
+          gameState: gState
+        };
+        sessionStorage.setItem('jeopardy_p2p_session', JSON.stringify(sessionData));
+      } else if (state === 'disconnected' || state === 'error') {
+        sessionStorage.removeItem('jeopardy_p2p_session');
+      }
+    });
+  }
+
+  /**
+   * Attempt to restore session from sessionStorage
+   */
+  tryRestoreSession(): Promise<boolean> {
+    const dataStr = sessionStorage.getItem('jeopardy_p2p_session');
+    if (!dataStr) return Promise.resolve(false);
+
+    try {
+      const session = JSON.parse(dataStr);
+      if (!session || !session.roomCode) {
+        sessionStorage.removeItem('jeopardy_p2p_session');
+        this.connectionState.set('disconnected');
+        return Promise.resolve(false);
+      }
+
+      this.connectionState.set('connecting');
+
+      if (session.role === 'host') {
+        return this.restoreHostRoom(session);
+      } else {
+        return this.restoreClientRoom(session);
+      }
+    } catch (e) {
+      console.error('Failed to parse saved session:', e);
+      sessionStorage.removeItem('jeopardy_p2p_session');
+      this.connectionState.set('disconnected');
+      return Promise.resolve(false);
+    }
+  }
+
+  private restoreHostRoom(session: any): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.disconnect(); // Clear any existing instance state first
+      this.maxPlayersLimit = session.maxPlayers;
+      this.teamMode.set(session.teamMode);
+      this.maxTeamsLimit.set(session.maxTeamsLimit);
+      this.maxPlayersPerTeam.set(session.maxPlayersPerTeam);
+      this.wasKicked.set(false);
+      this.connectionState.set('connecting');
+      this.errorMessage.set('');
+
+      const formattedCode = session.roomCode.toUpperCase().trim();
+      
+      // Initialize Peer with host room code
+      this.peer = new Peer(formattedCode, {
+        debug: 1
+      });
+
+      this.peer.on('open', (id) => {
+        this.isHost.set(true);
+        this.roomCode.set(id);
+        this.myPlayerId.set(id);
+        
+        // Restore players, but mark everyone else as offline (waiting for them to reconnect)
+        const restoredPlayers = (session.players || []).map((p: Player) => {
+          if (p.id === id) {
+            return p; // Host is online
+          }
+          return { ...p, isOffline: true };
+        });
+        this.players.set(restoredPlayers);
+
+        // Restore game state
+        if (session.gameState) {
+          this.gameState.set(session.gameState);
+        }
+
+        this.connectionState.set('connected');
+
+        // Setup host connection listeners
+        this.setupHostListeners();
+
+        // If game was already in progress, navigate to /game
+        if (this.gameState().phase !== 'LOBBY') {
+          this.router.navigate(['/game']);
+        }
+        resolve(true);
+      });
+
+      this.peer.on('error', (err) => {
+        console.error('PeerJS Restore Host Error:', err);
+        this.connectionState.set('error');
+        if (err.type === 'unavailable-id') {
+          this.errorMessage.set(`Wiederherstellung fehlgeschlagen: Raumcode "${formattedCode}" belegt.`);
+        } else {
+          this.errorMessage.set('Verbindung zum Signalisierungsserver bei Wiederherstellung fehlgeschlagen.');
+        }
+        sessionStorage.removeItem('jeopardy_p2p_session');
+        resolve(false);
+      });
+    });
+  }
+
+  private restoreClientRoom(session: any): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.disconnect();
+      this.wasKicked.set(false);
+      this.connectionState.set('connecting');
+      this.errorMessage.set('');
+
+      const formattedCode = session.roomCode.toUpperCase().trim();
+
+      // Initialize Peer with a random ID
+      this.peer = new Peer({
+        debug: 1
+      });
+
+      this.peer.on('open', (myId) => {
+        this.myPlayerId.set(myId);
+        
+        // Connect to the Host using the room code
+        // We pass the player's profile AND the original player ID in metadata
+        const conn = this.peer!.connect(formattedCode, {
+          metadata: { 
+            name: session.playerName, 
+            color: session.playerColor, 
+            originalPlayerId: session.myPlayerId // This tells the Host who we were!
+          },
+          reliable: true
+        });
+
+        this.setupClientListeners(conn, formattedCode, () => {
+          resolve(true);
+        }, (err) => {
+          sessionStorage.removeItem('jeopardy_p2p_session');
+          resolve(false);
+        });
+      });
+
+      this.peer.on('error', (err) => {
+        console.error('PeerJS Restore Client Error:', err);
+        this.connectionState.set('error');
+        sessionStorage.removeItem('jeopardy_p2p_session');
+        resolve(false);
+      });
+    });
+  }
 
   /**
    * Initialize a new room as Host
@@ -240,6 +419,77 @@ export class P2pService {
         const playerName = metadata.name || 'Unbekannt';
         const playerColor = metadata.color || '#0052cc';
 
+        // Check if player is reconnecting with an existing session
+        const originalPlayerId = metadata.originalPlayerId;
+        if (originalPlayerId) {
+          const existingPlayerIndex = this.players().findIndex(p => p.id === originalPlayerId);
+          if (existingPlayerIndex !== -1) {
+            const existingPlayer = this.players()[existingPlayerIndex];
+            
+            // Update the connection in map
+            this.hostConnectionMap.set(playerId, conn);
+            
+            // Update player list with new Peer ID, clear isOffline
+            const updatedPlayers = [...this.players()];
+            updatedPlayers[existingPlayerIndex] = {
+              ...existingPlayer,
+              id: playerId, // Update to new Peer ID
+              isOffline: false
+            };
+            this.players.set(updatedPlayers);
+
+            // Update game state references if they reference originalPlayerId
+            const currentGameState = this.gameState();
+            let stateChanged = false;
+            let updatedBuzzedPlayerId = currentGameState.buzzedPlayerId;
+            let updatedLockedOutPlayerIds = [...currentGameState.lockedOutPlayerIds];
+
+            if (currentGameState.buzzedPlayerId === originalPlayerId) {
+              updatedBuzzedPlayerId = playerId;
+              stateChanged = true;
+            }
+            if (currentGameState.lockedOutPlayerIds.includes(originalPlayerId)) {
+              updatedLockedOutPlayerIds = currentGameState.lockedOutPlayerIds.map(id => id === originalPlayerId ? playerId : id);
+              stateChanged = true;
+            }
+
+            if (stateChanged) {
+              this.gameState.set({
+                ...currentGameState,
+                buzzedPlayerId: updatedBuzzedPlayerId,
+                lockedOutPlayerIds: updatedLockedOutPlayerIds
+              });
+            }
+
+            // Acknowledge the connection and send initial welcome with the current game state and chat
+            const ackMessage: P2pMessage = {
+              type: 'JOIN_ACK',
+              senderId: this.myPlayerId()!,
+              payload: { 
+                success: true,
+                teamMode: this.teamMode(),
+                maxTeamsLimit: this.maxTeamsLimit(),
+                maxPlayersPerTeam: this.maxPlayersPerTeam(),
+                gameState: this.gameState(),
+                chatHistory: this.chatMessages()
+              }
+            };
+            conn.send(ackMessage);
+
+            // Broadcast updated player list & game state to everyone
+            this.broadcastPlayerList();
+            this.broadcast({
+              type: 'GAME_STATE',
+              senderId: this.myPlayerId()!,
+              payload: this.gameState()
+            });
+
+            // Handle messages from this client
+            this.setupMessageListener(conn, playerId);
+            return;
+          }
+        }
+
         // Check if player limit is reached (excludes the host/owner)
         const maxAllowed = this.teamMode() 
           ? this.maxTeamsLimit() * this.maxPlayersPerTeam()
@@ -274,7 +524,7 @@ export class P2pService {
         // 3. Add player to the list
         const updatedPlayers = [
           ...this.players(),
-          { id: playerId, name: playerName, color: playerColor, isHost: false, score: 0, teamId }
+          { id: playerId, name: playerName, color: playerColor, isHost: false, score: 0, teamId, isOffline: false }
         ];
         this.players.set(updatedPlayers);
 
@@ -317,7 +567,16 @@ export class P2pService {
     });
 
     conn.on('close', () => {
-      this.disconnect();
+      const hasSavedSession = sessionStorage.getItem('jeopardy_p2p_session');
+      if (hasSavedSession && !this.wasKicked()) {
+        console.log('Connection closed unexpectedly. Attempting to reconnect...');
+        this.connectionState.set('connecting');
+        setTimeout(() => {
+          this.tryRestoreSession();
+        }, 2000);
+      } else {
+        this.disconnect();
+      }
     });
 
     conn.on('error', (err) => {
@@ -365,7 +624,12 @@ export class P2pService {
 
     conn.on('close', () => {
       this.hostConnectionMap.delete(playerId);
-      const updatedPlayers = this.players().filter(p => p.id !== playerId);
+      const updatedPlayers = this.players().map(p => {
+        if (p.id === playerId) {
+          return { ...p, isOffline: true };
+        }
+        return p;
+      });
       this.players.set(updatedPlayers);
       this.broadcastPlayerList();
     });
@@ -393,6 +657,15 @@ export class P2pService {
             this.teamMode.set(msg.payload.teamMode || false);
             this.maxTeamsLimit.set(msg.payload.maxTeamsLimit || 4);
             this.maxPlayersPerTeam.set(msg.payload.maxPlayersPerTeam || 2);
+            if (msg.payload.gameState) {
+              this.gameState.set(msg.payload.gameState);
+              if (msg.payload.gameState.phase !== 'LOBBY') {
+                this.router.navigate(['/game']);
+              }
+            }
+            if (msg.payload.chatHistory) {
+              this.chatMessages.set(msg.payload.chatHistory);
+            }
             resolve();
           } else {
             this.disconnect();
