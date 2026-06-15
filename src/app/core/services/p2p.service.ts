@@ -100,6 +100,27 @@ export class P2pService {
     return this.players().find(p => p.id === myId) || null;
   });
 
+  private getPeerOptions(): any {
+    const host = window.location.hostname;
+    const port = window.location.port ? parseInt(window.location.port, 10) : (window.location.protocol === 'https:' ? 443 : 80);
+    const secure = window.location.protocol === 'https:';
+
+    return {
+      host: host,
+      port: port,
+      path: '/peerjs',
+      secure: secure,
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      }
+    };
+  }
+
   constructor() {
     // Attempt session restoration if there is a saved session
     if (sessionStorage.getItem('jeopardy_p2p_session')) {
@@ -184,9 +205,7 @@ export class P2pService {
       const formattedCode = session.roomCode.toUpperCase().trim();
       
       // Initialize Peer with host room code
-      this.peer = new Peer(formattedCode, {
-        debug: 1
-      });
+      this.peer = new Peer(formattedCode, this.getPeerOptions());
 
       this.peer.on('open', (id) => {
         this.isHost.set(true);
@@ -243,9 +262,7 @@ export class P2pService {
       const formattedCode = session.roomCode.toUpperCase().trim();
 
       // Initialize Peer with a random ID
-      this.peer = new Peer({
-        debug: 1
-      });
+      this.peer = new Peer(this.getPeerOptions());
 
       this.peer.on('open', (myId) => {
         this.myPlayerId.set(myId);
@@ -295,9 +312,7 @@ export class P2pService {
       const formattedCode = roomCode.toUpperCase().trim();
       
       // Initialize Peer with the custom room code
-      this.peer = new Peer(formattedCode, {
-        debug: 1 // Only print errors/warnings
-      });
+      this.peer = new Peer(formattedCode, this.getPeerOptions());
 
       this.peer.on('open', (id) => {
         this.isHost.set(true);
@@ -345,9 +360,7 @@ export class P2pService {
       const formattedCode = roomCode.toUpperCase().trim();
 
       // Initialize Peer with a random ID
-      this.peer = new Peer({
-        debug: 1
-      });
+      this.peer = new Peer(this.getPeerOptions());
 
       this.peer.on('open', (myId) => {
         this.myPlayerId.set(myId);

@@ -294,7 +294,15 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(angularBuildPath, 'index.html'));
 });
 
+const { ExpressPeerServer } = require('peer');
+
 // Start Server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// Initialize and mount PeerJS server
+const peerServer = ExpressPeerServer(server, {
+  path: '/'
+});
+app.use('/peerjs', peerServer);
