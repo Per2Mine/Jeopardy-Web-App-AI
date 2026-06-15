@@ -1,5 +1,6 @@
 import { Injectable, signal, computed, inject, effect } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { Peer, DataConnection } from 'peerjs';
 import { Category } from './quiz.service';
 
@@ -52,10 +53,15 @@ export interface P2pMessage {
 })
 export class P2pService {
   private router = inject(Router);
+  private http = inject(HttpClient);
   private peer: Peer | null = null;
   private hostConnectionMap = new Map<string, DataConnection>(); // Host only: playerId -> DataConnection
   private clientConnection: DataConnection | null = null; // Client only: connection to host
   private maxPlayersLimit = 8;
+  
+  private iceServers: any[] = [
+    { urls: 'stun:stun.l.google.com:19302' }
+  ];
 
   // State Signals
   roomCode = signal<string | null>(null);
@@ -110,25 +116,7 @@ export class P2pService {
       secure: secure,
       debug: 3,
       config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:openrelay.metered.ca:80' },
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turns:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
-        ]
+        iceServers: this.iceServers
       }
     };
 
@@ -139,9 +127,24 @@ export class P2pService {
     return options;
   }
 
+  private fetchIceServers() {
+    this.http.get<{ iceServers: any[] }>('/api/webrtc/ice-servers').subscribe({
+      next: (res) => {
+        if (res && res.iceServers) {
+          this.iceServers = res.iceServers;
+        }
+      },
+      error: (err) => {
+        console.warn('Could not fetch custom ICE servers from backend, using default STUN', err);
+      }
+    });
+  }
+
 
 
   constructor() {
+    this.fetchIceServers();
+    
     // Attempt session restoration if there is a saved session
     if (sessionStorage.getItem('jeopardy_p2p_session')) {
       this.tryRestoreSession();

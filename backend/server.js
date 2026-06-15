@@ -285,6 +285,29 @@ app.post('/api/quizzes/sync', authenticateToken, async (req, res) => {
   }
 });
 
+// 10. Get WebRTC ICE Servers (STUN/TURN)
+app.get('/api/webrtc/ice-servers', (req, res) => {
+  const turnUrl = process.env.TURN_URL;
+  const turnUsername = process.env.TURN_USERNAME;
+  const turnPassword = process.env.TURN_PASSWORD;
+
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+
+  if (turnUrl && turnUsername && turnPassword) {
+    iceServers.push({
+      urls: turnUrl,
+      username: turnUsername,
+      credential: turnPassword
+    });
+  }
+
+  res.json({ iceServers });
+});
+
+
 const { ExpressPeerServer } = require('peer');
 
 // Start Server
