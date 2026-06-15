@@ -1,0 +1,424 @@
+<div class="min-h-screen w-full flex flex-col md:flex-row bg-jeopardy-dark text-white select-none">
+  
+  <!-- MAIN GAME AREA -->
+  <div class="flex-1 flex flex-col min-h-0 relative">
+    
+    <!-- Top Header bar -->
+    <header class="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-black/10 shrink-0">
+      <div class="flex items-center gap-4">
+        <app-logo size="sm"></app-logo>
+        <div class="h-4 w-[1px] bg-white/20"></div>
+        <span class="text-xs text-white/50 tracking-wider font-semibold">
+          Code: <span class="text-jeopardy-gold font-mono font-bold">{{ p2pService.roomCode() }}</span>
+        </span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        @if (p2pService.isHost()) {
+          <span class="text-[10px] bg-jeopardy-accent/20 text-jeopardy-accent border border-jeopardy-accent/30 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+            Host / Moderator
+          </span>
+          @if (p2pService.gameState().phase === 'BOARD') {
+            <app-button variant="danger" size="sm" (click)="onEndGame()">
+              Spiel beenden
+            </app-button>
+          }
+        } @else {
+          <span class="text-[10px] bg-white/5 border border-white/10 px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider text-white/60">
+            Spieler-Client
+          </span>
+        }
+      </div>
+    </header>
+
+    <!-- Content panels based on Game Phase -->
+    <main class="flex-1 p-6 md:p-8 flex items-center justify-center min-h-0 overflow-y-auto">
+      
+      <!-- PHASE A: BOARD (5x5 Jeopardy Grid) -->
+      @if (p2pService.gameState().phase === 'BOARD') {
+        <div class="w-full max-w-[95%] xl:max-w-[90%] flex flex-col gap-6 animate-fade-in">
+          
+          <div class="text-center md:text-left">
+            <h2 class="text-xl md:text-2xl font-black tracking-wide">Jeopardy Spielfeld</h2>
+            <p class="text-xs text-white/40 mt-1">
+              {{ p2pService.isHost() ? 'Wähle eine Kachel aus, um die Frage zu öffnen.' : 'Der Host wählt als Nächstes eine Frage aus.' }}
+            </p>
+          </div>
+
+          <!-- Board Grid -->
+          <div 
+            [style.grid-template-columns]="'repeat(' + categories.length + ', minmax(0, 1fr))'"
+            class="grid gap-3 md:gap-4 lg:gap-5">
+            
+            <!-- Category Headers -->
+            @for (cat of categories; track cat.name; let catIdx = $index) {
+              <div class="bg-jeopardy-blue/30 border border-jeopardy-accent/30 rounded-xl p-3 flex items-center justify-center text-center font-extrabold text-[10px] sm:text-xs md:text-sm lg:text-base uppercase tracking-wider text-white min-h-[50px] md:min-h-[70px] lg:min-h-[80px] shadow-lg">
+                {{ cat.name }}
+              </div>
+            }
+
+            <!-- Values Grid Cells -->
+            @for (rowIdx of rows; track rowIdx) {
+              @for (cat of categories; track cat.name; let catIdx = $index) {
+                @let question = cat.questions[rowIdx];
+                @let answered = isQuestionAnswered(catIdx, rowIdx);
+
+                @if (answered) {
+                  <!-- Played question card (empty slot) -->
+                  <div class="bg-black/20 border border-white/5 opacity-10 flex items-center justify-center rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px]">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                } @else {
+                  <!-- Active question card -->
+                  @if (p2pService.isHost()) {
+                    <!-- Host: Clickable -->
+                    <button
+                      (click)="onSelectQuestion(catIdx, rowIdx)"
+                      class="bg-jeopardy-blue/20 hover:bg-jeopardy-accent/15 border border-white/10 hover:border-jeopardy-accent rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px] flex flex-col items-center justify-center font-black text-lg sm:text-xl md:text-2xl lg:text-2xl text-jeopardy-gold cursor-pointer transform hover:-translate-y-1 hover:shadow-lg active:scale-95 transition-all duration-300">
+                      {{ question.value }} $
+                    </button>
+                  } @else {
+                    <!-- Guest: Static display -->
+                    <div class="bg-jeopardy-blue/20 border border-white/10 rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px] flex items-center justify-center font-black text-lg sm:text-xl md:text-2xl lg:text-2xl text-jeopardy-gold">
+                      {{ question.value }} $
+                    </div>
+                  }
+                }
+              }
+            }
+
+          </div>
+
+        </div>
+      }
+
+      <!-- PHASE B: QUESTION PRESENTATION -->
+      @if (p2pService.gameState().phase === 'QUESTION') {
+        @let activeQ = p2pService.gameState().activeQuestion;
+        @let buzzedPlayerId = p2pService.gameState().buzzedPlayerId;
+        @let isBuzzed = buzzedPlayerId !== null;
+
+        <div 
+          [style.box-shadow]="isBuzzed ? 'inset 0 0 80px ' + getBuzzedPlayerColor() + '25' : ''"
+          class="w-full max-w-3xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 relative transition-all duration-500 shadow-2xl">
+          
+          <!-- Category and Value badge -->
+          <div class="bg-jeopardy-blue/40 border border-jeopardy-accent/30 px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase text-jeopardy-gold">
+            {{ categories[activeQ?.categoryIndex || 0].name }} • {{ activeQ?.value }} $
+          </div>
+
+          <!-- Question Text -->
+          <div class="w-full py-6 flex items-center justify-center min-h-[140px] text-center border-b border-white/5">
+            <p class="text-2xl md:text-3xl font-extrabold leading-relaxed text-white max-w-2xl filter drop-shadow-[0_2px_10px_rgba(255,255,255,0.1)]">
+              „{{ activeQ?.text }}“
+            </p>
+          </div>
+
+          <!-- Buzzer Area / Player Interactions -->
+          <div class="w-full flex flex-col items-center gap-6">
+
+            <!-- STATE 1: Player Buzzed -->
+            @if (isBuzzed) {
+              <div 
+                [style.border-color]="getBuzzedPlayerColor()"
+                [style.background-color]="getBuzzedPlayerColor() + '10'"
+                class="w-full max-w-lg p-5 rounded-2xl border flex flex-col items-center gap-3 animate-scale-up">
+                
+                <div 
+                  [style.background-color]="getBuzzedPlayerColor()"
+                  class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shadow-md animate-bounce"
+                  [ngClass]="getBuzzedPlayerColor() === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                  {{ getBuzzedPlayerName().slice(0,2).toUpperCase() }}
+                </div>
+
+                <div class="text-center">
+                  <h4 class="text-base font-extrabold text-white">
+                    {{ getBuzzedPlayerName() }} hat gebuzzert!
+                  </h4>
+                  <p class="text-[10px] text-white/50 uppercase tracking-widest mt-1">
+                    Gibt jetzt die Antwort...
+                  </p>
+                </div>
+
+                <!-- Host Moderator Controls -->
+                @if (p2pService.isHost()) {
+                  <div class="flex gap-4 w-full mt-4">
+                    <app-button 
+                      variant="primary" 
+                      [fullWidth]="true" 
+                      (click)="onAwardPoints(true)">
+                      Richtig (+{{ activeQ?.value }} $)
+                    </app-button>
+                    <app-button 
+                      variant="danger" 
+                      [fullWidth]="true" 
+                      (click)="onAwardPoints(false)">
+                      Falsch (-{{ activeQ?.value }} $)
+                    </app-button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- STATE 2: Waiting for Buzz -->
+            @if (!isBuzzed) {
+              @if (p2pService.isHost()) {
+                <!-- Host screen: show correct answer and moderator skip -->
+                <div class="w-full max-w-md bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex flex-col items-center gap-4 text-center">
+                  <div class="flex flex-col gap-1">
+                    <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Antwort-Schlüssel</span>
+                    <span class="text-base font-extrabold text-jeopardy-gold">{{ activeQ?.answer }}</span>
+                  </div>
+                  
+                  <div class="h-[1px] w-full bg-white/5"></div>
+                  
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-jeopardy-accent animate-ping"></span>
+                    <span class="text-[11px] text-white/50 font-semibold">Warte auf Buzzer der Spieler...</span>
+                  </div>
+
+                  <app-button 
+                    variant="ghost" 
+                    size="sm" 
+                    [fullWidth]="true" 
+                    (click)="onSkipQuestion()">
+                    Niemand weiß es (Überspringen)
+                  </app-button>
+                </div>
+              } @else {
+                <!-- Guest screen: Big satisfy buzzer button -->
+                <div class="flex flex-col items-center gap-2">
+                  <button 
+                    [disabled]="isBuzzerDisabled()"
+                    (click)="p2pService.buzz()"
+                    [class]="isBuzzerDisabled() ? 
+                      'w-40 h-40 rounded-full bg-neutral-850 border-8 border-neutral-750 shadow-none flex items-center justify-center text-white/10 text-2xl font-black uppercase tracking-widest cursor-not-allowed select-none transition-all' : 
+                      'w-40 h-40 rounded-full bg-red-600 hover:bg-red-500 active:scale-90 border-8 border-red-800 shadow-xl shadow-red-600/30 flex items-center justify-center text-white text-2xl font-black uppercase tracking-widest cursor-pointer select-none transition-all duration-200 transform hover:-translate-y-1'">
+                    BUZZ!
+                  </button>
+                  <span 
+                    [class]="isBuzzerDisabled() ? 'text-[10px] text-red-500 font-bold uppercase tracking-widest mt-2 text-center max-w-[200px]' : 'text-[10px] text-white/40 uppercase tracking-widest mt-2 animate-pulse'">
+                    {{ getBuzzerSubtext() }}
+                  </span>
+                </div>
+              }
+            }
+
+          </div>
+
+        </div>
+      }
+
+      <!-- PHASE C: GAME SUMMARY (Final Leaderboard) -->
+      @if (p2pService.gameState().phase === 'SUMMARY') {
+        <div class="w-full max-w-xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 shadow-2xl animate-fade-in">
+          
+          <div class="text-center flex flex-col items-center gap-2">
+            <span class="text-xs font-bold text-jeopardy-accent uppercase tracking-widest">Spiel Beendet</span>
+            <h2 class="text-3xl font-black text-white">🏆 Endergebnis 🏆</h2>
+            <p class="text-xs text-white/50 max-w-xs mt-1">
+              Das Spiel ist vorbei. Hier ist die finale Rangliste der Spieler.
+            </p>
+          </div>
+
+          <!-- Podium / Leaderboard display (Solo Mode vs Team Mode) -->
+          <div class="w-full flex flex-col gap-4">
+            @if (p2pService.teamMode()) {
+              @for (team of sortedTeams(); track team.id; let index = $index) {
+                <div 
+                  [class]="'flex flex-col gap-3 p-4 border rounded-2xl transition-all duration-300 ' + 
+                           (index === 0 ? 'bg-jeopardy-gold/15 border-jeopardy-gold shadow-lg shadow-jeopardy-gold/5 scale-105' : 'bg-white/[0.01] border-white/10')">
+                  
+                  <!-- Team Header Info -->
+                  <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                    <div class="flex items-center gap-3">
+                      <!-- Rank Badge -->
+                      <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
+                           [ngClass]="index === 0 ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-white/10 text-white'">
+                        {{ index + 1 }}
+                      </div>
+                      
+                      <!-- Team Indicator -->
+                      <div class="flex items-center gap-2">
+                        <span [class]="'w-3 h-3 rounded-full ' + 
+                                      (team.id === 1 ? 'bg-blue-500' : 
+                                       team.id === 2 ? 'bg-red-500' : 
+                                       team.id === 3 ? 'bg-green-500' : 
+                                       team.id === 4 ? 'bg-purple-500' : 
+                                       team.id === 5 ? 'bg-pink-500' : 'bg-yellow-500')">
+                        </span>
+                        <span class="text-base font-black text-white font-sans uppercase tracking-wider">Team {{ team.id }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Team Score -->
+                    <div class="text-lg font-black text-jeopardy-gold">
+                      {{ team.score }} $
+                    </div>
+                  </div>
+
+                  <!-- Team Members List -->
+                  <div class="flex flex-wrap gap-2.5 p-1">
+                    @for (player of team.players; track player.id) {
+                      <div class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/5">
+                        <div 
+                          [style.background-color]="player.color"
+                          class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm shrink-0"
+                          [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                          {{ player.name.slice(0, 2).toUpperCase() }}
+                        </div>
+                        <span class="text-xs font-bold text-white/90 truncate max-w-[100px]">{{ player.name }}</span>
+                        <span class="text-[10px] font-black text-jeopardy-gold/70">({{ player.score }} $)</span>
+                      </div>
+                    }
+                  </div>
+
+                </div>
+              }
+            } @else {
+              @for (player of sortedPlayers(); track player.id; let index = $index) {
+                <div 
+                  [class]="'flex items-center gap-4 p-4 border rounded-2xl transition-all duration-300 ' + 
+                           (index === 0 ? 'bg-jeopardy-gold/15 border-jeopardy-gold shadow-lg shadow-jeopardy-gold/5 scale-105' : 'bg-white/[0.01] border-white/10')">
+                  
+                  <!-- Rank Badge -->
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
+                       [ngClass]="index === 0 ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-white/10 text-white'">
+                    {{ index + 1 }}
+                  </div>
+
+                  <!-- Avatar -->
+                  <div 
+                    [style.background-color]="player.color"
+                    class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shadow-sm shrink-0"
+                    [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                    {{ player.name.slice(0, 2).toUpperCase() }}
+                  </div>
+
+                  <!-- Profile -->
+                  <div class="flex-1 min-w-0">
+                    <span class="text-sm font-bold text-white truncate block">{{ player.name }}</span>
+                    <span class="text-[9px] uppercase tracking-wider text-white/40 font-bold">
+                      {{ player.isHost ? 'Host' : 'Spieler' }}
+                    </span>
+                  </div>
+
+                  <!-- Score -->
+                  <div class="text-base font-black text-jeopardy-gold">
+                    {{ player.score }} $
+                  </div>
+                </div>
+              }
+            }
+          </div>
+
+          <div class="w-full border-t border-white/10 pt-6 flex flex-col gap-3">
+            <app-button 
+              variant="ghost" 
+              size="md" 
+              [fullWidth]="true" 
+              (click)="onLeaveLobby()">
+              Lobby verlassen
+            </app-button>
+          </div>
+
+        </div>
+      }
+
+    </main>
+
+  </div>
+
+  <!-- RIGHT SIDEBAR: SCOREBOARD & PLAYERS -->
+  <aside class="w-full md:w-80 border-t md:border-t-0 md:border-l border-white/10 bg-black/15 p-6 flex flex-col gap-6 shrink-0 justify-between">
+    
+    <!-- Scoreboard List -->
+    <div class="flex flex-col gap-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-widest text-white/40">Scoreboard</h3>
+        <span class="text-[10px] text-white/30">
+          {{ p2pService.teamMode() ? p2pService.teamsArray().length + ' Teams' : p2pService.players().length + ' Spieler' }}
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        @if (p2pService.teamMode()) {
+          <!-- TEAM MODE SIDEBAR LIST -->
+          @for (team of sortedTeams(); track team.id; let index = $index) {
+            <div class="flex flex-col gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
+              
+              <!-- Team Header -->
+              <div class="flex items-center justify-between pb-1.5 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                  <span class="text-[9px] font-bold text-white/35">#{{ index + 1 }}</span>
+                  <span [class]="'w-2 h-2 rounded-full ' + 
+                                (team.id === 1 ? 'bg-blue-500' : 
+                                 team.id === 2 ? 'bg-red-500' : 
+                                 team.id === 3 ? 'bg-green-500' : 
+                                 team.id === 4 ? 'bg-purple-500' : 
+                                 team.id === 5 ? 'bg-pink-500' : 'bg-yellow-500')">
+                  </span>
+                  <span class="text-xs font-black text-white">Team {{ team.id }}</span>
+                </div>
+                <span class="text-xs font-black text-jeopardy-gold">{{ team.score }} $</span>
+              </div>
+
+              <!-- Members list -->
+              <div class="flex flex-col gap-1 pl-4">
+                @for (player of team.players; track player.id) {
+                  <div class="flex items-center justify-between gap-1.5">
+                    <span class="text-[10px] font-semibold text-white/75 truncate max-w-[120px]">{{ player.name }}</span>
+                    <span class="text-[9px] font-bold text-white/40">{{ player.score }} $</span>
+                  </div>
+                }
+              </div>
+
+            </div>
+          }
+        } @else {
+          <!-- SOLO MODE SIDEBAR LIST -->
+          @for (player of sortedPlayers(); track player.id; let index = $index) {
+            <div class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
+              <!-- Position -->
+              <span class="text-[10px] font-bold text-white/35 w-3.5">#{{ index + 1 }}</span>
+              
+              <!-- Avatar -->
+              <div 
+                [style.background-color]="player.color"
+                class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm shrink-0"
+                [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                {{ player.name.slice(0, 2).toUpperCase() }}
+              </div>
+
+              <!-- Profile Name -->
+              <div class="flex-1 min-w-0">
+                <span class="text-xs font-bold text-white truncate block">{{ player.name }}</span>
+              </div>
+
+              <!-- Score -->
+              <div class="text-xs font-black text-jeopardy-gold">
+                {{ player.score }} $
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Bottom Sidebar Quit / Back Action -->
+    <div class="border-t border-white/10 pt-4 mt-6">
+      <button 
+        (click)="onLeaveLobby()"
+        class="text-xs text-white/40 hover:text-red-500 transition-colors flex items-center gap-2 cursor-pointer w-full py-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+        </svg>
+        <span>Spiel abbrechen / Verlassen</span>
+      </button>
+    </div>
+
+  </aside>
+
+</div>

@@ -1,0 +1,59 @@
+/* Custom range input styling matching a switch track and slider handle */
+.custom-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px; /* thick capsule track */
+  background: rgba(10, 25, 79, 0.3); /* jeopardy-blue with transparency */
+  border: 1px solid rgba(0, 82, 204, 0.2); /* jeopardy-accent with transparency */
+  border-radius: 9999px; /* fully rounded track */
+  outline: none;
+  padding: 0 4px;
+  transition: all 0.3s ease;
+}
+
+.custom-range-slider:hover {
+  background: rgba(10, 25, 79, 0.5);
+  border-color: rgba(0, 82, 204, 0.4);
+}
+
+.custom-range-slider:focus {
+  box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.5);
+}
+
+/* Chrome, Safari, Opera, and Edge Chromium */
+.custom-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f1b814; /* jeopardy-gold */
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.custom-range-slider::-webkit-slider-thumb:hover {
+  background: #ffd256; /* jeopardy-gold-light */
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(241, 184, 20, 0.4);
+}
+
+/* Firefox */
+.custom-range-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: #f1b814; /* jeopardy-gold */
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.custom-range-slider::-moz-range-thumb:hover {
+  background: #ffd256; /* jeopardy-gold-light */
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(241, 184, 20, 0.4);
+}

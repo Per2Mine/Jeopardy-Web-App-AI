@@ -1,0 +1,5 @@
+@media (min-width: 640px) {
+  .dynamic-quiz-grid {
+    grid-template-columns: var(--grid-cols-dynamic);
+  }
+}

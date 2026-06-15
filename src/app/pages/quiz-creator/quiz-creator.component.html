@@ -1,0 +1,252 @@
+<div class="min-h-screen w-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-jeopardy-blue/30 via-jeopardy-dark to-jeopardy-dark p-4 md:p-8 flex flex-col gap-6 md:gap-8">
+  
+  <!-- Header Bar -->
+  <div class="w-full max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/[0.02] border border-white/10 p-5 rounded-3xl backdrop-blur-md shadow-lg">
+    <div class="flex items-center gap-3">
+      <app-logo size="sm"></app-logo>
+      <div class="h-6 w-[1px] bg-white/20 hidden sm:block"></div>
+      <div>
+        <h1 class="text-lg font-black text-white leading-tight">{{ editingId() ? 'Quiz bearbeiten' : 'Quiz-Creator' }}</h1>
+        <p class="text-xs text-white/50">{{ editingId() ? 'Bearbeite deine benutzerdefinierte Jeopardy-Vorlage' : 'Erstelle deine eigene Jeopardy-Vorlage' }}</p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3 w-full sm:w-auto">
+      <app-button 
+        variant="ghost" 
+        size="md" 
+        (click)="onCancel()"
+        class="flex-1 sm:flex-none">
+        Abbrechen
+      </app-button>
+      <app-button 
+        variant="primary" 
+        size="md" 
+        (click)="onSaveQuiz()"
+        class="flex-1 sm:flex-none shadow-lg shadow-jeopardy-accent/20">
+        {{ editingId() ? 'Änderungen speichern' : 'Vorlage speichern' }}
+      </app-button>
+    </div>
+  </div>
+
+  <!-- Main Content Form -->
+  <div class="w-full max-w-7xl mx-auto flex flex-col gap-6">
+    
+    <!-- Meta Configuration Card -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white/[0.02] border border-white/5 p-6 rounded-3xl backdrop-blur-md">
+      
+      <!-- Quiz Name -->
+      <div class="md:col-span-1">
+        <app-input
+          label="Quiz-Name"
+          placeholder="z.B. Kneipenquiz Sommer 2026"
+          [(value)]="quizName"
+          [maxLength]="30">
+        </app-input>
+      </div>
+
+      <!-- Fragen pro Kategorie (Zeilenanzahl) -->
+      <div class="flex flex-col gap-1.5">
+        <span class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">Fragen pro Kategorie</span>
+        <div class="flex p-1 bg-black/30 rounded-xl border border-white/5 h-12 items-center">
+          @for (count of [3, 4, 5, 6]; track count) {
+            <button 
+              type="button"
+              (click)="onNumQuestionsChange(count)"
+              [class]="'flex-1 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 cursor-pointer text-center ' + 
+                       (numQuestions() === count ? 'bg-jeopardy-accent text-white shadow-lg shadow-jeopardy-accent/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
+              {{ count }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Progress Card -->
+      <div class="flex flex-col justify-center p-4 bg-jeopardy-blue/10 border border-white/5 rounded-2xl">
+        <span class="text-xs font-bold text-white/50 uppercase tracking-widest mb-1.5">Ausfüll-Status</span>
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex-1 bg-black/30 rounded-full h-3.5 overflow-hidden border border-white/5 p-[2px]">
+            <div 
+              [style.width.%]="(getFilledCellsCount() / totalQuestionsCount()) * 100"
+              class="h-full bg-[linear-gradient(90deg,_var(--color-jeopardy-accent),_var(--color-jeopardy-gold))] rounded-full transition-all duration-500">
+            </div>
+          </div>
+          <span class="text-sm font-black text-white shrink-0">
+            {{ getFilledCellsCount() }} / {{ totalQuestionsCount() }} <span class="text-white/40 font-bold text-xs">Fragen</span>
+          </span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Error Banner -->
+    @if (errorMessage()) {
+      <div class="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm font-semibold flex items-center gap-3 animate-fade-in">
+        <svg class="w-5 h-5 shrink-0 text-red-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <!-- Dynamic Board Grid -->
+    <div 
+      [style.--grid-cols-dynamic]="'repeat(' + (categories().length < 10 ? categories().length + 1 : categories().length) + ', minmax(0, 1fr))'"
+      class="grid grid-cols-1 sm:grid dynamic-quiz-grid gap-4">
+      
+      @for (cat of categories(); track cIndex; let cIndex = $index) {
+        <div class="flex flex-col gap-4 bg-white/[0.01] border border-white/5 p-4 rounded-2xl backdrop-blur-sm">
+          
+          <!-- Category Header Name Input & Delete Button -->
+          <div class="pb-2 border-b border-white/5 flex gap-2 items-end">
+            <div class="flex-1">
+              <app-input
+                [label]="'Kategorie ' + (cIndex + 1)"
+                placeholder="Themenname"
+                [value]="cat.name"
+                (valueChange)="onCategoryNameChange(cIndex, $event)"
+                [maxLength]="18">
+              </app-input>
+            </div>
+            @if (categories().length > 1) {
+              <button 
+                type="button"
+                (click)="removeCategory(cIndex)"
+                class="p-2 text-white/30 hover:text-red-500 rounded hover:bg-white/5 mb-0.5 shrink-0 transition-colors cursor-pointer"
+                title="Kategorie löschen">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+              </button>
+            }
+          </div>
+
+          <!-- Value Cards -->
+          <div class="flex flex-col gap-3">
+            @for (q of cat.questions.slice(0, numQuestions()); track qIndex; let qIndex = $index) {
+              @let filled = isCellFilled(cIndex, qIndex);
+
+              <button
+                type="button"
+                (click)="openEditModal(cIndex, qIndex)"
+                [class]="'w-full py-4 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all duration-300 transform active:scale-95 cursor-pointer relative ' + 
+                         (filled ? 'bg-jeopardy-accent/10 border-jeopardy-accent shadow-md shadow-jeopardy-accent/5 hover:bg-jeopardy-accent/20' : 
+                                   'bg-black/20 border-white/5 hover:border-white/15 hover:bg-white/[0.02] border-dashed')">
+                
+                <span [class]="'text-sm font-extrabold tracking-wider ' + (filled ? 'text-jeopardy-gold' : 'text-white/40')">
+                  {{ q.value }} $
+                </span>
+
+                <!-- Indicator Badges -->
+                @if (filled) {
+                  <!-- Green check dot -->
+                  <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-green-500 shadow-sm shadow-green-500/50"></span>
+                  <span class="text-[9px] text-white/50 font-semibold truncate max-w-[90%] px-1">Ausgefüllt</span>
+                } @else {
+                  <span class="text-[9px] text-white/25 font-bold uppercase tracking-wider">Muster</span>
+                }
+              </button>
+            }
+          </div>
+
+        </div>
+      }
+
+      <!-- Add Category Column Button -->
+      @if (categories().length < 10) {
+        <button 
+          type="button"
+          (click)="addCategory()"
+          class="flex flex-col items-center justify-center gap-3 p-6 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-white/20 border-dashed rounded-2xl cursor-pointer min-h-[300px] transition-all duration-300 group">
+          <div class="w-12 h-12 rounded-full bg-jeopardy-accent/10 group-hover:bg-jeopardy-accent/20 flex items-center justify-center text-jeopardy-accent transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+            </svg>
+          </div>
+          <span class="text-xs font-bold text-white/50 group-hover:text-white transition-colors uppercase tracking-widest text-center">Kategorie hinzufügen</span>
+        </button>
+      }
+
+    </div>
+
+  </div>
+
+  <!-- 3. QUESTION EDITOR OVERLAY MODAL -->
+  @if (activeCell(); as cell) {
+    @let activeCatName = categories()[cell.cIndex].name || ('Kategorie ' + (cell.cIndex + 1));
+    @let activeValue = categories()[cell.cIndex].questions[cell.qIndex].value;
+
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      
+      <!-- Backdrop -->
+      <div 
+        (click)="closeEditModal()"
+        class="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity z-40">
+      </div>
+
+      <!-- Modal Box -->
+      <div class="relative max-w-lg w-full bg-jeopardy-dark/95 border border-white/10 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-50 animate-scale-in">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center pb-4 border-b border-white/10">
+          <div>
+            <span class="text-[10px] font-bold text-jeopardy-accent uppercase tracking-widest">
+              {{ activeCatName }} • Fragewert: {{ activeValue }} $
+            </span>
+            <h3 class="text-xl font-black text-white mt-1">
+              Antwort & Frage bearbeiten
+            </h3>
+          </div>
+          <button 
+            (click)="closeEditModal()"
+            class="p-2 text-white/40 hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="flex flex-col gap-5">
+          
+          <app-input
+            label="Die Antwort (wird den Spielern gezeigt)"
+            placeholder="z.B. Dieser italienische Klempner mit roter Mütze ist das Maskottchen von Nintendo."
+            type="textarea"
+            [rows]="4"
+            [(value)]="modalQuestionText"
+            [maxLength]="120">
+          </app-input>
+
+          <app-input
+            label="Die Frage (das gesuchte Lösungswort / Name)"
+            placeholder="z.B. Mario"
+            [(value)]="modalAnswerText"
+            [maxLength]="30">
+          </app-input>
+
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3 justify-end border-t border-white/5 pt-4 mt-2">
+          <app-button 
+            variant="ghost" 
+            size="md" 
+            (click)="closeEditModal()">
+            Abbrechen
+          </app-button>
+          <app-button 
+            variant="primary" 
+            size="md" 
+            (click)="saveActiveCell()">
+            Speichern
+          </app-button>
+        </div>
+
+      </div>
+
+    </div>
+  }
+
+</div>

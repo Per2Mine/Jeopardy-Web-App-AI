@@ -1,0 +1,21 @@
+<div class="flex flex-col items-center select-none">
+  <div 
+    [class]="'font-black uppercase italic text-center select-none ' + logoClass()">
+    <span class="bg-gradient-to-r from-jeopardy-gold via-yellow-400 to-jeopardy-goldLight bg-clip-text text-transparent filter drop-shadow-[0_4px_12px_rgba(241,184,20,0.4)]">
+      Jeopardy
+    </span>
+    <span class="text-jeopardy-gold font-extrabold animate-pulse ml-0.5 filter drop-shadow-[0_0_8px_rgba(241,184,20,0.8)]">
+      !
+    </span>
+  </div>
+  
+  @if (size() === 'lg' || size() === 'md') {
+    <div class="mt-1 flex items-center gap-1.5">
+      <div class="h-[1px] w-8 bg-gradient-to-r from-transparent to-jeopardy-accent"></div>
+      <span class="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase text-jeopardy-accent">
+        Party Edition
+      </span>
+      <div class="h-[1px] w-8 bg-gradient-to-l from-transparent to-jeopardy-accent"></div>
+    </div>
+  }
+</div>

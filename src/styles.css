@@ -1,1 +1,43 @@
-/* You can add global styles to this file, and also import other style files */
+@import "tailwindcss";
+
+/* Explicitly tell Tailwind v4 to scan our source files relative to this stylesheet */
+@source "./app/**/*.{html,ts}";
+@source "./index.html";
+
+@theme {
+  --color-jeopardy-dark: #03081e;
+  --color-jeopardy-blue: #0a194f;
+  --color-jeopardy-accent: #0052cc;
+  --color-jeopardy-gold: #f1b814;
+  --color-jeopardy-gold-light: #ffd256;
+  
+  --font-sans: 'Outfit', 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--color-jeopardy-dark);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-jeopardy-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
