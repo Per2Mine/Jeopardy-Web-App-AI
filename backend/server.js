@@ -297,8 +297,12 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
   ];
 
   if (turnUrl && turnUsername && turnPassword) {
+    const urls = turnUrl.includes(',')
+      ? turnUrl.split(',').map(u => u.trim())
+      : turnUrl.trim();
+
     iceServers.push({
-      urls: turnUrl,
+      urls: urls,
       username: turnUsername,
       credential: turnPassword
     });
@@ -306,6 +310,7 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
 
   res.json({ iceServers });
 });
+
 
 
 const { ExpressPeerServer } = require('peer');
