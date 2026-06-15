@@ -101,9 +101,14 @@ export class P2pService {
   });
 
   private getPeerOptions(): any {
-    return {
+    const host = window.location.hostname;
+    const secure = window.location.protocol === 'https:';
+
+    const options: any = {
+      host: host,
       path: '/peerjs',
-      debug: 1,
+      secure: secure,
+      debug: 3,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -112,7 +117,14 @@ export class P2pService {
         ]
       }
     };
+
+    if (window.location.port) {
+      options.port = parseInt(window.location.port, 10);
+    }
+
+    return options;
   }
+
 
 
   constructor() {
