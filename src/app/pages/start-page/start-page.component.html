@@ -171,6 +171,37 @@
               </div>
             </div>
 
+            <!-- Countdown & Buzzer Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl">
+              <!-- Buzzer Timeout Range Slider -->
+              <div class="flex flex-col gap-1.5 justify-center">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1 select-none">
+                  Antwortzeit: 
+                  <span class="text-jeopardy-gold font-extrabold text-sm ml-1">{{ formatBuzzerTimeout(buzzerTimeout()) }}</span>
+                </label>
+                <div class="relative flex items-center h-10">
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="90" 
+                    step="5"
+                    [value]="buzzerTimeout()" 
+                    (input)="onBuzzerTimeoutChange($event)"
+                    class="custom-range-slider w-full cursor-pointer">
+                </div>
+              </div>
+
+              <!-- Deduct Points on Timeout Toggle -->
+              <div class="flex items-center justify-center p-3 bg-jeopardy-blue/10 border border-white/5 rounded-lg h-full">
+                <app-toggle 
+                  label="Punkte abziehen bei Zeitablauf (Erstversuch)" 
+                  [checked]="deductPointsOnTimeout()" 
+                  (checkedChange)="onDeductPointsChange($event)"
+                  class="w-full">
+                </app-toggle>
+              </div>
+            </div>
+
             <!-- Team Size Slider (only shown in team mode) -->
             @if (teamMode()) {
               <div class="flex flex-col gap-1.5 p-4 bg-white/[0.02] border border-white/5 rounded-xl animate-fade-in">

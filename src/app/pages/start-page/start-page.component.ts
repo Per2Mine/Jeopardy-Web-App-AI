@@ -70,6 +70,8 @@ export class StartPageComponent {
   teamSize = signal('2');
   teamMode = signal(false);
   selectedTemplate = signal('general');
+  buzzerTimeout = signal('10');
+  deductPointsOnTimeout = signal(false);
 
   canStartGame = computed(() => {
     const guests = this.p2pService.players().filter(p => !p.isHost);
@@ -163,6 +165,28 @@ export class StartPageComponent {
     this.teamSize.set(input.value);
   }
 
+  onBuzzerTimeoutChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.buzzerTimeout.set(input.value);
+  }
+
+  formatBuzzerTimeout(valueStr: string): string {
+    const value = parseInt(valueStr, 10);
+    if (value === 0) {
+      return 'Deaktiviert (Kein Countdown)';
+    }
+    if (value >= 60) {
+      const mins = Math.floor(value / 60);
+      const secs = value % 60;
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}s`;
+    }
+    return `${value}s`;
+  }
+
+  onDeductPointsChange(checked: boolean) {
+    this.deductPointsOnTimeout.set(checked);
+  }
+
   onTeamModeChange(checked: boolean) {
     this.teamMode.set(checked);
     if (checked) {
@@ -179,6 +203,10 @@ export class StartPageComponent {
     return name.slice(0, 2).toUpperCase();
   }
 
+  onAvatarColorClick(hex: string) {
+    this.selectedColor.set(hex);
+  }
+
   getPlayersInTeam(teamId: number): Player[] {
     return this.p2pService.players().filter(p => p.teamId === teamId);
   }
@@ -192,8 +220,8 @@ export class StartPageComponent {
       this.joinError.set('Bitte gib einen Namen ein.');
       return;
     }
-    if (this.roomCode().trim().length !== 6) {
-      this.joinError.set('Der Raumcode muss genau 6 Zeichen lang sein.');
+    if (!this.roomCode().trim()) {
+      this.joinError.set('Bitte gib einen Raumcode ein.');
       return;
     }
     this.joinError.set('');
@@ -230,7 +258,9 @@ export class StartPageComponent {
         this.selectedColor(),
         parseInt(this.maxPlayers()),
         this.teamMode(),
-        parseInt(this.teamSize())
+        parseInt(this.teamSize()),
+        parseInt(this.buzzerTimeout()),
+        this.deductPointsOnTimeout()
       );
     } catch (err: any) {
       this.joinError.set(this.p2pService.errorMessage() || 'Raumerstellung fehlgeschlagen.');
