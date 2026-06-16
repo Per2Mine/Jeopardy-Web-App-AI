@@ -41,7 +41,7 @@
           <div class="text-center md:text-left">
             <h2 class="text-xl md:text-2xl font-black tracking-wide">Jeopardy Spielfeld</h2>
             <p class="text-xs text-white/40 mt-1">
-              {{ p2pService.isHost() ? 'Wähle eine Kachel aus, um die Frage zu öffnen.' : 'Der Host wählt als Nächstes eine Frage aus.' }}
+              {{ getBoardInstructionText() }}
             </p>
           </div>
 
@@ -72,23 +72,110 @@
                   </div>
                 } @else {
                   <!-- Active question card -->
-                  @if (p2pService.isHost()) {
-                    <!-- Host: Clickable -->
+                  @let cardVoters = getQuestionVoters(catIdx, rowIdx);
+                  @let isClickable = p2pService.isHost() || canISelectOrVote();
+                  @let hasVotes = cardVoters.length > 0;
+
+                  @if (isClickable) {
                     <button
-                      (click)="onSelectQuestion(catIdx, rowIdx)"
-                      class="bg-jeopardy-blue/20 hover:bg-jeopardy-accent/15 border border-white/10 hover:border-jeopardy-accent rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px] flex flex-col items-center justify-center font-black text-lg sm:text-xl md:text-2xl lg:text-2xl text-jeopardy-gold cursor-pointer transform hover:-translate-y-1 hover:shadow-lg active:scale-95 transition-all duration-300">
-                      {{ question.value }} $
+                      (click)="onCardClick(catIdx, rowIdx)"
+                      [style.border-color]="getCardBorderColor(catIdx, rowIdx)"
+                      [style.box-shadow]="hasVotes ? '0 0 15px ' + getCardBorderColor(catIdx, rowIdx) + '40' : ''"
+                      [class]="'bg-jeopardy-blue/20 hover:bg-jeopardy-accent/15 border rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px] flex flex-col items-center justify-center font-black text-lg sm:text-xl md:text-2xl lg:text-2xl text-jeopardy-gold cursor-pointer transform hover:-translate-y-1 hover:shadow-lg active:scale-95 transition-all duration-300 relative ' + 
+                               (hasVotes ? 'border-2' : 'border-white/10 hover:border-jeopardy-accent')">
+                      
+                      <span>{{ question.value }} $</span>
+
+                      <!-- Voter Avatars -->
+                      @if (hasVotes) {
+                        <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex -space-x-1 overflow-hidden">
+                          @for (voter of cardVoters; track voter.id) {
+                            <div 
+                              [style.background-color]="voter.color"
+                              [title]="voter.name"
+                              class="w-4 h-4 rounded-full border border-jeopardy-dark flex items-center justify-center text-[7px] font-extrabold text-white shrink-0 shadow-sm"
+                              [ngClass]="voter.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                              {{ voter.name.slice(0, 1).toUpperCase() }}
+                            </div>
+                          }
+                        </div>
+                      }
                     </button>
                   } @else {
-                    <!-- Guest: Static display -->
-                    <div class="bg-jeopardy-blue/20 border border-white/10 rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px] flex items-center justify-center font-black text-lg sm:text-xl md:text-2xl lg:text-2xl text-jeopardy-gold">
-                      {{ question.value }} $
+                    <div 
+                      [style.border-color]="getCardBorderColor(catIdx, rowIdx)"
+                      [style.box-shadow]="hasVotes ? '0 0 15px ' + getCardBorderColor(catIdx, rowIdx) + '40' : ''"
+                      [class]="'bg-jeopardy-blue/20 border rounded-xl min-h-[50px] sm:min-h-[65px] md:min-h-[85px] lg:min-h-[95px] flex flex-col items-center justify-center font-black text-lg sm:text-xl md:text-2xl lg:text-2xl text-jeopardy-gold relative ' + 
+                               (hasVotes ? 'border-2' : 'border-white/10')">
+                      
+                      <span>{{ question.value }} $</span>
+
+                      <!-- Voter Avatars -->
+                      @if (hasVotes) {
+                        <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex -space-x-1 overflow-hidden">
+                          @for (voter of cardVoters; track voter.id) {
+                            <div 
+                              [style.background-color]="voter.color"
+                              [title]="voter.name"
+                              class="w-4 h-4 rounded-full border border-jeopardy-dark flex items-center justify-center text-[7px] font-extrabold text-white shrink-0 shadow-sm"
+                              [ngClass]="voter.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                              {{ voter.name.slice(0, 1).toUpperCase() }}
+                            </div>
+                          }
+                        </div>
+                      }
                     </div>
                   }
                 }
               }
             }
 
+          </div>
+
+          <!-- STATUS & CONFIRMATION BAR -->
+          <div class="mt-4 w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+            <div class="flex items-center gap-3">
+              <div 
+                [style.background-color]="getActiveSelectorColor()"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shrink-0 shadow-md"
+                [ngClass]="getActiveSelectorColor() === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                {{ getActiveSelectorInitials() }}
+              </div>
+              <div class="text-left">
+                <div class="text-[9px] text-white/40 uppercase tracking-widest font-bold">Auswahlsrecht</div>
+                <div class="text-xs sm:text-sm font-extrabold text-white flex items-center gap-1.5">
+                  <span>{{ getActiveSelectorName() }} ist am Zug</span>
+                  <span class="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex-1 text-center sm:text-left sm:pl-6 border-t sm:border-t-0 sm:border-l border-white/5 pt-3 sm:pt-0">
+              <p class="text-xs text-white/60 font-medium">
+                {{ getSelectionStatusText() }}
+              </p>
+            </div>
+
+            <div class="flex gap-2">
+              @if (p2pService.isHost()) {
+                @if (canIConfirmSelection()) {
+                  <app-button 
+                    variant="primary" 
+                    size="sm" 
+                    (click)="onConfirmSelectedQuestion()">
+                    Frage öffnen
+                  </app-button>
+                } @else {
+                  <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Auswahl...</span>
+                }
+              } @else {
+                @if (canISelectOrVote()) {
+                  <span class="text-[10px] text-jeopardy-gold font-bold animate-pulse uppercase tracking-wider">Warte auf Freigabe durch Host...</span>
+                } @else {
+                  <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Host...</span>
+                }
+              }
+            </div>
           </div>
 
         </div>
@@ -102,107 +189,224 @@
 
         <div 
           [style.box-shadow]="isBuzzed ? 'inset 0 0 80px ' + getBuzzedPlayerColor() + '25' : ''"
-          class="w-full max-w-3xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 relative transition-all duration-500 shadow-2xl">
+          class="w-full max-w-3xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 relative transition-all duration-500 shadow-2xl animate-fade-in">
           
-          <!-- Category and Value badge -->
-          <div class="bg-jeopardy-blue/40 border border-jeopardy-accent/30 px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase text-jeopardy-gold">
-            {{ categories[activeQ?.categoryIndex || 0].name }} • {{ activeQ?.value }} $
+          <!-- Timer progress bar at the very top of the card -->
+          @if (p2pService.gameState().timerSeconds !== null) {
+            @let percentage = (p2pService.gameState().timerSeconds! / p2pService.gameState().buzzerTimeout) * 100;
+            <div class="absolute top-0 left-0 right-0 h-1.5 bg-white/5 overflow-hidden rounded-t-3xl">
+              <div 
+                [style.width.%]="percentage"
+                [class]="'h-full transition-all duration-1000 ease-linear ' + 
+                         (p2pService.gameState().timerSeconds! <= 3 ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-jeopardy-gold')">
+              </div>
+            </div>
+          }
+
+          <!-- Category, Value and Timer badges -->
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <div class="bg-jeopardy-blue/40 border border-jeopardy-accent/30 px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase text-jeopardy-gold">
+              {{ categories[activeQ?.categoryIndex || 0].name }} • {{ activeQ?.value }} $
+            </div>
+
+            @if (p2pService.gameState().timerSeconds !== null) {
+              <div 
+                [class]="'px-4 py-2 rounded-full text-xs font-black tracking-wider border transition-all duration-300 flex items-center gap-1.5 shadow-md ' + 
+                         (p2pService.gameState().timerSeconds! <= 3 ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' : 'bg-black/40 border-white/10 text-white')">
+                ⏱️ {{ p2pService.gameState().timerSeconds }}s
+              </div>
+            }
           </div>
 
-          <!-- Question Text -->
-          <div class="w-full py-6 flex items-center justify-center min-h-[140px] text-center border-b border-white/5">
+          <!-- Question Text & Optional Image -->
+          <div class="w-full py-6 flex flex-col items-center justify-center min-h-[140px] text-center border-b border-white/5 gap-4">
+            @if (activeQ?.image) {
+              <div class="relative group max-w-full">
+                <img 
+                  [src]="activeQ?.image" 
+                  alt="Fragenbild" 
+                  class="max-h-64 md:max-h-80 w-auto object-contain rounded-2xl border border-white/15 shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                />
+              </div>
+            }
             <p class="text-2xl md:text-3xl font-extrabold leading-relaxed text-white max-w-2xl filter drop-shadow-[0_2px_10px_rgba(255,255,255,0.1)]">
               „{{ activeQ?.text }}“
             </p>
           </div>
 
-          <!-- Buzzer Area / Player Interactions -->
+          <!-- Buzzer Area / Player Interactions / Answer Reveal -->
           <div class="w-full flex flex-col items-center gap-6">
 
-            <!-- STATE 1: Player Buzzed -->
-            @if (isBuzzed) {
-              <div 
-                [style.border-color]="getBuzzedPlayerColor()"
-                [style.background-color]="getBuzzedPlayerColor() + '10'"
-                class="w-full max-w-lg p-5 rounded-2xl border flex flex-col items-center gap-3 animate-scale-up">
+            @if (p2pService.gameState().showAnswer) {
+              <!-- ANSWER REVEAL STATE -->
+              <div class="w-full max-w-lg p-6 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col items-center gap-4 animate-scale-up text-center">
                 
-                <div 
-                  [style.background-color]="getBuzzedPlayerColor()"
-                  class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shadow-md animate-bounce"
-                  [ngClass]="getBuzzedPlayerColor() === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                  {{ getBuzzedPlayerName().slice(0,2).toUpperCase() }}
-                </div>
+                @let lastRes = p2pService.gameState().lastAnswerResult;
 
-                <div class="text-center">
-                  <h4 class="text-base font-extrabold text-white">
-                    {{ getBuzzedPlayerName() }} hat gebuzzert!
-                  </h4>
-                  <p class="text-[10px] text-white/50 uppercase tracking-widest mt-1">
-                    Gibt jetzt die Antwort...
-                  </p>
+                @if (lastRes) {
+                  @if (lastRes.correct) {
+                    <!-- Correct Answer Alert Banner -->
+                    <div class="w-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl flex flex-col items-center gap-1 shadow-lg">
+                      <svg class="w-8 h-8 text-emerald-400 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <span class="text-sm font-black uppercase tracking-wider">Richtige Antwort!</span>
+                      <span class="text-xs font-bold text-white/80">{{ lastRes.playerName }} erhält +{{ lastRes.value }} $</span>
+                    </div>
+                  } @else {
+                    <!-- Failed/Skipped Alert Banner -->
+                    <div class="w-full bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl flex flex-col items-center gap-1 shadow-lg">
+                      <svg class="w-8 h-8 text-red-400 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <span class="text-sm font-black uppercase tracking-wider">Keine Punkte vergeben!</span>
+                      <span class="text-xs font-bold text-white/80">Niemand konnte die Frage beantworten.</span>
+                    </div>
+                  }
+                }
+
+                <div class="flex flex-col gap-1.5 w-full pt-2">
+                  <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Richtige Antwort-Auflösung</span>
+                  <span class="text-xl font-extrabold text-jeopardy-gold uppercase tracking-wide">
+                    {{ activeQ?.answer }}
+                  </span>
                 </div>
 
                 <!-- Host Moderator Controls -->
                 @if (p2pService.isHost()) {
-                  <div class="flex gap-4 w-full mt-4">
+                  <div class="w-full mt-4">
                     <app-button 
                       variant="primary" 
                       [fullWidth]="true" 
-                      (click)="onAwardPoints(true)">
-                      Richtig (+{{ activeQ?.value }} $)
+                      (click)="onBackToBoard()">
+                      Weiter zum Spielfeld
                     </app-button>
-                    <app-button 
-                      variant="danger" 
-                      [fullWidth]="true" 
-                      (click)="onAwardPoints(false)">
-                      Falsch (-{{ activeQ?.value }} $)
-                    </app-button>
+                  </div>
+                } @else {
+                  <!-- Guest Screen Subtext -->
+                  <div class="flex items-center gap-2 mt-4">
+                    <span class="w-2 h-2 rounded-full bg-jeopardy-accent animate-ping"></span>
+                    <span class="text-[11px] text-white/50 font-semibold">Warte auf Moderator...</span>
                   </div>
                 }
+
               </div>
-            }
-
-            <!-- STATE 2: Waiting for Buzz -->
-            @if (!isBuzzed) {
-              @if (p2pService.isHost()) {
-                <!-- Host screen: show correct answer and moderator skip -->
-                <div class="w-full max-w-md bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex flex-col items-center gap-4 text-center">
-                  <div class="flex flex-col gap-1">
-                    <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Antwort-Schlüssel</span>
-                    <span class="text-base font-extrabold text-jeopardy-gold">{{ activeQ?.answer }}</span>
-                  </div>
+            } @else {
+              <!-- STATE 1: Player Buzzed -->
+              @if (isBuzzed) {
+                <div 
+                  [style.border-color]="getBuzzedPlayerColor()"
+                  [style.background-color]="getBuzzedPlayerColor() + '10'"
+                  class="w-full max-w-lg p-5 rounded-2xl border flex flex-col items-center gap-3 animate-scale-up">
                   
-                  <div class="h-[1px] w-full bg-white/5"></div>
-                  
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-jeopardy-accent animate-ping"></span>
-                    <span class="text-[11px] text-white/50 font-semibold">Warte auf Buzzer der Spieler...</span>
+                  <div 
+                    [style.background-color]="getBuzzedPlayerColor()"
+                    class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shadow-md animate-bounce"
+                    [ngClass]="getBuzzedPlayerColor() === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
+                    {{ getBuzzedPlayerName().slice(0,2).toUpperCase() }}
                   </div>
 
-                  <app-button 
-                    variant="ghost" 
-                    size="sm" 
-                    [fullWidth]="true" 
-                    (click)="onSkipQuestion()">
-                    Niemand weiß es (Überspringen)
-                  </app-button>
+                  <div class="text-center">
+                    <h4 class="text-base font-extrabold text-white">
+                      {{ p2pService.gameState().isInitialTurn ? getBuzzedPlayerName() + ' hat Erstauswahlsrecht!' : getBuzzedPlayerName() + ' hat gebuzzert!' }}
+                    </h4>
+                    <p class="text-[10px] text-white/50 uppercase tracking-widest mt-1">
+                      {{ p2pService.gameState().isInitialTurn ? 'Muss jetzt antworten (Erstversuch)...' : 'Gibt jetzt die Antwort...' }}
+                    </p>
+                  </div>
+
+                  <!-- Host Moderator Controls -->
+                  @if (p2pService.isHost()) {
+                    <div class="flex gap-4 w-full mt-4">
+                      <app-button 
+                        variant="primary" 
+                        [fullWidth]="true" 
+                        (click)="onAwardPoints(true)">
+                        Richtig (+{{ activeQ?.value }} $)
+                      </app-button>
+                      <app-button 
+                        variant="danger" 
+                        [fullWidth]="true" 
+                        (click)="onAwardPoints(false)">
+                        Falsch (-{{ activeQ?.value }} $)
+                      </app-button>
+                    </div>
+                  }
                 </div>
-              } @else {
-                <!-- Guest screen: Big satisfy buzzer button -->
-                <div class="flex flex-col items-center gap-2">
-                  <button 
-                    [disabled]="isBuzzerDisabled()"
-                    (click)="p2pService.buzz()"
-                    [class]="isBuzzerDisabled() ? 
-                      'w-40 h-40 rounded-full bg-neutral-850 border-8 border-neutral-750 shadow-none flex items-center justify-center text-white/10 text-2xl font-black uppercase tracking-widest cursor-not-allowed select-none transition-all' : 
-                      'w-40 h-40 rounded-full bg-red-600 hover:bg-red-500 active:scale-90 border-8 border-red-800 shadow-xl shadow-red-600/30 flex items-center justify-center text-white text-2xl font-black uppercase tracking-widest cursor-pointer select-none transition-all duration-200 transform hover:-translate-y-1'">
-                    BUZZ!
-                  </button>
-                  <span 
-                    [class]="isBuzzerDisabled() ? 'text-[10px] text-red-500 font-bold uppercase tracking-widest mt-2 text-center max-w-[200px]' : 'text-[10px] text-white/40 uppercase tracking-widest mt-2 animate-pulse'">
-                    {{ getBuzzerSubtext() }}
-                  </span>
-                </div>
+              }
+
+              <!-- STATE 2: Waiting for Buzz -->
+              @if (!isBuzzed) {
+                @if (p2pService.isHost()) {
+                  <!-- Host screen: show correct answer and moderator actions -->
+                  <div class="w-full max-w-md bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex flex-col items-center gap-4 text-center">
+                    <div class="flex flex-col gap-1">
+                      <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Antwort-Schlüssel</span>
+                      <span class="text-base font-extrabold text-jeopardy-gold">{{ activeQ?.answer }}</span>
+                    </div>
+                    
+                    <div class="h-[1px] w-full bg-white/5"></div>
+                    
+                    @if (p2pService.gameState().buzzerLocked) {
+                      <!-- Buzzer is locked after selector failed: Host must choose to release it or end the question -->
+                      <div class="w-full flex flex-col gap-3">
+                        <div class="text-[11px] text-red-400 font-bold uppercase tracking-wider">
+                          Erstversuch fehlgeschlagen / Zeit abgelaufen
+                        </div>
+                        <p class="text-xs text-white/60">
+                          Möchtest du die Buzzer für die anderen Spieler/Teams freigeben?
+                        </p>
+                        
+                        <div class="flex gap-3 w-full mt-1">
+                          <app-button 
+                            variant="primary" 
+                            size="sm"
+                            [fullWidth]="true" 
+                            (click)="onUnlockBuzzer()">
+                            Buzzer freigeben
+                          </app-button>
+                          <app-button 
+                            variant="danger" 
+                            size="sm"
+                            [fullWidth]="true" 
+                            (click)="onSkipQuestion()">
+                            Frage beenden
+                          </app-button>
+                        </div>
+                      </div>
+                    } @else {
+                      <!-- Free-for-all buzzing state -->
+                      <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-jeopardy-accent animate-ping"></span>
+                        <span class="text-[11px] text-white/50 font-semibold">Warte auf Buzzer der Spieler...</span>
+                      </div>
+
+                      <app-button 
+                        variant="ghost" 
+                        size="sm" 
+                        [fullWidth]="true" 
+                        (click)="onSkipQuestion()">
+                        Niemand weiß es (Überspringen)
+                      </app-button>
+                    }
+                  </div>
+                } @else {
+                  <!-- Guest screen: Big satisfy buzzer button -->
+                  <div class="flex flex-col items-center gap-2">
+                    <button 
+                      [disabled]="isBuzzerDisabled()"
+                      (click)="p2pService.buzz()"
+                      [class]="isBuzzerDisabled() ? 
+                        'w-40 h-40 rounded-full bg-neutral-850 border-8 border-neutral-750 shadow-none flex items-center justify-center text-white/10 text-2xl font-black uppercase tracking-widest cursor-not-allowed select-none transition-all' : 
+                        'w-40 h-40 rounded-full bg-red-600 hover:bg-red-500 active:scale-90 border-8 border-red-800 shadow-xl shadow-red-600/30 flex items-center justify-center text-white text-2xl font-black uppercase tracking-widest cursor-pointer select-none transition-all duration-200 transform hover:-translate-y-1'">
+                      BUZZ!
+                    </button>
+                    <span 
+                      [class]="isBuzzerDisabled() ? 'text-[10px] text-red-500 font-bold uppercase tracking-widest mt-2 text-center max-w-[200px]' : 'text-[10px] text-white/40 uppercase tracking-widest mt-2 animate-pulse'">
+                      {{ getBuzzerSubtext() }}
+                    </span>
+                  </div>
+                }
               }
             }
 
@@ -340,7 +544,7 @@
       <div class="flex items-center justify-between">
         <h3 class="text-xs font-bold uppercase tracking-widest text-white/40">Scoreboard</h3>
         <span class="text-[10px] text-white/30">
-          {{ p2pService.teamMode() ? p2pService.teamsArray().length + ' Teams' : p2pService.players().length + ' Spieler' }}
+          {{ p2pService.teamMode() ? p2pService.teamsArray().length + ' Teams' : sortedPlayers().length + ' Spieler' }}
         </span>
       </div>
 

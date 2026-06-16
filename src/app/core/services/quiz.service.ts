@@ -8,6 +8,7 @@ export interface Question {
   text: string;
   answer: string;
   value: number;
+  image?: string;
 }
 
 export interface Category {
@@ -304,6 +305,15 @@ export class QuizService {
         }
         if (!q.answer.trim()) {
           throw new Error(`Kategorie "${cat.name}" hat eine leere Antwort bei ${q.value} $.`);
+        }
+        if (q.image) {
+          if (!q.image.startsWith('data:image/')) {
+            throw new Error(`Kategorie "${cat.name}" hat ein ungültiges Bildformat bei ${q.value} $.`);
+          }
+          const approximateSize = q.image.length * 0.75;
+          if (approximateSize > 1.2 * 1024 * 1024) {
+            throw new Error(`Kategorie "${cat.name}" hat ein zu großes Bild bei ${q.value} $ (max. 1 MB).`);
+          }
         }
       });
     });

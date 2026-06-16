@@ -55,6 +55,8 @@ export class QuizCreatorComponent implements OnInit {
   activeCell = signal<{ cIndex: number; qIndex: number } | null>(null);
   modalQuestionText = signal('');
   modalAnswerText = signal('');
+  modalImage = signal<string | null>(null);
+  imageError = signal<string | null>(null);
 
   onNumQuestionsChange(count: number) {
     this.numQuestions.set(count);
@@ -157,6 +159,8 @@ export class QuizCreatorComponent implements OnInit {
     this.activeCell.set({ cIndex, qIndex });
     this.modalQuestionText.set(q.text);
     this.modalAnswerText.set(q.answer);
+    this.modalImage.set(q.image || null);
+    this.imageError.set(null);
   }
 
   saveActiveCell() {
@@ -168,12 +172,50 @@ export class QuizCreatorComponent implements OnInit {
       newCats[cell.cIndex].questions[cell.qIndex] = {
         ...newCats[cell.cIndex].questions[cell.qIndex],
         text: this.modalQuestionText().trim(),
-        answer: this.modalAnswerText().trim()
+        answer: this.modalAnswerText().trim(),
+        image: this.modalImage() || undefined
       };
       return newCats;
     });
 
     this.activeCell.set(null);
+  }
+
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+
+      // Validate format
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        this.imageError.set('Ungültiges Dateiformat. Bitte verwende PNG, JPEG, WEBP oder GIF.');
+        return;
+      }
+
+      // Validate size (1 MB limit)
+      const maxSize = 1 * 1024 * 1024;
+      if (file.size > maxSize) {
+        this.imageError.set('Die Bilddatei ist zu groß. Maximale Größe ist 1 MB.');
+        return;
+      }
+
+      this.imageError.set(null);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.modalImage.set(reader.result as string);
+      };
+      reader.onerror = () => {
+        this.imageError.set('Fehler beim Lesen der Datei.');
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeModalImage() {
+    this.modalImage.set(null);
+    this.imageError.set(null);
   }
 
   closeEditModal() {

@@ -175,15 +175,61 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
   }
 });
 
+function validateQuizPayload(name, categories) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return 'Bitte gib der Quiz-Vorlage einen Namen.';
+  }
+  if (!categories || !Array.isArray(categories) || categories.length === 0) {
+    return 'Das Quiz muss mindestens eine Kategorie enthalten.';
+  }
+  if (categories.length > 10) {
+    return 'Ein Quiz darf maximal 10 Kategorien besitzen.';
+  }
+
+  for (const cat of categories) {
+    if (!cat.name || typeof cat.name !== 'string' || !cat.name.trim()) {
+      return 'Alle Kategorien müssen einen Namen haben.';
+    }
+    if (!cat.questions || !Array.isArray(cat.questions)) {
+      return 'Ungültiges Format für Fragen.';
+    }
+    for (const q of cat.questions) {
+      if (!q.text || typeof q.text !== 'string' || !q.text.trim()) {
+        return 'Alle Fragen müssen einen Text haben.';
+      }
+      if (!q.answer || typeof q.answer !== 'string' || !q.answer.trim()) {
+        return 'Alle Fragen müssen eine Antwort haben.';
+      }
+      if (q.image) {
+        if (typeof q.image !== 'string') {
+          return 'Ungültiges Bild-Format.';
+        }
+        if (!q.image.startsWith('data:image/')) {
+          return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
+        }
+        const allowedTypes = ['data:image/png', 'data:image/jpeg', 'data:image/jpg', 'data:image/webp', 'data:image/gif'];
+        const matchesType = allowedTypes.some(type => q.image.startsWith(type));
+        if (!matchesType) {
+          return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
+        }
+        // Approximate base64 string size in bytes: length * 0.75
+        const approximateSizeBytes = q.image.length * 0.75;
+        if (approximateSizeBytes > 1.2 * 1024 * 1024) {
+          return 'Die Bildgröße darf 1 MB nicht überschreiten.';
+        }
+      }
+    }
+  }
+  return null;
+}
+
 // 6. Save Custom Quiz (Create)
 app.post('/api/quizzes', authenticateToken, async (req, res) => {
   const { name, categories } = req.body;
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Bitte gib der Quiz-Vorlage einen Namen.' });
-  }
-  if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    return res.status(400).json({ error: 'Das Quiz muss mindestens eine Kategorie enthalten.' });
+  const validationError = validateQuizPayload(name, categories);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   const id = 'custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
@@ -205,11 +251,9 @@ app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { name, categories } = req.body;
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Bitte gib der Quiz-Vorlage einen Namen.' });
-  }
-  if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    return res.status(400).json({ error: 'Das Quiz muss mindestens eine Kategorie enthalten.' });
+  const validationError = validateQuizPayload(name, categories);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   try {
@@ -266,6 +310,10 @@ app.post('/api/quizzes/sync', authenticateToken, async (req, res) => {
     for (const quiz of quizzes) {
       const { name, categories, id } = quiz;
       if (!name || !categories) continue;
+
+      const validationError = validateQuizPayload(name, categories);
+      if (validationError) continue; // Skip invalid quizzes during legacy sync
+
 
       const quizId = id || ('custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5));
       

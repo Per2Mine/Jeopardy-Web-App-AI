@@ -24,6 +24,7 @@ export interface GameState {
     value: number;
     text: string;
     answer: string;
+    image?: string;
   } | null;
   buzzedPlayerId: string | null;
   buzzerLocked: boolean;
@@ -31,6 +32,18 @@ export interface GameState {
   lockedOutPlayerIds: string[];
   lockedOutTeamIds: number[];
   categories: Category[];
+  activeSelectorId: string | null;
+  votes: { [questionKey: string]: string[] };
+  showAnswer: boolean;
+  lastAnswerResult: {
+    correct: boolean;
+    playerName: string;
+    value: number;
+  } | null;
+  buzzerTimeout: number;
+  deductPointsOnTimeout: boolean;
+  timerSeconds: number | null;
+  isInitialTurn: boolean;
 }
 
 export interface ChatMessage {
@@ -43,7 +56,7 @@ export interface ChatMessage {
 }
 
 export interface P2pMessage {
-  type: 'JOIN_ACK' | 'PLAYER_LIST' | 'GAME_STATE' | 'KICK' | 'BUZZ' | 'START_GAME' | 'SELECT_TEAM' | 'CHAT_MSG';
+  type: 'JOIN_ACK' | 'PLAYER_LIST' | 'GAME_STATE' | 'KICK' | 'BUZZ' | 'START_GAME' | 'SELECT_TEAM' | 'CHAT_MSG' | 'VOTE_QUESTION';
   senderId: string;
   payload: any;
 }
@@ -80,7 +93,15 @@ export class P2pService {
     answeredQuestions: [],
     lockedOutPlayerIds: [],
     lockedOutTeamIds: [],
-    categories: []
+    categories: [],
+    activeSelectorId: null,
+    votes: {},
+    showAnswer: false,
+    lastAnswerResult: null,
+    buzzerTimeout: 10,
+    deductPointsOnTimeout: false,
+    timerSeconds: null,
+    isInitialTurn: false
   });
   chatMessages = signal<ChatMessage[]>([]);
 
@@ -321,13 +342,30 @@ export class P2pService {
   /**
    * Initialize a new room as Host
    */
-  hostRoom(roomCode: string, hostName: string, hostColor: string, maxPlayers: number, teamMode: boolean, maxPlayersPerTeam: number): Promise<void> {
+  hostRoom(
+    roomCode: string, 
+    hostName: string, 
+    hostColor: string, 
+    maxPlayers: number, 
+    teamMode: boolean, 
+    maxPlayersPerTeam: number,
+    buzzerTimeout: number,
+    deductPointsOnTimeout: boolean
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.disconnect();
       this.maxPlayersLimit = maxPlayers;
       this.teamMode.set(teamMode);
       this.maxTeamsLimit.set(maxPlayers);
       this.maxPlayersPerTeam.set(maxPlayersPerTeam);
+
+      const current = this.gameState();
+      this.gameState.set({
+        ...current,
+        buzzerTimeout,
+        deductPointsOnTimeout
+      });
+
       this.wasKicked.set(false);
       this.connectionState.set('connecting');
       this.errorMessage.set('');
@@ -415,6 +453,8 @@ export class P2pService {
    * Disconnect and cleanup all connections
    */
   disconnect() {
+    this.stopHostTimer();
+    
     // Client disconnect
     if (this.clientConnection) {
       this.clientConnection.close();
@@ -572,7 +612,9 @@ export class P2pService {
             success: true,
             teamMode: this.teamMode(),
             maxTeamsLimit: this.maxTeamsLimit(),
-            maxPlayersPerTeam: this.maxPlayersPerTeam()
+            maxPlayersPerTeam: this.maxPlayersPerTeam(),
+            gameState: this.gameState(),
+            chatHistory: this.chatMessages()
           }
         };
         conn.send(ackMessage);
@@ -653,6 +695,9 @@ export class P2pService {
         case 'CHAT_MSG':
           this.handleHostChatMessage(msg);
           break;
+        case 'VOTE_QUESTION':
+          this.handleHostVoteQuestion(playerId, msg.payload.categoryIndex, msg.payload.questionIndex);
+          break;
         default:
           break;
       }
@@ -668,6 +713,7 @@ export class P2pService {
       });
       this.players.set(updatedPlayers);
       this.broadcastPlayerList();
+      this.handlePlayerDisconnect(playerId);
     });
   }
 
@@ -798,9 +844,188 @@ export class P2pService {
     }
   }
 
+  private timerId: any = null;
+
+  unlockBuzzer() {
+    if (!this.isHost()) return;
+    const current = this.gameState();
+    const nextState: GameState = {
+      ...current,
+      buzzerLocked: false
+    };
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
+  startHostTimer() {
+    this.stopHostTimer();
+    const current = this.gameState();
+    
+    // If buzzerTimeout is 0 (disabled), do not start interval/timer
+    if (current.buzzerTimeout === 0) {
+      const nextState = {
+        ...current,
+        timerSeconds: null
+      };
+      this.gameState.set(nextState);
+      this.broadcast({
+        type: 'GAME_STATE',
+        senderId: this.myPlayerId()!,
+        payload: nextState
+      });
+      return;
+    }
+
+    // Set initial timer seconds
+    const nextState = {
+      ...current,
+      timerSeconds: current.buzzerTimeout
+    };
+    this.gameState.set(nextState);
+
+    this.timerId = setInterval(() => {
+      const state = this.gameState();
+      if (state.timerSeconds !== null && state.timerSeconds > 0) {
+        const updatedState = {
+          ...state,
+          timerSeconds: state.timerSeconds - 1
+        };
+        this.gameState.set(updatedState);
+
+        if (updatedState.timerSeconds <= 0) {
+          this.handleHostTimerTimeout();
+        } else {
+          this.broadcast({
+            type: 'GAME_STATE',
+            senderId: this.myPlayerId()!,
+            payload: updatedState
+          });
+        }
+      } else {
+        this.stopHostTimer();
+      }
+    }, 1000);
+
+    // Initial broadcast of starting timer state
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
+  stopHostTimer() {
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+    const current = this.gameState();
+    if (current.timerSeconds !== null) {
+      const nextState = {
+        ...current,
+        timerSeconds: null
+      };
+      this.gameState.set(nextState);
+    }
+  }
+
+  private handleHostTimerTimeout() {
+    this.stopHostTimer();
+    const current = this.gameState();
+    const playerId = current.buzzedPlayerId;
+    if (!playerId) return;
+
+    // Deduct points?
+    // Deduct points if it's NOT the initial turn, OR if deductPointsOnTimeout is true
+    let shouldDeduct = !current.isInitialTurn || current.deductPointsOnTimeout;
+
+    const value = current.activeQuestion ? current.activeQuestion.value : 0;
+    
+    if (shouldDeduct && value > 0) {
+      const updatedPlayers = this.players().map(p => {
+        if (p.id === playerId) {
+          return { ...p, score: p.score - value };
+        }
+        return p;
+      });
+      this.players.set(updatedPlayers);
+      this.broadcastPlayerList();
+    }
+
+    // Add to lock out lists
+    const lockedOutPlayers = [...(current.lockedOutPlayerIds || [])];
+    if (!lockedOutPlayers.includes(playerId)) {
+      lockedOutPlayers.push(playerId);
+    }
+
+    const lockedOutTeams = [...(current.lockedOutTeamIds || [])];
+    const player = this.players().find(p => p.id === playerId);
+    if (this.teamMode() && player && player.teamId !== undefined) {
+      if (!lockedOutTeams.includes(player.teamId)) {
+        lockedOutTeams.push(player.teamId);
+      }
+    }
+
+    // Check if everyone is locked out
+    const activePlayers = this.players().filter(p => !p.isHost && !p.isOffline);
+    const allLockedOut = this.teamMode()
+      ? this.teamsArray().every(teamId => {
+          const teamPlayers = activePlayers.filter(p => p.teamId === teamId);
+          if (teamPlayers.length === 0) return true;
+          return lockedOutTeams.includes(teamId);
+        })
+      : activePlayers.every(p => lockedOutPlayers.includes(p.id));
+
+    let nextState: GameState;
+    if (allLockedOut) {
+      // Everyone failed: show answer
+      const questionKey = `${current.activeQuestion!.categoryIndex}-${current.activeQuestion!.questionIndex}`;
+      nextState = {
+        ...current,
+        showAnswer: true,
+        buzzedPlayerId: null,
+        buzzerLocked: true,
+        timerSeconds: null,
+        isInitialTurn: false,
+        lockedOutPlayerIds: lockedOutPlayers,
+        lockedOutTeamIds: lockedOutTeams,
+        answeredQuestions: [...current.answeredQuestions, questionKey],
+        lastAnswerResult: {
+          correct: false,
+          playerName: '',
+          value
+        }
+      };
+    } else {
+      nextState = {
+        ...current,
+        buzzedPlayerId: null,
+        buzzerLocked: current.isInitialTurn,
+        timerSeconds: null,
+        isInitialTurn: false, // Initial turn is over after first failure/timeout
+        lockedOutPlayerIds: lockedOutPlayers,
+        lockedOutTeamIds: lockedOutTeams
+      };
+    }
+
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
   private handleHostBuzzer(playerId: string) {
     if (!this.isHost()) return;
     const current = this.gameState();
+
+    // Check if buzzer is locked or if it's still the initial turn (buzzing not allowed yet)
+    if (current.isInitialTurn || current.buzzerLocked) return;
 
     // Check if player is locked out
     if (current.lockedOutPlayerIds && current.lockedOutPlayerIds.includes(playerId)) {
@@ -814,11 +1039,96 @@ export class P2pService {
     }
 
     // Only accept buzzer if in QUESTION phase, no one has buzzed yet, and buzzer isn't locked
-    if (current.phase === 'QUESTION' && current.buzzedPlayerId === null && !current.buzzerLocked) {
+    if (current.phase === 'QUESTION' && current.buzzedPlayerId === null) {
       const nextState: GameState = {
         ...current,
         buzzedPlayerId: playerId,
         buzzerLocked: true
+      };
+      this.gameState.set(nextState);
+      
+      // Start the countdown timer for this buzz!
+      this.startHostTimer();
+
+      this.broadcast({
+        type: 'GAME_STATE',
+        senderId: this.myPlayerId()!,
+        payload: nextState
+      });
+    }
+  }
+
+  getNextSelectorId(currentState: GameState): string | null {
+    const activePlayers = this.players().filter(p => !p.isHost && !p.isOffline);
+    if (activePlayers.length === 0) return this.myPlayerId(); // Fallback to host
+
+    if (this.teamMode()) {
+      // Rotate through teams that have active players
+      const activeTeams = [...new Set(activePlayers.filter(p => p.teamId !== undefined).map(p => p.teamId!))].sort((a, b) => a - b);
+      if (activeTeams.length === 0) return this.myPlayerId();
+
+      const currentSelector = currentState.activeSelectorId;
+      if (!currentSelector || !currentSelector.startsWith('team-')) {
+        return `team-${activeTeams[0]}`;
+      }
+
+      const currentTeamId = parseInt(currentSelector.replace('team-', ''), 10);
+      const currentIndex = activeTeams.indexOf(currentTeamId);
+      if (currentIndex === -1) {
+        return `team-${activeTeams[0]}`;
+      }
+      const nextIndex = (currentIndex + 1) % activeTeams.length;
+      return `team-${activeTeams[nextIndex]}`;
+    } else {
+      // Rotate through active players
+      const currentSelector = currentState.activeSelectorId;
+      const currentIndex = activePlayers.findIndex(p => p.id === currentSelector);
+      if (currentIndex === -1) {
+        return activePlayers[0].id;
+      }
+      const nextIndex = (currentIndex + 1) % activePlayers.length;
+      return activePlayers[nextIndex].id;
+    }
+  }
+
+  handlePlayerDisconnect(playerId: string) {
+    if (!this.isHost()) return;
+    const current = this.gameState();
+    
+    // Remove their votes
+    const nextVotes = { ...current.votes };
+    let votesChanged = false;
+    for (const key in nextVotes) {
+      if (nextVotes[key] && nextVotes[key].includes(playerId)) {
+        nextVotes[key] = nextVotes[key].filter(id => id !== playerId);
+        votesChanged = true;
+      }
+    }
+
+    let nextSelector = current.activeSelectorId;
+    let selectorChanged = false;
+
+    if (this.teamMode()) {
+      const player = this.players().find(p => p.id === playerId);
+      if (player && player.teamId !== undefined) {
+        const teamPlayers = this.players().filter(p => !p.isHost && !p.isOffline && p.teamId === player.teamId);
+        if (teamPlayers.length === 0 && current.activeSelectorId === `team-${player.teamId}`) {
+          nextSelector = this.getNextSelectorId(current);
+          selectorChanged = true;
+        }
+      }
+    } else {
+      if (current.activeSelectorId === playerId) {
+        nextSelector = this.getNextSelectorId(current);
+        selectorChanged = true;
+      }
+    }
+
+    if (votesChanged || selectorChanged) {
+      const nextState: GameState = {
+        ...current,
+        activeSelectorId: nextSelector,
+        votes: nextVotes
       };
       this.gameState.set(nextState);
       this.broadcast({
@@ -829,6 +1139,75 @@ export class P2pService {
     }
   }
 
+  private handleHostVoteQuestion(playerId: string, categoryIndex: number, questionIndex: number) {
+    if (!this.isHost()) return;
+    const current = this.gameState();
+    if (current.phase !== 'BOARD') return;
+
+    const player = this.players().find(p => p.id === playerId);
+    if (!player) return;
+
+    let authorized = false;
+    if (this.teamMode()) {
+      const activeTeamStr = current.activeSelectorId;
+      if (activeTeamStr) {
+        const activeTeamId = parseInt(activeTeamStr.replace('team-', ''), 10);
+        authorized = player.teamId === activeTeamId;
+      }
+    } else {
+      authorized = current.activeSelectorId === playerId;
+    }
+
+    if (!authorized) return;
+
+    // Check if the question is already answered
+    const questionKey = `${categoryIndex}-${questionIndex}`;
+    if (current.answeredQuestions.includes(questionKey)) return;
+
+    const nextVotes = { ...current.votes };
+
+    if (this.teamMode()) {
+      // Remove this player's vote from any other question
+      for (const key in nextVotes) {
+        if (nextVotes[key] && nextVotes[key].includes(playerId)) {
+          nextVotes[key] = nextVotes[key].filter(id => id !== playerId);
+        }
+      }
+      // Add to this question
+      if (!nextVotes[questionKey]) {
+        nextVotes[questionKey] = [];
+      }
+      if (!nextVotes[questionKey].includes(playerId)) {
+        nextVotes[questionKey].push(playerId);
+      }
+    } else {
+      // Solo mode: clear all votes and set this one
+      for (const key in nextVotes) {
+        delete nextVotes[key];
+      }
+      nextVotes[questionKey] = [playerId];
+    }
+
+    const nextState: GameState = {
+      ...current,
+      votes: nextVotes
+    };
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
+  voteQuestion(categoryIndex: number, questionIndex: number) {
+    this.sendToHost({
+      type: 'VOTE_QUESTION',
+      senderId: this.myPlayerId()!,
+      payload: { categoryIndex, questionIndex }
+    });
+  }
+
   startGame(categories: Category[]) {
     if (!this.isHost()) return;
     
@@ -836,6 +1215,28 @@ export class P2pService {
     const resetPlayers = this.players().map(p => ({ ...p, score: 0 }));
     this.players.set(resetPlayers);
     this.broadcastPlayerList();
+
+    const current = this.gameState();
+
+    const tempStateForSelector: GameState = {
+      phase: 'BOARD',
+      activeQuestion: null,
+      buzzedPlayerId: null,
+      buzzerLocked: false,
+      answeredQuestions: [],
+      lockedOutPlayerIds: [],
+      lockedOutTeamIds: [],
+      categories,
+      activeSelectorId: null,
+      votes: {},
+      showAnswer: false,
+      lastAnswerResult: null,
+      buzzerTimeout: current.buzzerTimeout,
+      deductPointsOnTimeout: current.deductPointsOnTimeout,
+      timerSeconds: null,
+      isInitialTurn: false
+    };
+    const firstSelector = this.getNextSelectorId(tempStateForSelector);
 
     const initialState: GameState = {
       phase: 'BOARD',
@@ -845,7 +1246,15 @@ export class P2pService {
       answeredQuestions: [],
       lockedOutPlayerIds: [],
       lockedOutTeamIds: [],
-      categories
+      categories,
+      activeSelectorId: firstSelector,
+      votes: {},
+      showAnswer: false,
+      lastAnswerResult: null,
+      buzzerTimeout: current.buzzerTimeout,
+      deductPointsOnTimeout: current.deductPointsOnTimeout,
+      timerSeconds: null,
+      isInitialTurn: false
     };
     this.gameState.set(initialState);
     
@@ -861,16 +1270,41 @@ export class P2pService {
   selectQuestion(categoryIndex: number, questionIndex: number, value: number, text: string, answer: string) {
     if (!this.isHost()) return;
     const current = this.gameState();
+
+    // Find the player representing the active selector
+    let initialBuzzedPlayerId: string | null = null;
+    if (this.teamMode()) {
+      const activeTeamStr = current.activeSelectorId;
+      if (activeTeamStr) {
+        const teamId = parseInt(activeTeamStr.replace('team-', ''), 10);
+        const player = this.players().find(p => !p.isHost && !p.isOffline && p.teamId === teamId);
+        initialBuzzedPlayerId = player ? player.id : null;
+      }
+    } else {
+      initialBuzzedPlayerId = current.activeSelectorId;
+    }
+
+    const question = current.categories[categoryIndex]?.questions[questionIndex];
+    const image = question?.image || undefined;
+
     const nextState: GameState = {
       ...current,
       phase: 'QUESTION',
-      activeQuestion: { categoryIndex, questionIndex, value, text, answer },
-      buzzedPlayerId: null,
-      buzzerLocked: false,
+      activeQuestion: { categoryIndex, questionIndex, value, text, answer, image },
+      buzzedPlayerId: initialBuzzedPlayerId,
+      buzzerLocked: true, // Lock the buzzer so others cannot buzz yet
       lockedOutPlayerIds: [],
-      lockedOutTeamIds: []
+      lockedOutTeamIds: [],
+      showAnswer: false,
+      lastAnswerResult: null,
+      isInitialTurn: true, // Initial turn is active
+      timerSeconds: current.buzzerTimeout === 0 ? null : current.buzzerTimeout
     };
     this.gameState.set(nextState);
+
+    // Start timer for the initial selector player
+    this.startHostTimer();
+
     this.broadcast({
       type: 'GAME_STATE',
       senderId: this.myPlayerId()!,
@@ -880,6 +1314,8 @@ export class P2pService {
 
   awardPoints(playerId: string, correct: boolean) {
     if (!this.isHost()) return;
+    this.stopHostTimer(); // STOP TIMEOUT COUNTDOWN
+    
     const current = this.gameState();
     if (!current.activeQuestion) return;
 
@@ -897,17 +1333,22 @@ export class P2pService {
     // 2. Compute next game state
     let nextState: GameState;
     if (correct) {
-      // Correct answer: question resolved, return to board
+      // Correct answer: question resolved, show answer first
       const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
+      const winnerName = this.players().find(p => p.id === playerId)?.name || 'Ein Spieler';
       nextState = {
         ...current,
-        phase: 'BOARD',
-        activeQuestion: null,
+        showAnswer: true,
         buzzedPlayerId: null,
-        buzzerLocked: false,
+        buzzerLocked: true,
+        timerSeconds: null,
+        isInitialTurn: false,
         answeredQuestions: [...current.answeredQuestions, questionKey],
-        lockedOutPlayerIds: [],
-        lockedOutTeamIds: []
+        lastAnswerResult: {
+          correct: true,
+          playerName: winnerName,
+          value
+        }
       };
     } else {
       // Incorrect answer: lock this player / team out of buzzing
@@ -924,13 +1365,46 @@ export class P2pService {
         }
       }
 
-      nextState = {
-        ...current,
-        buzzedPlayerId: null,
-        buzzerLocked: false,
-        lockedOutPlayerIds: lockedOutPlayers,
-        lockedOutTeamIds: lockedOutTeams
-      };
+      // Check if all active players/teams are now locked out
+      const activePlayers = this.players().filter(p => !p.isHost && !p.isOffline);
+      const allLockedOut = this.teamMode()
+        ? this.teamsArray().every(teamId => {
+            const teamPlayers = activePlayers.filter(p => p.teamId === teamId);
+            if (teamPlayers.length === 0) return true;
+            return lockedOutTeams.includes(teamId);
+          })
+        : activePlayers.every(p => lockedOutPlayers.includes(p.id));
+
+      if (allLockedOut) {
+        // Everyone failed: show answer
+        const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
+        nextState = {
+          ...current,
+          showAnswer: true,
+          buzzedPlayerId: null,
+          buzzerLocked: true,
+          timerSeconds: null,
+          isInitialTurn: false,
+          lockedOutPlayerIds: lockedOutPlayers,
+          lockedOutTeamIds: lockedOutTeams,
+          answeredQuestions: [...current.answeredQuestions, questionKey],
+          lastAnswerResult: {
+            correct: false,
+            playerName: '',
+            value
+          }
+        };
+      } else {
+        nextState = {
+          ...current,
+          buzzedPlayerId: null,
+          buzzerLocked: current.isInitialTurn,
+          timerSeconds: null,
+          isInitialTurn: false, // Initial turn is over after first failure
+          lockedOutPlayerIds: lockedOutPlayers,
+          lockedOutTeamIds: lockedOutTeams
+        };
+      }
     }
 
     this.gameState.set(nextState);
@@ -943,17 +1417,58 @@ export class P2pService {
 
   skipQuestion() {
     if (!this.isHost()) return;
+    this.stopHostTimer(); // STOP TIMEOUT COUNTDOWN
+    
     const current = this.gameState();
     if (!current.activeQuestion) return;
 
     const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
     const nextState: GameState = {
       ...current,
+      showAnswer: true,
+      buzzedPlayerId: null,
+      buzzerLocked: true,
+      timerSeconds: null,
+      isInitialTurn: false,
+      answeredQuestions: [...current.answeredQuestions, questionKey],
+      lastAnswerResult: {
+        correct: false,
+        playerName: '',
+        value: current.activeQuestion.value
+      }
+    };
+
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
+  backToBoard() {
+    if (!this.isHost()) return;
+    this.stopHostTimer();
+    
+    const current = this.gameState();
+    
+    // Advance active selector
+    const nextSelector = this.getNextSelectorId(current);
+
+    const nextState: GameState = {
+      ...current,
       phase: 'BOARD',
       activeQuestion: null,
+      showAnswer: false,
       buzzedPlayerId: null,
       buzzerLocked: false,
-      answeredQuestions: [...current.answeredQuestions, questionKey]
+      timerSeconds: null,
+      isInitialTurn: false,
+      lockedOutPlayerIds: [],
+      lockedOutTeamIds: [],
+      votes: {}, // Clear votes for the next round
+      activeSelectorId: nextSelector,
+      lastAnswerResult: null
     };
 
     this.gameState.set(nextState);
@@ -966,13 +1481,17 @@ export class P2pService {
 
   endGame() {
     if (!this.isHost()) return;
+    this.stopHostTimer();
+    
     const current = this.gameState();
     const nextState: GameState = {
       ...current,
       phase: 'SUMMARY',
       activeQuestion: null,
       buzzedPlayerId: null,
-      buzzerLocked: false
+      buzzerLocked: false,
+      timerSeconds: null,
+      isInitialTurn: false
     };
     this.gameState.set(nextState);
     this.broadcast({
