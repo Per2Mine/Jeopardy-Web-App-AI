@@ -90,13 +90,14 @@
                       @if (hasVotes) {
                         <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex -space-x-1 overflow-hidden">
                           @for (voter of cardVoters; track voter.id) {
-                            <div 
-                              [style.background-color]="voter.color"
+                            <app-avatar 
+                              [color]="voter.color" 
+                              [avatar]="voter.avatar || ''" 
+                              [name]="voter.name" 
+                              [size]="16"
                               [title]="voter.name"
-                              class="w-4 h-4 rounded-full border border-jeopardy-dark flex items-center justify-center text-[7px] font-extrabold text-white shrink-0 shadow-sm"
-                              [ngClass]="voter.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                              {{ voter.name.slice(0, 1).toUpperCase() }}
-                            </div>
+                              class="border border-jeopardy-dark rounded-full shrink-0 shadow-sm overflow-hidden"
+                            ></app-avatar>
                           }
                         </div>
                       }
@@ -114,13 +115,14 @@
                       @if (hasVotes) {
                         <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex -space-x-1 overflow-hidden">
                           @for (voter of cardVoters; track voter.id) {
-                            <div 
-                              [style.background-color]="voter.color"
+                            <app-avatar 
+                              [color]="voter.color" 
+                              [avatar]="voter.avatar || ''" 
+                              [name]="voter.name" 
+                              [size]="16"
                               [title]="voter.name"
-                              class="w-4 h-4 rounded-full border border-jeopardy-dark flex items-center justify-center text-[7px] font-extrabold text-white shrink-0 shadow-sm"
-                              [ngClass]="voter.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                              {{ voter.name.slice(0, 1).toUpperCase() }}
-                            </div>
+                              class="border border-jeopardy-dark rounded-full shrink-0 shadow-sm overflow-hidden"
+                            ></app-avatar>
                           }
                         </div>
                       }
@@ -135,12 +137,7 @@
           <!-- STATUS & CONFIRMATION BAR -->
           <div class="mt-4 w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
             <div class="flex items-center gap-3">
-              <div 
-                [style.background-color]="getActiveSelectorColor()"
-                class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white shrink-0 shadow-md"
-                [ngClass]="getActiveSelectorColor() === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                {{ getActiveSelectorInitials() }}
-              </div>
+              <app-avatar [color]="getActiveSelectorColor()" [avatar]="getActiveSelectorAvatar()" [name]="getActiveSelectorName()" size="md" class="shrink-0"></app-avatar>
               <div class="text-left">
                 <div class="text-[9px] text-white/40 uppercase tracking-widest font-bold">Auswahlsrecht</div>
                 <div class="text-xs sm:text-sm font-extrabold text-white flex items-center gap-1.5">
@@ -299,12 +296,7 @@
                   [style.background-color]="getBuzzedPlayerColor() + '10'"
                   class="w-full max-w-lg p-5 rounded-2xl border flex flex-col items-center gap-3 animate-scale-up">
                   
-                  <div 
-                    [style.background-color]="getBuzzedPlayerColor()"
-                    class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shadow-md animate-bounce"
-                    [ngClass]="getBuzzedPlayerColor() === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                    {{ getBuzzedPlayerName().slice(0,2).toUpperCase() }}
-                  </div>
+                  <app-avatar [color]="getBuzzedPlayerColor()" [avatar]="getBuzzedPlayerAvatar()" [name]="getBuzzedPlayerName()" size="lg" class="animate-bounce shrink-0"></app-avatar>
 
                   <div class="text-center">
                     <h4 class="text-base font-extrabold text-white">
@@ -467,12 +459,7 @@
                   <div class="flex flex-wrap gap-2.5 p-1">
                     @for (player of team.players; track player.id) {
                       <div class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/5" [class.opacity-40]="player.isOffline">
-                        <div 
-                          [style.background-color]="player.color"
-                          class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm shrink-0"
-                          [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                          {{ player.name.slice(0, 2).toUpperCase() }}
-                        </div>
+                        <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="xs" class="shrink-0"></app-avatar>
                         <span class="text-xs font-bold text-white/90 truncate max-w-[100px]">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</span>
                         <span class="text-[10px] font-black text-jeopardy-gold/70">({{ player.score }} $)</span>
                       </div>
@@ -494,13 +481,7 @@
                     {{ index + 1 }}
                   </div>
 
-                  <!-- Avatar -->
-                  <div 
-                    [style.background-color]="player.color"
-                    class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shadow-sm shrink-0"
-                    [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                    {{ player.name.slice(0, 2).toUpperCase() }}
-                  </div>
+                  <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="md" class="shrink-0"></app-avatar>
 
                   <!-- Profile -->
                   <div class="flex-1 min-w-0">
@@ -589,13 +570,7 @@
               <!-- Position -->
               <span class="text-[10px] font-bold text-white/35 w-3.5">#{{ index + 1 }}</span>
               
-              <!-- Avatar -->
-              <div 
-                [style.background-color]="player.color"
-                class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm shrink-0"
-                [ngClass]="player.color === '#f1b814' ? 'text-jeopardy-dark' : 'text-white'">
-                {{ player.name.slice(0, 2).toUpperCase() }}
-              </div>
+              <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="xs" class="shrink-0"></app-avatar>
 
               <!-- Profile Name -->
               <div class="flex-1 min-w-0">

@@ -8,11 +8,12 @@ import { LogoComponent } from '../../shared/components/logo/logo.component';
 import { P2pService, Player } from '../../core/services/p2p.service';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizService } from '../../core/services/quiz.service';
+import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
 
 @Component({
   selector: 'app-start-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, ToggleComponent, LogoComponent],
+  imports: [CommonModule, ButtonComponent, InputComponent, ToggleComponent, LogoComponent, AvatarComponent],
   templateUrl: './start-page.component.html',
   styleUrl: './start-page.component.css'
 })
@@ -29,6 +30,13 @@ export class StartPageComponent {
   playerName = signal(this.authService.currentUser()?.username || '');
   selectedColor = signal('#f1b814'); // Default gold
 
+  // Avatar Customization Parts
+  avatarBase = signal(0);
+  avatarEyes = signal(0);
+  avatarMouth = signal(0);
+  avatarAccessory = signal(0);
+  selectedAvatar = computed(() => `b${this.avatarBase()}e${this.avatarEyes()}m${this.avatarMouth()}a${this.avatarAccessory()}`);
+
   // Auth form states
   authModalOpen = signal(false);
   authMode = signal<'login' | 'register'>('login');
@@ -44,6 +52,27 @@ export class StartPageComponent {
   settingsSuccess = signal('');
 
   constructor() {
+    // Load from localStorage if present
+    const savedName = localStorage.getItem('jeopardy_player_name');
+    const savedColor = localStorage.getItem('jeopardy_player_color');
+    const savedAvatar = localStorage.getItem('jeopardy_player_avatar');
+
+    if (savedName) {
+      this.playerName.set(savedName);
+    }
+    if (savedColor) {
+      this.selectedColor.set(savedColor);
+    }
+    if (savedAvatar) {
+      const match = savedAvatar.match(/^b(\d+)e(\d+)m(\d+)a(\d+)$/);
+      if (match) {
+        this.avatarBase.set(parseInt(match[1], 10));
+        this.avatarEyes.set(parseInt(match[2], 10));
+        this.avatarMouth.set(parseInt(match[3], 10));
+        this.avatarAccessory.set(parseInt(match[4], 10));
+      }
+    }
+
     effect(() => {
       const user = this.authService.currentUser();
       if (user) {
@@ -52,12 +81,24 @@ export class StartPageComponent {
     });
   }
   avatarColors = [
-    { name: 'Gold', hex: '#f1b814', bgClass: 'bg-[#f1b814]', borderClass: 'border-[#f1b814]' },
-    { name: 'Blue', hex: '#0052cc', bgClass: 'bg-[#0052cc]', borderClass: 'border-[#0052cc]' },
-    { name: 'Red', hex: '#ef4444', bgClass: 'bg-[#ef4444]', borderClass: 'border-[#ef4444]' },
-    { name: 'Green', hex: '#22c55e', bgClass: 'bg-[#22c55e]', borderClass: 'border-[#22c55e]' },
-    { name: 'Purple', hex: '#a855f7', bgClass: 'bg-[#a855f7]', borderClass: 'border-[#a855f7]' },
-    { name: 'Pink', hex: '#ec4899', bgClass: 'bg-[#ec4899]', borderClass: 'border-[#ec4899]' }
+    { name: 'Gelb', hex: '#f1b814' },
+    { name: 'Orange', hex: '#f97316' },
+    { name: 'Rot', hex: '#ef4444' },
+    { name: 'Pink', hex: '#ec4899' },
+    { name: 'Violett', hex: '#a855f7' },
+    { name: 'Indigo', hex: '#6366f1' },
+    { name: 'Blau', hex: '#0052cc' },
+    { name: 'Hellblau', hex: '#0ea5e9' },
+    { name: 'Cyan', hex: '#06b6d4' },
+    { name: 'Teal', hex: '#14b8a6' },
+    { name: 'Smaragd', hex: '#10b981' },
+    { name: 'Grün', hex: '#22c55e' },
+    { name: 'Limette', hex: '#84cc16' },
+    { name: 'Waldgrün', hex: '#15803d' },
+    { name: 'Crimson', hex: '#be123c' },
+    { name: 'Amber', hex: '#f59e0b' },
+    { name: 'Bronze', hex: '#b45309' },
+    { name: 'Silber', hex: '#94a3b8' }
   ];
 
   // Join Game state
@@ -227,10 +268,15 @@ export class StartPageComponent {
     this.joinError.set('');
     
     try {
+      localStorage.setItem('jeopardy_player_name', this.playerName().trim());
+      localStorage.setItem('jeopardy_player_color', this.selectedColor());
+      localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
+
       await this.p2pService.joinRoom(
         this.roomCode().trim().toUpperCase(),
         this.playerName().trim(),
-        this.selectedColor()
+        this.selectedColor(),
+        this.selectedAvatar()
       );
     } catch (err: any) {
       this.joinError.set(this.p2pService.errorMessage() || 'Verbindung fehlgeschlagen.');
@@ -252,10 +298,15 @@ export class StartPageComponent {
     }
 
     try {
+      localStorage.setItem('jeopardy_player_name', this.playerName().trim());
+      localStorage.setItem('jeopardy_player_color', this.selectedColor());
+      localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
+
       await this.p2pService.hostRoom(
         randomCode,
         this.playerName().trim(),
         this.selectedColor(),
+        this.selectedAvatar(),
         parseInt(this.maxPlayers()),
         this.teamMode(),
         parseInt(this.teamSize()),
@@ -349,5 +400,48 @@ export class StartPageComponent {
 
   onCreateQuizClick() {
     this.router.navigate(['/create-quiz']);
+  }
+
+  cycleBase(direction: number) {
+    const total = 3; // 0, 1, 2
+    let next = this.avatarBase() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarBase.set(next);
+  }
+
+  cycleEyes(direction: number) {
+    const total = 8; // 0 to 7
+    let next = this.avatarEyes() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarEyes.set(next);
+  }
+
+  cycleMouth(direction: number) {
+    const total = 6; // 0 to 5
+    let next = this.avatarMouth() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarMouth.set(next);
+  }
+
+  cycleAccessory(direction: number) {
+    const total = 8; // 0 to 7
+    let next = this.avatarAccessory() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarAccessory.set(next);
+  }
+
+  randomizeAvatar() {
+    this.avatarBase.set(Math.floor(Math.random() * 3));
+    this.avatarEyes.set(Math.floor(Math.random() * 8));
+    this.avatarMouth.set(Math.floor(Math.random() * 6));
+    this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
+
+    // Also pick a random color from predefined ones
+    const randomColorObj = this.avatarColors[Math.floor(Math.random() * this.avatarColors.length)];
+    this.selectedColor.set(randomColorObj.hex);
   }
 }

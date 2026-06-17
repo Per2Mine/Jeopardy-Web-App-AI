@@ -355,6 +355,73 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
   res.json({ iceServers });
 });
 
+// 11. P2P HTTP Long-Polling Relay
+const messageQueues = new Map(); // peerId -> queue of messages
+const pendingPolls = new Map();  // peerId -> array of pending response objects
+
+app.post('/api/p2p/send', (req, res) => {
+  const { senderId, receiverId, message } = req.body;
+  if (!receiverId || !message) {
+    return res.status(400).json({ error: 'Missing receiverId or message' });
+  }
+
+  // Queue message for receiver
+  if (!messageQueues.has(receiverId)) {
+    messageQueues.set(receiverId, []);
+  }
+  messageQueues.get(receiverId).push({ senderId, message });
+
+  // Resolve pending polls for receiver
+  if (pendingPolls.has(receiverId)) {
+    const polls = pendingPolls.get(receiverId);
+    pendingPolls.delete(receiverId);
+    
+    const queue = messageQueues.get(receiverId) || [];
+    messageQueues.set(receiverId, []);
+
+    for (const pollRes of polls) {
+      if (!pollRes.destroyed && !pollRes.headersSent) {
+        pollRes.json({ messages: queue });
+      }
+    }
+  }
+
+  res.json({ success: true });
+});
+
+app.get('/api/p2p/poll/:peerId', (req, res) => {
+  const { peerId } = req.params;
+
+  // If messages are queued, return them immediately
+  const queue = messageQueues.get(peerId) || [];
+  if (queue.length > 0) {
+    messageQueues.set(peerId, []);
+    return res.json({ messages: queue });
+  }
+
+  // Otherwise, hold connection (long poll)
+  if (!pendingPolls.has(peerId)) {
+    pendingPolls.set(peerId, []);
+  }
+  pendingPolls.get(peerId).push(res);
+
+  // Timeout after 15 seconds
+  setTimeout(() => {
+    const polls = pendingPolls.get(peerId) || [];
+    const index = polls.indexOf(res);
+    if (index !== -1) {
+      polls.splice(index, 1);
+      if (polls.length === 0) {
+        pendingPolls.delete(peerId);
+      }
+      if (!res.destroyed && !res.headersSent) {
+        res.json({ messages: [] });
+      }
+    }
+  }, 15000);
+});
+
+
 
 const { ExpressPeerServer } = require('peer');
 

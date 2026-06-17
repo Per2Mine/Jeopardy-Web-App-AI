@@ -6,6 +6,7 @@ import { ButtonComponent } from '../../shared/components/button/button.component
 import { LogoComponent } from '../../shared/components/logo/logo.component';
 
 import { Category, Question } from '../../core/services/quiz.service';
+import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
 
 interface TeamScoreInfo {
   id: number;
@@ -17,7 +18,7 @@ interface TeamScoreInfo {
 @Component({
   selector: 'app-game-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, LogoComponent],
+  imports: [CommonModule, ButtonComponent, LogoComponent, AvatarComponent],
   templateUrl: './game-page.component.html',
   styleUrl: './game-page.component.css'
 })
@@ -108,6 +109,13 @@ export class GamePageComponent implements OnInit {
     if (!state || !state.buzzedPlayerId) return '#f1b814';
     const player = this.p2pService.players().find(p => p.id === state.buzzedPlayerId);
     return player ? player.color : '#f1b814';
+  }
+
+  getBuzzedPlayerAvatar(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.buzzedPlayerId) return '';
+    const player = this.p2pService.players().find(p => p.id === state.buzzedPlayerId);
+    return player ? (player.avatar || '') : '';
   }
 
   isBuzzerDisabled(): boolean {
@@ -247,6 +255,13 @@ export class GamePageComponent implements OnInit {
       const player = this.p2pService.players().find(p => p.id === state.activeSelectorId);
       return player ? player.color : '#f1b814';
     }
+  }
+
+  getActiveSelectorAvatar(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.activeSelectorId || this.p2pService.teamMode()) return '';
+    const player = this.p2pService.players().find(p => p.id === state.activeSelectorId);
+    return player ? (player.avatar || '') : '';
   }
 
   getActiveSelectorInitials(): string {

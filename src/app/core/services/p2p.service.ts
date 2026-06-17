@@ -8,6 +8,7 @@ export interface Player {
   id: string;
   name: string;
   color: string;
+  avatar?: string;
   isHost: boolean;
   score: number;
   teamId?: number; // 1-indexed team identifier
@@ -51,14 +52,63 @@ export interface ChatMessage {
   senderId: string;
   senderName: string;
   senderColor: string;
+  senderAvatar?: string;
   text: string;
   timestamp: number;
 }
 
 export interface P2pMessage {
-  type: 'JOIN_ACK' | 'PLAYER_LIST' | 'GAME_STATE' | 'KICK' | 'BUZZ' | 'START_GAME' | 'SELECT_TEAM' | 'CHAT_MSG' | 'VOTE_QUESTION';
+  type: 'JOIN_ACK' | 'PLAYER_LIST' | 'GAME_STATE' | 'KICK' | 'BUZZ' | 'START_GAME' | 'SELECT_TEAM' | 'CHAT_MSG' | 'VOTE_QUESTION' | 'JOIN_REQ';
   senderId: string;
   payload: any;
+}
+
+export class HttpRelayConnection {
+  open = true;
+  private listeners: { [key: string]: Function[] } = {};
+
+  constructor(
+    public peer: string,
+    private myPeerId: string,
+    private http: HttpClient,
+    public metadata?: any
+  ) {}
+
+  send(data: any) {
+    if (!this.open) return;
+    this.http.post('/api/p2p/send', {
+      senderId: this.myPeerId,
+      receiverId: this.peer,
+      message: data
+    }).subscribe({
+      error: (err) => console.error('Failed to send HTTP relay message:', err)
+    });
+  }
+
+  close() {
+    if (!this.open) return;
+    this.open = false;
+    this.trigger('close');
+  }
+
+  on(event: 'open' | 'data' | 'close' | 'error', callback: (data?: any) => void) {
+    if (event === 'open') {
+      setTimeout(() => {
+        if (this.open) callback();
+      }, 0);
+      return;
+    }
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+  }
+
+  trigger(event: string, data?: any) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(cb => cb(data));
+    }
+  }
 }
 
 @Injectable({
@@ -68,13 +118,14 @@ export class P2pService {
   private router = inject(Router);
   private http = inject(HttpClient);
   private peer: Peer | null = null;
-  private hostConnectionMap = new Map<string, DataConnection>(); // Host only: playerId -> DataConnection
-  private clientConnection: DataConnection | null = null; // Client only: connection to host
+  private hostConnectionMap = new Map<string, any>(); // Host only: playerId -> DataConnection or HttpRelayConnection
+  private clientConnection: any = null; // Client only: connection to host
   private maxPlayersLimit = 8;
   
   private iceServers: any[] = [
     { urls: 'stun:stun.l.google.com:19302' }
   ];
+
 
   // State Signals
   roomCode = signal<string | null>(null);
@@ -161,6 +212,204 @@ export class P2pService {
     });
   }
 
+  // HTTP Polling Fallback System
+  private isPolling = false;
+  private startPolling(myId: string) {
+    if (this.isPolling) return;
+    this.isPolling = true;
+    this.pollNext(myId);
+  }
+
+  private stopPolling() {
+    this.isPolling = false;
+  }
+
+  private pollNext(myId: string) {
+    if (!this.isPolling || !this.peer) return;
+
+    this.http.get<{ messages: Array<{ senderId: string, message: any }> }>(`/api/p2p/poll/${myId}`).subscribe({
+      next: (res) => {
+        if (res && res.messages) {
+          for (const item of res.messages) {
+            this.handleRelayedMessage(item.senderId, item.message);
+          }
+        }
+        // Poll again immediately
+        setTimeout(() => this.pollNext(myId), 100);
+      },
+      error: (err) => {
+        console.warn('HTTP poll failed, retrying in 2s...', err);
+        setTimeout(() => this.pollNext(myId), 2000);
+      }
+    });
+  }
+
+  private handleRelayedMessage(senderId: string, msg: any) {
+    if (this.isHost()) {
+      if (msg.type === 'JOIN_REQ') {
+        // Create an HTTP Relay Connection for this player
+        const relayConn = new HttpRelayConnection(
+          senderId,
+          this.myPlayerId()!,
+          this.http,
+          msg.payload
+        );
+        this.handleIncomingConnection(relayConn);
+      } else {
+        const conn = this.hostConnectionMap.get(senderId);
+        if (conn && conn instanceof HttpRelayConnection) {
+          conn.trigger('data', msg);
+        }
+      }
+    } else {
+      if (this.clientConnection && this.clientConnection instanceof HttpRelayConnection && senderId === this.clientConnection.peer) {
+        this.clientConnection.trigger('data', msg);
+      }
+    }
+  }
+
+  private handleIncomingConnection(conn: any) {
+    const metadata = conn.metadata || {};
+    const playerId = conn.peer;
+    const playerName = metadata.name || 'Unbekannt';
+    const playerColor = metadata.color || '#0052cc';
+    const playerAvatar = metadata.avatar || '';
+
+    // Check if player is reconnecting with an existing session
+    const originalPlayerId = metadata.originalPlayerId;
+    if (originalPlayerId) {
+      const existingPlayerIndex = this.players().findIndex(p => p.id === originalPlayerId);
+      if (existingPlayerIndex !== -1) {
+        const existingPlayer = this.players()[existingPlayerIndex];
+        
+        // Update the connection in map
+        this.hostConnectionMap.set(playerId, conn);
+        
+        // Update player list with new Peer ID, clear isOffline
+        const updatedPlayers = [...this.players()];
+        updatedPlayers[existingPlayerIndex] = {
+          ...existingPlayer,
+          id: playerId, // Update to new Peer ID
+          name: playerName,
+          color: playerColor,
+          avatar: playerAvatar,
+          isOffline: false
+        };
+        this.players.set(updatedPlayers);
+
+        // Update game state references if they reference originalPlayerId
+        const currentGameState = this.gameState();
+        let stateChanged = false;
+        let updatedBuzzedPlayerId = currentGameState.buzzedPlayerId;
+        let updatedLockedOutPlayerIds = [...currentGameState.lockedOutPlayerIds];
+
+        if (currentGameState.buzzedPlayerId === originalPlayerId) {
+          updatedBuzzedPlayerId = playerId;
+          stateChanged = true;
+        }
+        if (currentGameState.lockedOutPlayerIds.includes(originalPlayerId)) {
+          updatedLockedOutPlayerIds = currentGameState.lockedOutPlayerIds.map(id => id === originalPlayerId ? playerId : id);
+          stateChanged = true;
+        }
+
+        if (stateChanged) {
+          this.gameState.set({
+            ...currentGameState,
+            buzzedPlayerId: updatedBuzzedPlayerId,
+            lockedOutPlayerIds: updatedLockedOutPlayerIds
+          });
+        }
+
+        // Acknowledge the connection and send initial welcome with the current game state and chat
+        const ackMessage: P2pMessage = {
+          type: 'JOIN_ACK',
+          senderId: this.myPlayerId()!,
+          payload: { 
+            success: true,
+            teamMode: this.teamMode(),
+            maxTeamsLimit: this.maxTeamsLimit(),
+            maxPlayersPerTeam: this.maxPlayersPerTeam(),
+            gameState: this.gameState(),
+            chatHistory: this.chatMessages()
+          }
+        };
+        conn.send(ackMessage);
+
+        // Broadcast updated player list & game state to everyone
+        this.broadcastPlayerList();
+        this.broadcast({
+          type: 'GAME_STATE',
+          senderId: this.myPlayerId()!,
+          payload: this.gameState()
+        });
+
+        // Handle messages from this client
+        this.setupMessageListener(conn, playerId);
+        return;
+      }
+    }
+
+    // Check if player limit is reached (excludes the host/owner)
+    const maxAllowed = this.teamMode() 
+      ? this.maxTeamsLimit() * this.maxPlayersPerTeam()
+      : this.maxPlayersLimit;
+
+    if (this.hostConnectionMap.size >= maxAllowed) {
+      conn.send({
+        type: 'JOIN_ACK',
+        senderId: this.myPlayerId()!,
+        payload: { success: false, reason: 'lobby_full' }
+      });
+      setTimeout(() => conn.close(), 500);
+      return;
+    }
+    
+    // 1. Add connection to host map
+    this.hostConnectionMap.set(playerId, conn);
+
+    // 2. Assign to first team with empty slot if in team mode
+    let teamId: number | undefined = undefined;
+    if (this.teamMode()) {
+      for (let t = 1; t <= this.maxTeamsLimit(); t++) {
+        const teamCount = this.players().filter(p => p.teamId === t).length;
+        if (teamCount < this.maxPlayersPerTeam()) {
+          teamId = t;
+          break;
+        }
+      }
+      if (teamId === undefined) teamId = 1;
+    }
+
+    // 3. Add player to the list
+    const updatedPlayers = [
+      ...this.players(),
+      { id: playerId, name: playerName, color: playerColor, avatar: playerAvatar, isHost: false, score: 0, teamId, isOffline: false }
+    ];
+    this.players.set(updatedPlayers);
+
+    // 4. Acknowledge the connection and send initial welcome
+    const ackMessage: P2pMessage = {
+      type: 'JOIN_ACK',
+      senderId: this.myPlayerId()!,
+      payload: { 
+        success: true,
+        teamMode: this.teamMode(),
+        maxTeamsLimit: this.maxTeamsLimit(),
+        maxPlayersPerTeam: this.maxPlayersPerTeam(),
+        gameState: this.gameState(),
+        chatHistory: this.chatMessages()
+      }
+    };
+    conn.send(ackMessage);
+
+    // 5. Broadcast updated player list to everyone
+    this.broadcastPlayerList();
+
+    // 6. Handle messages from this client
+    this.setupMessageListener(conn, playerId);
+  }
+
+
 
 
   constructor() {
@@ -190,6 +439,7 @@ export class P2pService {
           roomCode: code,
           playerName: me ? me.name : (isHost ? 'Host' : 'Spieler'),
           playerColor: me ? me.color : '#f1b814',
+          playerAvatar: me ? (me.avatar || '') : '',
           myPlayerId: myId,
           teamMode: tMode,
           maxPlayers: this.maxPlayersLimit,
@@ -255,6 +505,7 @@ export class P2pService {
         this.isHost.set(true);
         this.roomCode.set(id);
         this.myPlayerId.set(id);
+        this.startPolling(id);
         
         // Restore players, but mark everyone else as offline (waiting for them to reconnect)
         const restoredPlayers = (session.players || []).map((p: Player) => {
@@ -282,7 +533,16 @@ export class P2pService {
         resolve(true);
       });
 
-      this.peer.on('error', (err) => {
+      this.peer.on('error', (err: any) => {
+        const isNonFatal = err.type === 'negotiation-failed' || 
+                            err.type === 'webrtc' || 
+                            err.type === 'connection-closed' ||
+                            (err.message && (err.message.includes('Negotiation') || err.message.includes('ICE') || err.message.includes('WebRTC')));
+        if (isNonFatal) {
+          console.warn('Ignoring non-fatal PeerJS Restore Host error:', err);
+          return;
+        }
+
         console.error('PeerJS Restore Host Error:', err);
         this.connectionState.set('error');
         if (err.type === 'unavailable-id') {
@@ -312,25 +572,80 @@ export class P2pService {
         this.myPlayerId.set(myId);
         
         // Connect to the Host using the room code
-        // We pass the player's profile AND the original player ID in metadata
         const conn = this.peer!.connect(formattedCode, {
           metadata: { 
             name: session.playerName, 
             color: session.playerColor, 
-            originalPlayerId: session.myPlayerId // This tells the Host who we were!
+            avatar: session.playerAvatar || '',
+            originalPlayerId: session.myPlayerId
           },
           reliable: true
         });
 
-        this.setupClientListeners(conn, formattedCode, () => {
-          resolve(true);
-        }, (err) => {
-          sessionStorage.removeItem('jeopardy_p2p_session');
-          resolve(false);
+        let webRtcOk = false;
+        conn.on('open', () => {
+          webRtcOk = true;
+          this.setupClientListeners(conn, formattedCode, () => {
+            resolve(true);
+          }, (err) => {
+            sessionStorage.removeItem('jeopardy_p2p_session');
+            resolve(false);
+          });
         });
+
+        // 3 second WebRTC timeout -> HTTP relay fallback
+        setTimeout(() => {
+          if (!webRtcOk && this.connectionState() === 'connecting') {
+            console.warn('WebRTC session restore timed out, falling back to HTTP relay...');
+            
+            conn.close();
+
+            const relayConn = new HttpRelayConnection(
+              formattedCode,
+              myId,
+              this.http,
+              { 
+                name: session.playerName, 
+                color: session.playerColor, 
+                avatar: session.playerAvatar || '',
+                originalPlayerId: session.myPlayerId
+              }
+            );
+            
+            this.clientConnection = relayConn;
+            this.startPolling(myId);
+
+            this.setupClientListeners(relayConn as any, formattedCode, () => {
+              resolve(true);
+            }, (err) => {
+              sessionStorage.removeItem('jeopardy_p2p_session');
+              resolve(false);
+            });
+
+            relayConn.send({
+              type: 'JOIN_REQ',
+              senderId: myId,
+              payload: {
+                name: session.playerName,
+                color: session.playerColor,
+                avatar: session.playerAvatar || '',
+                originalPlayerId: session.myPlayerId
+              }
+            });
+          }
+        }, 3000);
       });
 
-      this.peer.on('error', (err) => {
+      this.peer.on('error', (err: any) => {
+        const isNonFatal = err.type === 'negotiation-failed' || 
+                            err.type === 'webrtc' || 
+                            err.type === 'connection-closed' ||
+                            (err.message && (err.message.includes('Negotiation') || err.message.includes('ICE') || err.message.includes('WebRTC')));
+        if (this.clientConnection instanceof HttpRelayConnection || isNonFatal) {
+          console.warn('Ignoring non-fatal PeerJS Restore Client Error:', err);
+          return;
+        }
+
         console.error('PeerJS Restore Client Error:', err);
         this.connectionState.set('error');
         sessionStorage.removeItem('jeopardy_p2p_session');
@@ -346,6 +661,7 @@ export class P2pService {
     roomCode: string, 
     hostName: string, 
     hostColor: string, 
+    hostAvatar: string, 
     maxPlayers: number, 
     teamMode: boolean, 
     maxPlayersPerTeam: number,
@@ -379,6 +695,7 @@ export class P2pService {
         this.isHost.set(true);
         this.roomCode.set(id);
         this.myPlayerId.set(id);
+        this.startPolling(id);
         this.connectionState.set('connected');
 
         // Add host as the first player in the list
@@ -386,6 +703,7 @@ export class P2pService {
           id: id,
           name: hostName,
           color: hostColor,
+          avatar: hostAvatar,
           isHost: true,
           score: 0
         }]);
@@ -395,7 +713,16 @@ export class P2pService {
         resolve();
       });
 
-      this.peer.on('error', (err) => {
+      this.peer.on('error', (err: any) => {
+        const isNonFatal = err.type === 'negotiation-failed' || 
+                            err.type === 'webrtc' || 
+                            err.type === 'connection-closed' ||
+                            (err.message && (err.message.includes('Negotiation') || err.message.includes('ICE') || err.message.includes('WebRTC')));
+        if (isNonFatal) {
+          console.warn('Ignoring non-fatal PeerJS Host error:', err);
+          return;
+        }
+
         console.error('PeerJS Host Error:', err);
         this.connectionState.set('error');
         if (err.type === 'unavailable-id') {
@@ -411,7 +738,7 @@ export class P2pService {
   /**
    * Connect to an existing room as Client
    */
-  joinRoom(roomCode: string, playerName: string, playerColor: string): Promise<void> {
+  joinRoom(roomCode: string, playerName: string, playerColor: string, playerAvatar: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.disconnect();
       this.wasKicked.set(false);
@@ -427,16 +754,59 @@ export class P2pService {
         this.myPlayerId.set(myId);
         
         // Connect to the Host using the room code
-        // We pass the player's profile in metadata
         const conn = this.peer!.connect(formattedCode, {
-          metadata: { name: playerName, color: playerColor },
+          metadata: { name: playerName, color: playerColor, avatar: playerAvatar },
           reliable: true
         });
 
-        this.setupClientListeners(conn, formattedCode, resolve, reject);
+        let webRtcOk = false;
+        conn.on('open', () => {
+          webRtcOk = true;
+          this.setupClientListeners(conn, formattedCode, resolve, reject);
+        });
+
+        // 3 second WebRTC timeout -> HTTP relay fallback
+        setTimeout(() => {
+          if (!webRtcOk && this.connectionState() === 'connecting') {
+            console.warn('WebRTC connection to host timed out, falling back to HTTP relay...');
+            
+            conn.close();
+
+            const relayConn = new HttpRelayConnection(
+              formattedCode,
+              myId,
+              this.http,
+              { name: playerName, color: playerColor, avatar: playerAvatar }
+            );
+            
+            this.clientConnection = relayConn;
+            this.startPolling(myId);
+
+            this.setupClientListeners(relayConn as any, formattedCode, resolve, reject);
+
+            relayConn.send({
+              type: 'JOIN_REQ',
+              senderId: myId,
+              payload: {
+                name: playerName,
+                color: playerColor,
+                avatar: playerAvatar
+              }
+            });
+          }
+        }, 3000);
       });
 
-      this.peer.on('error', (err) => {
+      this.peer.on('error', (err: any) => {
+        const isNonFatal = err.type === 'negotiation-failed' || 
+                            err.type === 'webrtc' || 
+                            err.type === 'connection-closed' ||
+                            (err.message && (err.message.includes('Negotiation') || err.message.includes('ICE') || err.message.includes('WebRTC')));
+        if (this.clientConnection instanceof HttpRelayConnection || isNonFatal) {
+          console.warn('Ignoring non-fatal PeerJS Client Error:', err);
+          return;
+        }
+
         console.error('PeerJS Client Error:', err);
         this.connectionState.set('error');
         if (err.type === 'peer-unavailable') {
@@ -454,6 +824,7 @@ export class P2pService {
    */
   disconnect() {
     this.stopHostTimer();
+    this.stopPolling();
     
     // Client disconnect
     if (this.clientConnection) {
@@ -490,140 +861,7 @@ export class P2pService {
 
     this.peer.on('connection', (conn) => {
       conn.on('open', () => {
-        const metadata = conn.metadata || {};
-        const playerId = conn.peer;
-        const playerName = metadata.name || 'Unbekannt';
-        const playerColor = metadata.color || '#0052cc';
-
-        // Check if player is reconnecting with an existing session
-        const originalPlayerId = metadata.originalPlayerId;
-        if (originalPlayerId) {
-          const existingPlayerIndex = this.players().findIndex(p => p.id === originalPlayerId);
-          if (existingPlayerIndex !== -1) {
-            const existingPlayer = this.players()[existingPlayerIndex];
-            
-            // Update the connection in map
-            this.hostConnectionMap.set(playerId, conn);
-            
-            // Update player list with new Peer ID, clear isOffline
-            const updatedPlayers = [...this.players()];
-            updatedPlayers[existingPlayerIndex] = {
-              ...existingPlayer,
-              id: playerId, // Update to new Peer ID
-              isOffline: false
-            };
-            this.players.set(updatedPlayers);
-
-            // Update game state references if they reference originalPlayerId
-            const currentGameState = this.gameState();
-            let stateChanged = false;
-            let updatedBuzzedPlayerId = currentGameState.buzzedPlayerId;
-            let updatedLockedOutPlayerIds = [...currentGameState.lockedOutPlayerIds];
-
-            if (currentGameState.buzzedPlayerId === originalPlayerId) {
-              updatedBuzzedPlayerId = playerId;
-              stateChanged = true;
-            }
-            if (currentGameState.lockedOutPlayerIds.includes(originalPlayerId)) {
-              updatedLockedOutPlayerIds = currentGameState.lockedOutPlayerIds.map(id => id === originalPlayerId ? playerId : id);
-              stateChanged = true;
-            }
-
-            if (stateChanged) {
-              this.gameState.set({
-                ...currentGameState,
-                buzzedPlayerId: updatedBuzzedPlayerId,
-                lockedOutPlayerIds: updatedLockedOutPlayerIds
-              });
-            }
-
-            // Acknowledge the connection and send initial welcome with the current game state and chat
-            const ackMessage: P2pMessage = {
-              type: 'JOIN_ACK',
-              senderId: this.myPlayerId()!,
-              payload: { 
-                success: true,
-                teamMode: this.teamMode(),
-                maxTeamsLimit: this.maxTeamsLimit(),
-                maxPlayersPerTeam: this.maxPlayersPerTeam(),
-                gameState: this.gameState(),
-                chatHistory: this.chatMessages()
-              }
-            };
-            conn.send(ackMessage);
-
-            // Broadcast updated player list & game state to everyone
-            this.broadcastPlayerList();
-            this.broadcast({
-              type: 'GAME_STATE',
-              senderId: this.myPlayerId()!,
-              payload: this.gameState()
-            });
-
-            // Handle messages from this client
-            this.setupMessageListener(conn, playerId);
-            return;
-          }
-        }
-
-        // Check if player limit is reached (excludes the host/owner)
-        const maxAllowed = this.teamMode() 
-          ? this.maxTeamsLimit() * this.maxPlayersPerTeam()
-          : this.maxPlayersLimit;
-
-        if (this.hostConnectionMap.size >= maxAllowed) {
-          conn.send({
-            type: 'JOIN_ACK',
-            senderId: this.myPlayerId()!,
-            payload: { success: false, reason: 'lobby_full' }
-          });
-          setTimeout(() => conn.close(), 500);
-          return;
-        }
-        
-        // 1. Add connection to host map
-        this.hostConnectionMap.set(playerId, conn);
-
-        // 2. Assign to first team with empty slot if in team mode
-        let teamId: number | undefined = undefined;
-        if (this.teamMode()) {
-          for (let t = 1; t <= this.maxTeamsLimit(); t++) {
-            const teamCount = this.players().filter(p => p.teamId === t).length;
-            if (teamCount < this.maxPlayersPerTeam()) {
-              teamId = t;
-              break;
-            }
-          }
-          if (teamId === undefined) teamId = 1;
-        }
-
-        // 3. Add player to the list
-        const updatedPlayers = [
-          ...this.players(),
-          { id: playerId, name: playerName, color: playerColor, isHost: false, score: 0, teamId, isOffline: false }
-        ];
-        this.players.set(updatedPlayers);
-
-        // 4. Acknowledge the connection and send initial welcome
-        const ackMessage: P2pMessage = {
-          type: 'JOIN_ACK',
-          senderId: this.myPlayerId()!,
-          payload: { 
-            success: true,
-            teamMode: this.teamMode(),
-            maxTeamsLimit: this.maxTeamsLimit(),
-            maxPlayersPerTeam: this.maxPlayersPerTeam(),
-            gameState: this.gameState(),
-            chatHistory: this.chatMessages()
-          }
-        };
-        conn.send(ackMessage);
-
-        // 5. Broadcast updated player list to everyone
-        this.broadcastPlayerList();
-
-        // 6. Handle messages from this client
-        this.setupMessageListener(conn, playerId);
+        this.handleIncomingConnection(conn);
       });
     });
   }
@@ -1534,12 +1772,14 @@ export class P2pService {
     const me = this.me();
     const senderName = me ? me.name : (this.isHost() ? 'Host' : 'Spieler');
     const senderColor = me ? me.color : '#f1b814';
+    const senderAvatar = me ? (me.avatar || '') : '';
 
     const chatMsg: ChatMessage = {
       id: Math.random().toString(36).substring(2, 9),
       senderId: this.myPlayerId() || 'unknown',
       senderName,
       senderColor,
+      senderAvatar,
       text: trimmed,
       timestamp: Date.now()
     };
@@ -1560,6 +1800,7 @@ export class P2pService {
         payload: {
           senderName,
           senderColor,
+          senderAvatar,
           text: trimmed
         }
       });
@@ -1573,6 +1814,7 @@ export class P2pService {
       senderId: msg.senderId,
       senderName: msg.payload.senderName,
       senderColor: msg.payload.senderColor,
+      senderAvatar: msg.payload.senderAvatar || '',
       text: msg.payload.text,
       timestamp: Date.now()
     };

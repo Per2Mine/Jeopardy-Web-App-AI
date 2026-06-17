@@ -2,11 +2,12 @@ import { Component, signal, computed, inject, ViewChild, ElementRef, effect } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { P2pService, ChatMessage } from '../../../core/services/p2p.service';
+import { AvatarComponent } from '../avatar/avatar.component';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AvatarComponent],
   template: `
     <!-- Only show chat when connected to a room -->
     @if (p2pService.connectionState() === 'connected') {
@@ -81,38 +82,52 @@ import { P2pService, ChatMessage } from '../../../core/services/p2p.service';
                   @let isHostMsg = msg.senderId === p2pService.roomCode();
 
                   <div 
-                    [class]="'flex flex-col max-w-[85%] ' + (isSelf ? 'self-end items-end' : 'self-start items-start')">
+                    [class]="'flex flex-col max-w-[85%] ' + (isSelf ? 'self-end' : 'self-start')">
                     
-                    <!-- Sender Name/Badge -->
-                    @if (!isSelf) {
-                      <div class="flex items-center gap-1 mb-1 px-1">
-                        <span 
-                          [style.color]="msg.senderColor"
-                          class="text-[10px] font-black tracking-wide">
-                          {{ msg.senderName }}
-                        </span>
-                        @if (isHostMsg) {
-                          <span class="text-[8px] bg-jeopardy-gold/20 text-jeopardy-gold border border-jeopardy-gold/30 px-1 py-0.2 rounded uppercase font-bold tracking-wider">
-                            Host
-                          </span>
-                        }
+                    <!-- Avatar + Bubble row -->
+                    <div [class]="'flex items-start gap-2 ' + (isSelf ? 'flex-row-reverse' : 'flex-row')">
+                      <!-- Avatar -->
+                      <div class="flex-shrink-0 mt-0.5">
+                        <app-avatar 
+                          [avatar]="msg.senderAvatar || ''" 
+                          [name]="msg.senderName" 
+                          [size]="24" 
+                          [color]="msg.senderColor || '#f1b814'">
+                        </app-avatar>
                       </div>
-                    }
 
-                    <!-- Message Bubble -->
-                    <div 
-                      [class]="'px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words border ' + 
-                               (isSelf ? 
-                                 'bg-jeopardy-accent/15 border-jeopardy-accent/30 text-white rounded-tr-none' : 
-                                 'bg-white/[0.04] border-white/5 text-white/90 rounded-tl-none')">
-                      {{ msg.text }}
+                      <div [class]="'flex flex-col ' + (isSelf ? 'items-end' : 'items-start')">
+                        <!-- Sender Name/Badge -->
+                        @if (!isSelf) {
+                          <div class="flex items-center gap-1 mb-1 px-1">
+                            <span 
+                              [style.color]="msg.senderColor"
+                              class="text-[10px] font-black tracking-wide">
+                              {{ msg.senderName }}
+                            </span>
+                            @if (isHostMsg) {
+                              <span class="text-[8px] bg-jeopardy-gold/20 text-jeopardy-gold border border-jeopardy-gold/30 px-1 py-0.2 rounded uppercase font-bold tracking-wider">
+                                Host
+                              </span>
+                            }
+                          </div>
+                        }
+
+                        <!-- Message Bubble -->
+                        <div 
+                          [class]="'px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words border ' + 
+                                   (isSelf ? 
+                                     'bg-jeopardy-accent/15 border-jeopardy-accent/30 text-white rounded-tr-none' : 
+                                     'bg-white/[0.04] border-white/5 text-white/90 rounded-tl-none')">
+                          {{ msg.text }}
+                        </div>
+
+                        <!-- Timestamp -->
+                        <span class="text-[9px] text-white/20 mt-1 px-1 font-semibold">
+                          {{ msg.timestamp | date:'HH:mm' }}
+                        </span>
+                      </div>
                     </div>
-
-                    <!-- Timestamp -->
-                    <span class="text-[9px] text-white/20 mt-1 px-1 font-semibold">
-                      {{ msg.timestamp | date:'HH:mm' }}
-                    </span>
-
                   </div>
                 }
               }
