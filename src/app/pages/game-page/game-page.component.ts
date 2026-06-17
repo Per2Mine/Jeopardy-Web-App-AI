@@ -7,6 +7,8 @@ import { LogoComponent } from '../../shared/components/logo/logo.component';
 
 import { Category, Question } from '../../core/services/quiz.service';
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
+import { AudioSettingsComponent } from '../../shared/components/audio-settings/audio-settings.component';
+import { AudioService } from '../../core/services/audio.service';
 
 interface TeamScoreInfo {
   id: number;
@@ -18,12 +20,13 @@ interface TeamScoreInfo {
 @Component({
   selector: 'app-game-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, LogoComponent, AvatarComponent],
+  imports: [CommonModule, ButtonComponent, LogoComponent, AvatarComponent, AudioSettingsComponent],
   templateUrl: './game-page.component.html',
   styleUrl: './game-page.component.css'
 })
 export class GamePageComponent implements OnInit {
   p2pService = inject(P2pService);
+  audioService = inject(AudioService);
   private router = inject(Router);
 
   constructor() {

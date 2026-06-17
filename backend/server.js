@@ -355,6 +355,12 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
   res.json({ iceServers });
 });
 
+// Debug log endpoint to capture client logs on server
+app.post('/api/debug/log', (req, res) => {
+  console.log('[Client Log]', req.body.message);
+  res.json({ success: true });
+});
+
 // 11. P2P HTTP Long-Polling Relay
 const messageQueues = new Map(); // peerId -> queue of messages
 const pendingPolls = new Map();  // peerId -> array of pending response objects

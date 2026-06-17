@@ -9,11 +9,12 @@ import { P2pService, Player } from '../../core/services/p2p.service';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizService } from '../../core/services/quiz.service';
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
+import { AudioSettingsComponent } from '../../shared/components/audio-settings/audio-settings.component';
 
 @Component({
   selector: 'app-start-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, ToggleComponent, LogoComponent, AvatarComponent],
+  imports: [CommonModule, ButtonComponent, InputComponent, ToggleComponent, LogoComponent, AvatarComponent, AudioSettingsComponent],
   templateUrl: './start-page.component.html',
   styleUrl: './start-page.component.css'
 })

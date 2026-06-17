@@ -1,6 +1,7 @@
 <div class="min-h-screen w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-jeopardy-blue/30 via-jeopardy-dark to-jeopardy-dark p-4 md:p-8 relative">
 
   <div class="absolute top-4 right-4 z-40 flex items-center gap-3">
+    <app-audio-settings></app-audio-settings>
     @let user = authService.currentUser();
     @if (user) {
       <div class="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full py-1.5 pl-3 pr-2 backdrop-blur-md">

@@ -1,0 +1,36 @@
+/* Custom range slider styling for WebKit/Blink and Firefox */
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f1b814; /* Jeopardy Gold */
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  box-shadow: 0 0 4px rgba(241, 184, 20, 0.4);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: 50%;
+  background: #f1b814; /* Jeopardy Gold */
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  box-shadow: 0 0 4px rgba(241, 184, 20, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.3);
+}
+
+input[type="range"] {
+  outline: none;
+}

@@ -1,0 +1,40 @@
+<div class="group relative flex items-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-full p-1.5 transition-all duration-300 select-none shadow-md">
+  
+  <!-- Speaker Button -->
+  <button 
+    (click)="toggleMute($event)"
+    class="text-white hover:text-jeopardy-gold transition-colors p-1 cursor-pointer flex items-center justify-center rounded-full outline-none focus:ring-1 focus:ring-jeopardy-gold/50"
+    [title]="muted() ? 'Ton einschalten' : 'Stummschalten'">
+    
+    @if (muted() || volume() === 0) {
+      <!-- Mute Icon -->
+      <svg class="w-4 h-4 text-white/50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6L4.5 9H1.5v6h3l4.5 3.75V5.25z"></path>
+      </svg>
+    } @else if (volume() < 0.4) {
+      <!-- Low Volume Icon -->
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"></path>
+      </svg>
+    } @else {
+      <!-- High Volume Icon -->
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"></path>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21.5 12a12.5 12.5 0 01-2.386 7.386M21.5 12a12.5 12.5 0 00-2.386-7.386"></path>
+      </svg>
+    }
+  </button>
+
+  <!-- Slider: Slides open smoothly when parent is hovered -->
+  <div class="w-0 overflow-hidden group-hover:w-20 transition-all duration-300 flex items-center pr-1.5">
+    <input 
+      type="range" 
+      min="0" 
+      max="1" 
+      step="0.05"
+      [value]="volume()"
+      (input)="onVolumeChange($event)"
+      [class]="'w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-jeopardy-gold transition-opacity ' + (muted() ? 'opacity-30' : 'opacity-100')"
+      title="Lautstärke">
+  </div>
+</div>
