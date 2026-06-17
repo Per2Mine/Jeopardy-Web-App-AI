@@ -16,6 +16,7 @@ export class InputComponent {
   rows = input<number>(3);
   disabled = input<boolean>(false);
   maxLength = input<number | null>(null);
+  showCounter = input<boolean>(true);
   id = input<string>(`input-${Math.random().toString(36).substring(2, 9)}`);
 
   onInput(event: Event): void {

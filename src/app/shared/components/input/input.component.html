@@ -1,10 +1,35 @@
 <div class="w-full">
-  @if (label()) {
-    <label 
-      [for]="id()" 
-      class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5 transition-colors duration-200">
-      {{ label() }}
-    </label>
+  @if (label() || (maxLength() && showCounter())) {
+    <div class="flex justify-between items-center mb-1.5">
+      @if (label()) {
+        <label 
+          [for]="id()" 
+          class="block text-xs font-bold text-white/70 uppercase tracking-widest transition-colors duration-200">
+          {{ label() }}
+        </label>
+      } @else {
+        <div></div>
+      }
+      @if (maxLength(); as max) {
+        @if (showCounter()) {
+          <div class="flex items-center gap-1.5 text-[10px] font-mono font-bold text-white/40">
+            <span>{{ max - value().length }}</span>
+            <svg class="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 20 20">
+              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" class="text-white/10" stroke-width="2.5"/>
+              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor"
+                      [class.text-jeopardy-accent]="value().length / max < 0.75"
+                      [class.text-yellow-500]="value().length / max >= 0.75 && value().length / max < 0.9"
+                      [class.text-red-500]="value().length / max >= 0.9"
+                      stroke-width="2.5"
+                      [attr.stroke-dasharray]="50.26"
+                      [attr.stroke-dashoffset]="50.26 - (50.26 * value().length / max)"
+                      class="transition-all duration-150"
+              />
+            </svg>
+          </div>
+        }
+      }
+    </div>
   }
 
   <div class="relative rounded-lg shadow-sm">
@@ -31,6 +56,19 @@
         (input)="onInput($event)"
         [class]="'w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300 ' + 
                  (error() ? 'border-red-500/50 focus:border-red-500 focus:ring-4 focus:ring-red-500/20' : 'border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20')">
+    }
+
+    @if (maxLength(); as max) {
+      @if (showCounter()) {
+        <div class="absolute bottom-[1px] left-[1px] right-[1px] h-[2px] bg-white/5 rounded-b-[7px] overflow-hidden pointer-events-none">
+          <div 
+            [style.width.%]="(value().length / max) * 100"
+            [class]="'h-full transition-all duration-150 ' + 
+                     (value().length / max < 0.75 ? 'bg-jeopardy-accent' : 
+                      value().length / max < 0.9 ? 'bg-yellow-500' : 'bg-red-500')">
+          </div>
+        </div>
+      }
     }
   </div>
 
