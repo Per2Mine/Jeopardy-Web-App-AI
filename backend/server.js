@@ -343,6 +343,9 @@ function validateQuizPayloadDraft(name, categories) {
   if (!name || typeof name !== 'string' || !name.trim()) {
     return 'Bitte gib der Quiz-Vorlage einen Namen.';
   }
+  if (name.trim().length > 30) {
+    return 'Der Quiz-Name darf maximal 30 Zeichen lang sein.';
+  }
   if (!categories || !Array.isArray(categories)) {
     return 'Ungültiges Format für Kategorien.';
   }
@@ -350,10 +353,21 @@ function validateQuizPayloadDraft(name, categories) {
     return 'Ein Quiz darf maximal 10 Kategorien besitzen.';
   }
 
-  // Validate images if present (format & size)
-  for (const cat of categories) {
+  // Validate fields and images if present
+  for (let c = 0; c < categories.length; c++) {
+    const cat = categories[c];
+    if (cat.name && (typeof cat.name !== 'string' || cat.name.trim().length > 18)) {
+      return `Der Kategorie-Name von Kategorie ${c + 1} darf maximal 18 Zeichen lang sein.`;
+    }
     if (cat.questions && Array.isArray(cat.questions)) {
-      for (const q of cat.questions) {
+      for (let qIdx = 0; qIdx < cat.questions.length; qIdx++) {
+        const q = cat.questions[qIdx];
+        if (q.text && (typeof q.text !== 'string' || q.text.trim().length > 160)) {
+          return `Der Frage-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 160 Zeichen lang sein.`;
+        }
+        if (q.answer && (typeof q.answer !== 'string' || q.answer.trim().length > 30)) {
+          return `Der Antwort-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 30 Zeichen lang sein.`;
+        }
         if (q.image) {
           if (typeof q.image !== 'string') {
             return 'Ungültiges Bild-Format.';
@@ -522,7 +536,24 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
 
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // Open Relay Project (Free STUN/TURN servers powered by Metered.ca)
+    { urls: 'stun:openrelay.metered.ca:80' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ];
 
   if (turnUrl && turnUsername && turnPassword) {

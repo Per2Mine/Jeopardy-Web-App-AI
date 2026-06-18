@@ -123,7 +123,25 @@ export class P2pService {
   private maxPlayersLimit = 8;
   
   private iceServers: any[] = [
-    { urls: 'stun:stun.l.google.com:19302' }
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // Open Relay Project (Free STUN/TURN servers powered by Metered.ca)
+    { urls: 'stun:openrelay.metered.ca:80' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ];
 
 
@@ -382,11 +400,24 @@ export class P2pService {
       return;
     }
 
+    // Validate player name length and characters (Host authority validation)
+    const trimmedName = playerName ? playerName.trim() : '';
+    const nameRegex = /^[a-zA-Z0-9_\-\säöüÄÖÜß]+$/;
+    if (trimmedName.length < 2 || trimmedName.length > 14 || !nameRegex.test(trimmedName)) {
+      conn.send({
+        type: 'JOIN_ACK',
+        senderId: this.myPlayerId()!,
+        payload: { success: false, reason: 'invalid_name' }
+      });
+      setTimeout(() => conn.close(), 500);
+      return;
+    }
+
     // Check if there is an ACTIVE player with the same name (case-insensitive)
     const isNameTaken = this.players().some(
-      p => !p.isOffline && p.name.trim().toLowerCase() === playerName.trim().toLowerCase()
+      p => !p.isOffline && p.name.trim().toLowerCase() === trimmedName.toLowerCase()
     );
-    this.logDebug('[Host] Checking if name is taken:', { playerName, isNameTaken });
+    this.logDebug('[Host] Checking if name is taken:', { playerName: trimmedName, isNameTaken });
 
     if (isNameTaken) {
       conn.send({
@@ -1087,6 +1118,8 @@ export class P2pService {
               this.errorMessage.set('Diese Lobby ist leider bereits voll.');
             } else if (msg.payload?.reason === 'name_taken') {
               this.errorMessage.set('Dieser Name ist in dieser Lobby bereits vergeben.');
+            } else if (msg.payload?.reason === 'invalid_name') {
+              this.errorMessage.set('Der Name ist ungültig (2-14 Zeichen, nur Buchstaben, Zahlen, Leerzeichen, _ und -).');
             } else {
               this.errorMessage.set('Verbindung von der Lobby abgelehnt.');
             }
@@ -1910,13 +1943,21 @@ export class P2pService {
 
   private handleHostChatMessage(msg: P2pMessage) {
     if (!this.isHost()) return;
+
+    const rawText = msg.payload?.text;
+    if (typeof rawText !== 'string' || !rawText.trim() || rawText.trim().length > 200) {
+      return; // Ignore invalid/empty/overflow chat messages
+    }
+
+    const senderName = msg.payload?.senderName ? String(msg.payload.senderName).substring(0, 14) : 'Spieler';
+
     const chatMsg: ChatMessage = {
       id: Math.random().toString(36).substring(2, 9),
       senderId: msg.senderId,
-      senderName: msg.payload.senderName,
-      senderColor: msg.payload.senderColor,
+      senderName: senderName,
+      senderColor: msg.payload.senderColor || '#f1b814',
       senderAvatar: msg.payload.senderAvatar || '',
-      text: msg.payload.text,
+      text: rawText.trim(),
       timestamp: Date.now()
     };
 
