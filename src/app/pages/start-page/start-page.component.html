@@ -803,6 +803,167 @@
     </div>
   }
 
+  <!-- FOOTER LEGAL LINKS -->
+  <div class="absolute bottom-4 left-0 right-0 flex justify-center gap-6 text-[10px] text-white/30 font-bold uppercase tracking-wider z-40 select-none">
+    <button (click)="openLegalModal('impressum')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus:outline-none">Impressum</button>
+    <div class="h-3.5 w-[1px] bg-white/10"></div>
+    <button (click)="openLegalModal('privacy')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus:outline-none">Datenschutzerklärung</button>
+    <div class="h-3.5 w-[1px] bg-white/10"></div>
+    <button (click)="openLegalModal('terms')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus:outline-none">Nutzungsbedingungen</button>
+  </div>
+
+  <!-- 7. LEGAL MODAL OVERLAY -->
+  @if (legalModalOpen()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <!-- Backdrop -->
+      <div 
+        (click)="legalModalOpen.set(false)"
+        class="absolute inset-0 bg-black/75 backdrop-blur-md transition-opacity z-40">
+      </div>
+      
+      <!-- Modal Box -->
+      <div class="relative max-w-2xl w-full bg-jeopardy-dark/95 border border-white/10 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-50 max-h-[90vh] animate-fade-in">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center pb-4 border-b border-white/10">
+          <div>
+            <h3 class="text-xl font-black text-white">Rechtliche Hinweise</h3>
+            <p class="text-xs text-white/50 mt-1">Impressum, Datenschutzerklärung und Nutzungsbedingungen</p>
+          </div>
+          <button 
+            (click)="legalModalOpen.set(false)"
+            class="p-2 text-white/40 hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex p-1 bg-white/5 rounded-xl border border-white/5 shrink-0">
+          <button 
+            (click)="activeLegalTab.set('impressum')"
+            [class]="'flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ' + 
+                     (activeLegalTab() === 'impressum' ? 'bg-jeopardy-accent text-white shadow-md shadow-jeopardy-accent/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
+            Impressum
+          </button>
+          <button 
+            (click)="activeLegalTab.set('privacy')"
+            [class]="'flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ' + 
+                     (activeLegalTab() === 'privacy' ? 'bg-jeopardy-accent text-white shadow-md shadow-jeopardy-accent/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
+            Datenschutz
+          </button>
+          <button 
+            (click)="activeLegalTab.set('terms')"
+            [class]="'flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ' + 
+                     (activeLegalTab() === 'terms' ? 'bg-jeopardy-accent text-white shadow-md shadow-jeopardy-accent/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
+            Nutzungsbedingungen
+          </button>
+        </div>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto pr-2 text-xs text-white/70 leading-relaxed flex flex-col gap-4 font-sans select-text scrollbar-thin">
+          
+          <!-- IMPRESSUM -->
+          @if (activeLegalTab() === 'impressum') {
+            <div class="flex flex-col gap-4 animate-fade-in">
+              <h4 class="text-sm font-black text-white uppercase tracking-wider">Angaben gemäß § 5 DDG</h4>
+              <p>
+                [Dein Name / Betreibername]<br>
+                [Deine Anschrift / Straße, Hausnummer]<br>
+                [PLZ, Ort]<br>
+                Deutschland
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">Kontakt</h4>
+              <p>
+                Telefon: [Deine Telefonnummer (optional)]<br>
+                E-Mail: [Deine E-Mail-Adresse]<br>
+                Webseite: [Deine Domain]
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">Redaktionell verantwortlich</h4>
+              <p>[Dein Name / Betreibername] (Anschrift wie oben)</p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">Streitschlichtung</h4>
+              <p>
+                Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: 
+                <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" class="text-jeopardy-accent hover:underline">https://ec.europa.eu/consumers/odr/</a>.<br>
+                Unsere E-Mail-Adresse finden Sie oben im Impressum. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+              </p>
+            </div>
+          }
+
+          <!-- DATENSCHUTZ -->
+          @if (activeLegalTab() === 'privacy') {
+            <div class="flex flex-col gap-4 animate-fade-in">
+              <h4 class="text-sm font-black text-white uppercase tracking-wider">1. Datenschutz auf einen Blick</h4>
+              <p>
+                Diese Datenschutzerklärung gibt Ihnen einen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie unsere Webseite nutzen. Personenbezogene Daten sind alle Daten, mit denen Sie persönlich identifiziert werden können.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">2. Datenerfassung auf dieser Webseite</h4>
+              <p>
+                <strong>Wer ist verantwortlich für die Datenerfassung?</strong><br>
+                Der Webseitenbetreiber (siehe Impressum).
+              </p>
+              <p>
+                <strong>Wie erfassen wir Ihre Daten?</strong><br>
+                Ihre Daten werden zum einen dadurch erhoben, dass Sie uns diese mitteilen. Hierbei handelt es sich z.B. um Daten, die Sie bei der Account-Registrierung eingeben (E-Mail-Adresse, Benutzername). Andere Daten werden automatisch oder nach Ihrer Einwilligung beim Besuch der Website durch unsere IT-Systeme erfasst (z. B. IP-Adresse, Browser-Typ, Zeitpunkt des Zugriffs). Diese Daten sind technisch notwendig für das Rate-Limiting zur Abwehr von Bot-Angriffen und Spamming.
+              </p>
+              <p>
+                <strong>Wofür nutzen wir Ihre Daten?</strong><br>
+                Ein Teil der Daten wird erhoben, um eine fehlerfreie Bereitstellung der Website zu gewährleisten (z.B. Verbindungsdaten). Andere Daten werden verwendet, um Ihr Spielkonto zu verwalten und Ihre selbst erstellten Quizzes zu speichern.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">3. Sicherheit & Passwörter</h4>
+              <p>
+                Sämtliche Passwörter werden auf unserem Server mithilfe von modernen, kryptografischen Einweg-Hashingverfahren (Bcrypt) verschlüsselt gespeichert. Wir haben zu keinem Zeitpunkt Zugriff auf Ihr echtes Passwort im Klartext.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">4. WebRTC (P2P-Verbindungen)</h4>
+              <p>
+                Dieses Spiel nutzt das WebRTC-Protokoll zur Kopplung der Spieler während des Spiels. Um eine direkte Peer-to-Peer-Verbindung (P2P) zwischen den Geräten der Spieler aufzubauen, müssen Verbindungsdaten (insbesondere die öffentlichen IP-Adressen der Spieler) über unseren Server (Signaling) ausgetauscht werden. Dies erfolgt ausschließlich zum Zweck der Spielabwicklung. Es findet keine dauerhafte Protokollierung oder Weitergabe dieser Daten statt.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">5. Speicherung im Browser (Local Storage)</h4>
+              <p>
+                Um Sie nach dem Schließen des Browsers angemeldet zu lassen, wird ein Sitzungsschlüssel (JWT) im lokalen Speicher Ihres Browsers (Local Storage) abgelegt. Dies ist technisch notwendig, weshalb hierfür kein Cookie-Zustimmungsbanner erforderlich ist. Sie können diesen Speicher jederzeit über Ihre Browsereinstellungen löschen.
+              </p>
+            </div>
+          }
+
+          <!-- NUTZUNGSBEDINGUNGEN -->
+          @if (activeLegalTab() === 'terms') {
+            <div class="flex flex-col gap-4 animate-fade-in">
+              <h4 class="text-sm font-black text-white uppercase tracking-wider">1. Geltungsbereich</h4>
+              <p>
+                Diese Nutzungsbedingungen gelten für die Nutzung der Jeopardy-Webanwendung. Mit der Erstellung eines Kontos oder der Nutzung des Dienstes erklären Sie sich mit diesen Bedingungen einverstanden.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">2. Account und Verhaltensregeln</h4>
+              <p>
+                Sie sind verpflichtet, bei der Registrierung wahrheitsgemäße Angaben zu machen. Es ist untersagt, anstößige, rassistische, verleumderische oder anderweitig unangemessene Benutzernamen zu wählen oder solche in Ihren erstellten Quiz-Kategorien zu verwenden. Wir behalten uns das Recht vor, Konten oder Inhalte, die gegen diese Richtlinien verstoßen, ohne Vorankündigung zu löschen.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">3. Eigene Inhalte (Quiz-Vorlagen)</h4>
+              <p>
+                Wenn Sie eigene Quiz-Vorlagen erstellen und Bilder hochladen, garantieren Sie, dass Sie die erforderlichen Rechte (Urheberrechte) an diesen Inhalten besitzen. Sie stellen uns von jeglichen Ansprüchen Dritter frei, die aus einer Verletzung von Urheberrechten durch Ihre Inhalte resultieren.
+              </p>
+              <h4 class="text-sm font-black text-white uppercase tracking-wider mt-2">4. Gewährleistung und Haftung</h4>
+              <p>
+                Die Bereitstellung der Anwendung erfolgt im vorliegenden Zustand ("as is") und ohne jegliche Gewährleistung. Wir übernehmen keine Haftung für die ständige Verfügbarkeit der Web-App oder für den Verlust von gespeicherten Quizdaten. Die Nutzung erfolgt auf eigene Gefahr.
+              </p>
+            </div>
+          }
+
+        </div>
+
+        <!-- Footer -->
+        <div class="flex justify-end pt-4 border-t border-white/10 shrink-0">
+          <app-button 
+            variant="primary" 
+            size="md"
+            (click)="legalModalOpen.set(false)">
+            Schließen
+          </app-button>
+        </div>
+
+      </div>
+    </div>
+  }
+
 </div>
 
 

@@ -51,6 +51,10 @@ export class StartPageComponent {
   settingsError = signal('');
   settingsSuccess = signal('');
 
+  // Legal modal states
+  legalModalOpen = signal(false);
+  activeLegalTab = signal<'impressum' | 'privacy' | 'terms'>('impressum');
+
   constructor() {
     // Load from localStorage if present
     const savedName = localStorage.getItem('jeopardy_player_name');
@@ -443,5 +447,10 @@ export class StartPageComponent {
     // Also pick a random color from predefined ones
     const randomColorObj = this.avatarColors[Math.floor(Math.random() * this.avatarColors.length)];
     this.selectedColor.set(randomColorObj.hex);
+  }
+
+  openLegalModal(tab: 'impressum' | 'privacy' | 'terms') {
+    this.activeLegalTab.set(tab);
+    this.legalModalOpen.set(true);
   }
 }
