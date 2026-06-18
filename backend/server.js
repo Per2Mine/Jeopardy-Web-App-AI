@@ -17,6 +17,7 @@ const globalLimiter = rateLimit.rateLimit({
   max: 100, // Limit each IP to 100 requests per 15 minutes
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req, res) => req.originalUrl && req.originalUrl.includes('/api/p2p'),
   message: { error: 'Zu viele Anfragen von dieser IP, bitte versuche es in 15 Minuten erneut.' }
 });
 
