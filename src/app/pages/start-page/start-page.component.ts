@@ -283,24 +283,42 @@ export class StartPageComponent {
   }
 
   async onJoinSubmit() {
-    if (!this.playerName().trim()) {
+    const name = this.playerName().trim();
+    const nameRegex = /^[a-zA-Z0-9_\-\säöüÄÖÜß]+$/;
+    
+    if (!name) {
       this.joinError.set('Bitte gib einen Namen ein.');
       return;
     }
-    if (!this.roomCode().trim()) {
+    if (name.length < 2 || name.length > 14) {
+      this.joinError.set('Der Name muss zwischen 2 und 14 Zeichen lang sein.');
+      return;
+    }
+    if (!nameRegex.test(name)) {
+      this.joinError.set('Der Name darf nur Buchstaben, Zahlen, Leerzeichen, Unterstriche und Bindestriche enthalten.');
+      return;
+    }
+
+    const code = this.roomCode().trim();
+    if (!code) {
       this.joinError.set('Bitte gib einen Raumcode ein.');
       return;
     }
+    if (code.length !== 6) {
+      this.joinError.set('Der Raumcode muss genau 6 Zeichen lang sein.');
+      return;
+    }
+    
     this.joinError.set('');
     
     try {
-      localStorage.setItem('jeopardy_player_name', this.playerName().trim());
+      localStorage.setItem('jeopardy_player_name', name);
       localStorage.setItem('jeopardy_player_color', this.selectedColor());
       localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
 
       await this.p2pService.joinRoom(
-        this.roomCode().trim().toUpperCase(),
-        this.playerName().trim(),
+        code.toUpperCase(),
+        name,
         this.selectedColor(),
         this.selectedAvatar()
       );
@@ -310,10 +328,22 @@ export class StartPageComponent {
   }
 
   async onHostSubmit() {
-    if (!this.playerName().trim()) {
+    const name = this.playerName().trim();
+    const nameRegex = /^[a-zA-Z0-9_\-\säöüÄÖÜß]+$/;
+
+    if (!name) {
       this.joinError.set('Bitte gib einen Namen ein, um ein Spiel zu hosten.');
       return;
     }
+    if (name.length < 2 || name.length > 14) {
+      this.joinError.set('Der Name muss zwischen 2 und 14 Zeichen lang sein.');
+      return;
+    }
+    if (!nameRegex.test(name)) {
+      this.joinError.set('Der Name darf nur Buchstaben, Zahlen, Leerzeichen, Unterstriche und Bindestriche enthalten.');
+      return;
+    }
+    
     this.joinError.set('');
 
     // Generate a unique 6-character room code (e.g. JEOP55 or random uppercase alphanumeric)
@@ -324,13 +354,13 @@ export class StartPageComponent {
     }
 
     try {
-      localStorage.setItem('jeopardy_player_name', this.playerName().trim());
+      localStorage.setItem('jeopardy_player_name', name);
       localStorage.setItem('jeopardy_player_color', this.selectedColor());
       localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
 
       await this.p2pService.hostRoom(
         randomCode,
-        this.playerName().trim(),
+        name,
         this.selectedColor(),
         this.selectedAvatar(),
         parseInt(this.maxPlayers()),
@@ -365,6 +395,17 @@ export class StartPageComponent {
     if (template) {
       this.p2pService.startGame(template.categories);
     }
+  }
+
+  randomizeAvatar() {
+    this.avatarBase.set(Math.floor(Math.random() * 3));
+    this.avatarEyes.set(Math.floor(Math.random() * 8));
+    this.avatarMouth.set(Math.floor(Math.random() * 6));
+    this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
+
+    // Also pick a random color from predefined ones
+    const randomColorObj = this.avatarColors[Math.floor(Math.random() * this.avatarColors.length)];
+    this.selectedColor.set(randomColorObj.hex);
   }
 
   openAuthModal(mode: 'login' | 'register') {
@@ -458,17 +499,6 @@ export class StartPageComponent {
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
     this.avatarAccessory.set(next);
-  }
-
-  randomizeAvatar() {
-    this.avatarBase.set(Math.floor(Math.random() * 3));
-    this.avatarEyes.set(Math.floor(Math.random() * 8));
-    this.avatarMouth.set(Math.floor(Math.random() * 6));
-    this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
-
-    // Also pick a random color from predefined ones
-    const randomColorObj = this.avatarColors[Math.floor(Math.random() * this.avatarColors.length)];
-    this.selectedColor.set(randomColorObj.hex);
   }
 
   openLegalModal(tab: 'impressum' | 'privacy' | 'terms') {

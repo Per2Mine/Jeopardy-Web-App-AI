@@ -167,12 +167,24 @@ export class QuizCreatorComponent implements OnInit {
     const cell = this.activeCell();
     if (!cell) return;
 
+    const qText = this.modalQuestionText().trim();
+    const aText = this.modalAnswerText().trim();
+
+    if (qText.length > 160) {
+      this.imageError.set('Der Frage-Text darf maximal 160 Zeichen lang sein.');
+      return;
+    }
+    if (aText.length > 30) {
+      this.imageError.set('Der Antwort-Text darf maximal 30 Zeichen lang sein.');
+      return;
+    }
+
     this.categories.update(cats => {
       const newCats = [...cats];
       newCats[cell.cIndex].questions[cell.qIndex] = {
         ...newCats[cell.cIndex].questions[cell.qIndex],
-        text: this.modalQuestionText().trim(),
-        answer: this.modalAnswerText().trim(),
+        text: qText,
+        answer: aText,
         image: this.modalImage() || undefined
       };
       return newCats;
@@ -223,11 +235,12 @@ export class QuizCreatorComponent implements OnInit {
   }
 
   onCategoryNameChange(cIndex: number, value: string) {
+    const truncated = value ? value.substring(0, 18) : '';
     this.categories.update(cats => {
       const newCats = [...cats];
       newCats[cIndex] = {
         ...newCats[cIndex],
-        name: value
+        name: truncated
       };
       return newCats;
     });
@@ -248,8 +261,39 @@ export class QuizCreatorComponent implements OnInit {
       questions: cat.questions.slice(0, activeNum)
     }));
 
+    // Strict validation of all fields before saving
+    const qName = this.quizName() ? this.quizName().trim() : '';
+    if (!qName) {
+      this.errorMessage.set('Bitte gib der Quiz-Vorlage einen Namen.');
+      return;
+    }
+    if (qName.length > 30) {
+      this.errorMessage.set('Der Quiz-Name darf maximal 30 Zeichen lang sein.');
+      return;
+    }
+
+    for (let cIndex = 0; cIndex < finalCategories.length; cIndex++) {
+      const cat = finalCategories[cIndex];
+      const catName = cat.name ? cat.name.trim() : '';
+      if (catName.length > 18) {
+        this.errorMessage.set(`Der Name für Kategorie ${cIndex + 1} darf maximal 18 Zeichen lang sein.`);
+        return;
+      }
+      for (let qIndex = 0; qIndex < cat.questions.length; qIndex++) {
+        const q = cat.questions[qIndex];
+        if (q.text && q.text.trim().length > 160) {
+          this.errorMessage.set(`Der Frage-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 160 Zeichen lang sein.`);
+          return;
+        }
+        if (q.answer && q.answer.trim().length > 30) {
+          this.errorMessage.set(`Der Antwort-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 30 Zeichen lang sein.`);
+          return;
+        }
+      }
+    }
+
     try {
-      this.quizService.saveQuiz(this.quizName(), finalCategories, email, this.editingId() || undefined).subscribe({
+      this.quizService.saveQuiz(qName, finalCategories, email, this.editingId() || undefined).subscribe({
         next: () => {
           this.router.navigate(['/']);
         },
