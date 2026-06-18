@@ -3,11 +3,38 @@ const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const dns = require('dns').promises;
+const rateLimit = require('express-rate-limit');
 const { getDatabase } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'jeopardy_super_secret_key_123_abc_xyz';
+
+// Rate Limiters
+const globalLimiter = rateLimit.rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anfragen von dieser IP, bitte versuche es in 15 Minuten erneut.' }
+});
+
+const authLimiter = rateLimit.rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 registration/login attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anmelde- oder Registrierungsversuche. Bitte warte 15 Minuten.' }
+});
+
+const quizLimiter = rateLimit.rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 quiz creations/updates/deletes per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Quiz-Aktionen. Bitte warte 15 Minuten.' }
+});
 
 // Middlewares
 app.use(cors({
@@ -16,6 +43,106 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '10mb' })); // Support larger custom quiz payloads
+app.use('/api/', globalLimiter); // Apply global rate limiter to all API endpoints
+
+// --- VALIDATION UTILITIES ---
+
+// 1. Email Validator (Regex + disposable list + active DNS check)
+async function validateEmail(email) {
+  if (!email) return { valid: false, error: 'E-Mail-Adresse darf nicht leer sein.' };
+  
+  const formattedEmail = email.toLowerCase().trim();
+
+  // Syntax validation using standard RFC 5322 regex
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  if (!emailRegex.test(formattedEmail)) {
+    return { valid: false, error: 'Bitte gib eine E-Mail-Adresse in einem gültigen Format ein.' };
+  }
+
+  const parts = formattedEmail.split('@');
+  const domain = parts[1];
+
+  // Disposable/temporary email domains blocklist
+  const disposableDomains = new Set([
+    'mailinator.com', '10minutemail.com', 'tempmail.com', 'guerrillamail.com',
+    'sharklasers.com', 'yopmail.com', 'dispostable.com', 'getairmail.com',
+    'burnermail.io', 'trashmail.com', 'temp-mail.org', 'maildrop.cc', 'tempmailaddress.com'
+  ]);
+  if (disposableDomains.has(domain)) {
+    return { valid: false, error: 'Die Verwendung von temporären/Wegwerf-E-Mail-Adressen ist nicht gestattet.' };
+  }
+
+  // Active DNS Verification
+  try {
+    const mxRecords = await dns.resolveMx(domain);
+    if (mxRecords && mxRecords.length > 0) {
+      return { valid: true };
+    }
+  } catch (err) {
+    // If MX lookup fails, check A records as a fallback
+    try {
+      const addresses = await dns.resolve4(domain);
+      if (addresses && addresses.length > 0) {
+        return { valid: true };
+      }
+    } catch (err2) {
+      return { valid: false, error: 'Die E-Mail-Domain existiert nicht oder kann keine E-Mails empfangen.' };
+    }
+  }
+
+  return { valid: false, error: 'Die E-Mail-Domain konnte nicht validiert werden.' };
+}
+
+// 2. Username Validation (Profanity Check)
+function isOffensiveUsername(username) {
+  if (!username) return false;
+
+  const original = username.toLowerCase().trim();
+
+  // Normalize common leetspeak character substitutions
+  let normalized = original
+    .replace(/0/g, 'o')
+    .replace(/1/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/4/g, 'a')
+    .replace(/5/g, 's')
+    .replace(/7/g, 't')
+    .replace(/8/g, 'b')
+    .replace(/@/g, 'a')
+    .replace(/\$/g, 's')
+    .replace(/!/g, 'i');
+
+  const alphanumericOnly = normalized.replace(/[^a-z0-9]/g, '');
+
+  // Substring blacklist (highly specific offensive words)
+  const specificBlacklist = [
+    'arschloch', 'hurensohn', 'huren', 'huso', 'miststueck', 'miststück', 'wichser', 'wixxer', 'wixer',
+    'fotze', 'schlampe', 'niger', 'neger', 'nigger', 'kanacke', 'asshole', 'bitch', 'cunt', 'motherfucker', 
+    'cockhead', 'scheisse', 'scheisser', 'bastard', 'pussy', 'retard', 'faggot', 'wixxen', 'ficken',
+    'ficker', 'idiot', 'depp', 'penis', 'vagina'
+  ];
+
+  for (const word of specificBlacklist) {
+    if (alphanumericOnly.includes(word) || original.includes(word)) {
+      return true;
+    }
+  }
+
+  // Exact/boundary blacklist (shorter words to avoid the Scunthorpe problem, e.g. "Sebastian" or "Marschall")
+  const shortBlacklist = [
+    'arsch', 'fick', 'nazi', 'hitler', 'fuck', 'shit', 'ass', 'cock', 'dick', 'slut', 'whore', 'sex'
+  ];
+
+  for (const word of shortBlacklist) {
+    const regex = new RegExp(`(^|[^a-z])${word}([^a-z]|$)`, 'i');
+    if (regex.test(original) || regex.test(normalized)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 
 // Initialize Database on server startup
 let db;
@@ -51,7 +178,7 @@ function authenticateToken(req, res, next) {
 // --- API ROUTES ---
 
 // 1. Register User
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { username, email, password } = req.body;
   
   const formattedEmail = email ? email.toLowerCase().trim() : '';
@@ -60,9 +187,28 @@ app.post('/api/auth/register', async (req, res) => {
   if (!formattedUsername) {
     return res.status(400).json({ error: 'Benutzername darf nicht leer sein.' });
   }
-  if (!formattedEmail || !formattedEmail.includes('@')) {
-    return res.status(400).json({ error: 'Bitte gib eine gültige E-Mail-Adresse ein.' });
+
+  // Validate username length and characters
+  if (formattedUsername.length < 3 || formattedUsername.length > 20) {
+    return res.status(400).json({ error: 'Der Benutzername muss zwischen 3 und 20 Zeichen lang sein.' });
   }
+
+  const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+  if (!usernameRegex.test(formattedUsername)) {
+    return res.status(400).json({ error: 'Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten.' });
+  }
+
+  // Check for offensive username
+  if (isOffensiveUsername(formattedUsername)) {
+    return res.status(400).json({ error: 'Dieser Benutzername enthält unangemessene Ausdrücke. Bitte wähle einen anderen.' });
+  }
+
+  // Robust email validation
+  const emailValidation = await validateEmail(formattedEmail);
+  if (!emailValidation.valid) {
+    return res.status(400).json({ error: emailValidation.error });
+  }
+
   if (!password || password.length < 6) {
     return res.status(400).json({ error: 'Das Passwort muss mindestens 6 Zeichen lang sein.' });
   }
@@ -93,7 +239,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // 2. Login User
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   const formattedEmail = email ? email.toLowerCase().trim() : '';
 
@@ -146,6 +292,21 @@ app.put('/api/auth/username', authenticateToken, async (req, res) => {
 
   if (!formattedUsername) {
     return res.status(400).json({ error: 'Benutzername darf nicht leer sein.' });
+  }
+
+  // Validate username length and characters
+  if (formattedUsername.length < 3 || formattedUsername.length > 20) {
+    return res.status(400).json({ error: 'Der Benutzername muss zwischen 3 und 20 Zeichen lang sein.' });
+  }
+
+  const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+  if (!usernameRegex.test(formattedUsername)) {
+    return res.status(400).json({ error: 'Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten.' });
+  }
+
+  // Check for offensive username
+  if (isOffensiveUsername(formattedUsername)) {
+    return res.status(400).json({ error: 'Dieser Benutzername enthält unangemessene Ausdrücke. Bitte wähle einen anderen.' });
   }
 
   try {
@@ -240,7 +401,7 @@ function isQuizComplete(categories) {
 }
 
 // 6. Save Custom Quiz (Create)
-app.post('/api/quizzes', authenticateToken, async (req, res) => {
+app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
   const { name, categories } = req.body;
 
   const validationError = validateQuizPayloadDraft(name, categories);
@@ -264,7 +425,7 @@ app.post('/api/quizzes', authenticateToken, async (req, res) => {
 });
 
 // 7. Update Custom Quiz
-app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
+app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { name, categories } = req.body;
 
@@ -296,7 +457,7 @@ app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
 });
 
 // 8. Delete Custom Quiz
-app.delete('/api/quizzes/:id', authenticateToken, async (req, res) => {
+app.delete('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -383,6 +544,20 @@ app.post('/api/debug/log', (req, res) => {
 // 11. P2P HTTP Long-Polling Relay
 const messageQueues = new Map(); // peerId -> queue of messages
 const pendingPolls = new Map();  // peerId -> array of pending response objects
+const lastActivity = new Map();  // peerId -> timestamp of last poll/send
+
+// Periodic cleanup of idle queues to prevent memory leaks/DoS
+setInterval(() => {
+  const now = Date.now();
+  const maxIdleTime = 5 * 60 * 1000; // 5 minutes of inactivity
+  for (const [peerId, timestamp] of lastActivity.entries()) {
+    if (now - timestamp > maxIdleTime) {
+      messageQueues.delete(peerId);
+      pendingPolls.delete(peerId);
+      lastActivity.delete(peerId);
+    }
+  }
+}, 60 * 1000); // Run cleanup every minute
 
 app.post('/api/p2p/send', (req, res) => {
   const { senderId, receiverId, message } = req.body;
@@ -390,23 +565,45 @@ app.post('/api/p2p/send', (req, res) => {
     return res.status(400).json({ error: 'Missing receiverId or message' });
   }
 
+  // Safety checks to prevent spam / memory exhaustion
+  if (typeof message !== 'string' && typeof message !== 'object') {
+    return res.status(400).json({ error: 'Invalid message type' });
+  }
+
+  const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+  if (messageStr.length > 50 * 1024) { // 50 KB limit
+    return res.status(400).json({ error: 'Message size exceeds limit of 50KB' });
+  }
+
+  // Update activity timestamp
+  lastActivity.set(receiverId, Date.now());
+  if (senderId) {
+    lastActivity.set(senderId, Date.now());
+  }
+
   // Queue message for receiver
   if (!messageQueues.has(receiverId)) {
     messageQueues.set(receiverId, []);
   }
-  messageQueues.get(receiverId).push({ senderId, message });
+
+  const queue = messageQueues.get(receiverId);
+  if (queue.length >= 100) {
+    // Drop the oldest message if the queue exceeds 100 messages to prevent memory abuse
+    queue.shift();
+  }
+  queue.push({ senderId, message });
 
   // Resolve pending polls for receiver
   if (pendingPolls.has(receiverId)) {
     const polls = pendingPolls.get(receiverId);
     pendingPolls.delete(receiverId);
     
-    const queue = messageQueues.get(receiverId) || [];
+    const currentQueue = messageQueues.get(receiverId) || [];
     messageQueues.set(receiverId, []);
 
     for (const pollRes of polls) {
       if (!pollRes.destroyed && !pollRes.headersSent) {
-        pollRes.json({ messages: queue });
+        pollRes.json({ messages: currentQueue });
       }
     }
   }
@@ -416,6 +613,9 @@ app.post('/api/p2p/send', (req, res) => {
 
 app.get('/api/p2p/poll/:peerId', (req, res) => {
   const { peerId } = req.params;
+
+  // Update activity timestamp
+  lastActivity.set(peerId, Date.now());
 
   // If messages are queued, return them immediately
   const queue = messageQueues.get(peerId) || [];
