@@ -21,6 +21,7 @@ export interface QuizTemplate {
   name: string;
   icon: string;
   userEmail?: string; // Owned by user if set
+  isComplete?: boolean; // Whether all fields are filled
   categories: Category[];
 }
 
@@ -284,35 +285,20 @@ export class QuizService {
     if (!name.trim()) {
       throw new Error('Bitte gib der Quiz-Vorlage einen Namen.');
     }
-    if (categories.length < 1 || categories.length > 10) {
-      throw new Error('Ein Quiz muss zwischen 1 und 10 Kategorien besitzen.');
-    }
-    const numQuestions = categories[0]?.questions?.length || 0;
-    if (numQuestions < 1) {
-      throw new Error('Ein Quiz muss Fragen enthalten.');
+    if (categories.length > 10) {
+      throw new Error('Ein Quiz darf maximal 10 Kategorien besitzen.');
     }
 
-    categories.forEach((cat, cIndex) => {
-      if (!cat.name.trim()) {
-        throw new Error(`Kategorie ${cIndex + 1} besitzt keinen Namen.`);
-      }
-      if (cat.questions.length !== numQuestions) {
-        throw new Error('Alle Kategorien müssen dieselbe Anzahl an Fragen besitzen.');
-      }
-      cat.questions.forEach((q, qIndex) => {
-        if (!q.text.trim()) {
-          throw new Error(`Kategorie "${cat.name}" hat eine leere Frage bei ${q.value} $.`);
-        }
-        if (!q.answer.trim()) {
-          throw new Error(`Kategorie "${cat.name}" hat eine leere Antwort bei ${q.value} $.`);
-        }
+    // Validate images if present
+    categories.forEach((cat) => {
+      cat.questions.forEach((q) => {
         if (q.image) {
           if (!q.image.startsWith('data:image/')) {
-            throw new Error(`Kategorie "${cat.name}" hat ein ungültiges Bildformat bei ${q.value} $.`);
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Bildformat bei ${q.value} $.`);
           }
           const approximateSize = q.image.length * 0.75;
           if (approximateSize > 1.2 * 1024 * 1024) {
-            throw new Error(`Kategorie "${cat.name}" hat ein zu großes Bild bei ${q.value} $ (max. 1 MB).`);
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein zu großes Bild bei ${q.value} $ (max. 1 MB).`);
           }
         }
       });
@@ -339,5 +325,31 @@ export class QuizService {
         this.loadQuizzes();
       })
     );
+  }
+
+  /**
+   * Check if a quiz template is complete (all fields filled).
+   * System templates are always complete.
+   */
+  isQuizComplete(template: QuizTemplate): boolean {
+    // System templates (no userEmail) are always complete
+    if (!template.userEmail) {
+      return true;
+    }
+    // If backend provided the flag, use it
+    if (template.isComplete !== undefined) {
+      return template.isComplete;
+    }
+    // Fallback: check locally
+    if (!template.categories || template.categories.length === 0) return false;
+    for (const cat of template.categories) {
+      if (!cat.name?.trim()) return false;
+      if (!cat.questions || cat.questions.length === 0) return false;
+      for (const q of cat.questions) {
+        if (!q.text?.trim()) return false;
+        if (!q.answer?.trim()) return false;
+      }
+    }
+    return true;
   }
 }

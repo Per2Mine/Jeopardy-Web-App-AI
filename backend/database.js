@@ -31,10 +31,18 @@ async function getDatabase() {
       name TEXT NOT NULL,
       user_email TEXT NOT NULL,
       categories TEXT NOT NULL,
+      is_complete INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
     );
   `);
+
+  // Migration: Add is_complete column if it doesn't exist yet (for existing databases)
+  try {
+    await db.run('ALTER TABLE quizzes ADD COLUMN is_complete INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   return db;
 }

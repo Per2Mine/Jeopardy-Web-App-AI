@@ -166,7 +166,8 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
       name: row.name,
       icon: '📝',
       userEmail: row.user_email,
-      categories: JSON.parse(row.categories)
+      categories: JSON.parse(row.categories),
+      isComplete: row.is_complete === 1
     }));
     res.json(quizzes);
   } catch (err) {
@@ -175,47 +176,38 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
   }
 });
 
-function validateQuizPayload(name, categories) {
+// Draft validation: only quiz name is required, images are validated if present
+function validateQuizPayloadDraft(name, categories) {
   if (!name || typeof name !== 'string' || !name.trim()) {
     return 'Bitte gib der Quiz-Vorlage einen Namen.';
   }
-  if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    return 'Das Quiz muss mindestens eine Kategorie enthalten.';
+  if (!categories || !Array.isArray(categories)) {
+    return 'Ungültiges Format für Kategorien.';
   }
   if (categories.length > 10) {
     return 'Ein Quiz darf maximal 10 Kategorien besitzen.';
   }
 
+  // Validate images if present (format & size)
   for (const cat of categories) {
-    if (!cat.name || typeof cat.name !== 'string' || !cat.name.trim()) {
-      return 'Alle Kategorien müssen einen Namen haben.';
-    }
-    if (!cat.questions || !Array.isArray(cat.questions)) {
-      return 'Ungültiges Format für Fragen.';
-    }
-    for (const q of cat.questions) {
-      if (!q.text || typeof q.text !== 'string' || !q.text.trim()) {
-        return 'Alle Fragen müssen einen Text haben.';
-      }
-      if (!q.answer || typeof q.answer !== 'string' || !q.answer.trim()) {
-        return 'Alle Fragen müssen eine Antwort haben.';
-      }
-      if (q.image) {
-        if (typeof q.image !== 'string') {
-          return 'Ungültiges Bild-Format.';
-        }
-        if (!q.image.startsWith('data:image/')) {
-          return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
-        }
-        const allowedTypes = ['data:image/png', 'data:image/jpeg', 'data:image/jpg', 'data:image/webp', 'data:image/gif'];
-        const matchesType = allowedTypes.some(type => q.image.startsWith(type));
-        if (!matchesType) {
-          return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
-        }
-        // Approximate base64 string size in bytes: length * 0.75
-        const approximateSizeBytes = q.image.length * 0.75;
-        if (approximateSizeBytes > 1.2 * 1024 * 1024) {
-          return 'Die Bildgröße darf 1 MB nicht überschreiten.';
+    if (cat.questions && Array.isArray(cat.questions)) {
+      for (const q of cat.questions) {
+        if (q.image) {
+          if (typeof q.image !== 'string') {
+            return 'Ungültiges Bild-Format.';
+          }
+          if (!q.image.startsWith('data:image/')) {
+            return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
+          }
+          const allowedTypes = ['data:image/png', 'data:image/jpeg', 'data:image/jpg', 'data:image/webp', 'data:image/gif'];
+          const matchesType = allowedTypes.some(type => q.image.startsWith(type));
+          if (!matchesType) {
+            return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
+          }
+          const approximateSizeBytes = q.image.length * 0.75;
+          if (approximateSizeBytes > 1.2 * 1024 * 1024) {
+            return 'Die Bildgröße darf 1 MB nicht überschreiten.';
+          }
         }
       }
     }
@@ -223,23 +215,48 @@ function validateQuizPayload(name, categories) {
   return null;
 }
 
+// Completeness check: verifies all fields are filled for a playable quiz
+function isQuizComplete(categories) {
+  if (!categories || !Array.isArray(categories) || categories.length === 0) {
+    return false;
+  }
+  for (const cat of categories) {
+    if (!cat.name || typeof cat.name !== 'string' || !cat.name.trim()) {
+      return false;
+    }
+    if (!cat.questions || !Array.isArray(cat.questions) || cat.questions.length === 0) {
+      return false;
+    }
+    for (const q of cat.questions) {
+      if (!q.text || typeof q.text !== 'string' || !q.text.trim()) {
+        return false;
+      }
+      if (!q.answer || typeof q.answer !== 'string' || !q.answer.trim()) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 // 6. Save Custom Quiz (Create)
 app.post('/api/quizzes', authenticateToken, async (req, res) => {
   const { name, categories } = req.body;
 
-  const validationError = validateQuizPayload(name, categories);
+  const validationError = validateQuizPayloadDraft(name, categories);
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
 
   const id = 'custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+  const complete = isQuizComplete(categories) ? 1 : 0;
 
   try {
     await db.run(
-      'INSERT INTO quizzes (id, name, user_email, categories) VALUES (?, ?, ?, ?)',
-      [id, name.trim(), req.user.email, JSON.stringify(categories)]
+      'INSERT INTO quizzes (id, name, user_email, categories, is_complete) VALUES (?, ?, ?, ?, ?)',
+      [id, name.trim(), req.user.email, JSON.stringify(categories), complete]
     );
-    res.status(201).json({ success: true, id });
+    res.status(201).json({ success: true, id, isComplete: complete === 1 });
   } catch (err) {
     console.error('Create Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Erstellen des Quizzes.' });
@@ -251,10 +268,12 @@ app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { name, categories } = req.body;
 
-  const validationError = validateQuizPayload(name, categories);
+  const validationError = validateQuizPayloadDraft(name, categories);
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
+
+  const complete = isQuizComplete(categories) ? 1 : 0;
 
   try {
     const quiz = await db.get('SELECT * FROM quizzes WHERE id = ?', [id]);
@@ -266,10 +285,10 @@ app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
     }
 
     await db.run(
-      'UPDATE quizzes SET name = ?, categories = ? WHERE id = ?',
-      [name.trim(), JSON.stringify(categories), id]
+      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ? WHERE id = ?',
+      [name.trim(), JSON.stringify(categories), complete, id]
     );
-    res.json({ success: true });
+    res.json({ success: true, isComplete: complete === 1 });
   } catch (err) {
     console.error('Update Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Aktualisieren des Quizzes.' });
@@ -311,18 +330,18 @@ app.post('/api/quizzes/sync', authenticateToken, async (req, res) => {
       const { name, categories, id } = quiz;
       if (!name || !categories) continue;
 
-      const validationError = validateQuizPayload(name, categories);
+      const validationError = validateQuizPayloadDraft(name, categories);
       if (validationError) continue; // Skip invalid quizzes during legacy sync
 
-
+      const complete = isQuizComplete(categories) ? 1 : 0;
       const quizId = id || ('custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5));
       
       // Check if quiz already exists
       const existing = await db.get('SELECT * FROM quizzes WHERE id = ?', [quizId]);
       if (!existing) {
         await db.run(
-          'INSERT INTO quizzes (id, name, user_email, categories) VALUES (?, ?, ?, ?)',
-          [quizId, name.trim(), req.user.email, JSON.stringify(categories)]
+          'INSERT INTO quizzes (id, name, user_email, categories, is_complete) VALUES (?, ?, ?, ?, ?)',
+          [quizId, name.trim(), req.user.email, JSON.stringify(categories), complete]
         );
       }
     }

@@ -114,6 +114,7 @@ export class StartPageComponent {
   selectedTemplate = signal('general');
   buzzerTimeout = signal('10');
   deductPointsOnTimeout = signal(false);
+  incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
 
   canStartGame = computed(() => {
     const guests = this.p2pService.players().filter(p => !p.isHost);
@@ -194,7 +195,27 @@ export class StartPageComponent {
   }
 
   selectTemplate(templateId: string) {
+    const template = this.quizService.getTemplateById(
+      templateId,
+      this.authService.currentUser()?.email
+    );
+    if (template && !this.quizService.isQuizComplete(template)) {
+      this.incompleteQuizWarning.set({ name: template.name, id: template.id });
+      return;
+    }
+    this.incompleteQuizWarning.set(null);
     this.selectedTemplate.set(templateId);
+  }
+
+  dismissIncompleteWarning() {
+    this.incompleteQuizWarning.set(null);
+  }
+
+  onEditIncompleteQuiz() {
+    const warning = this.incompleteQuizWarning();
+    if (warning) {
+      this.router.navigate(['/create-quiz'], { queryParams: { id: warning.id } });
+    }
   }
 
   onMaxPlayersChange(event: Event) {
