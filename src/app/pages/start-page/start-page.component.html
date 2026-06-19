@@ -1210,7 +1210,7 @@
     <button 
       (click)="patchNotesModalOpen.set(true)"
       class="px-2.5 py-1 text-[10px] font-bold text-white/40 hover:text-jeopardy-accent bg-white/[0.01] hover:bg-white/[0.05] border border-white/10 hover:border-jeopardy-accent/30 rounded-full transition-all duration-300 flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-sm">
-      <span>v0.9.0</span>
+      <span>v0.9.5</span>
       <span class="w-1.5 h-1.5 rounded-full bg-jeopardy-accent animate-pulse"></span>
     </button>
   </div>
@@ -1245,29 +1245,42 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
-          <!-- Version 0.9.0 -->
+          <!-- Version 0.9.5 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.0 - Multi-Board Update</span>
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.5 - Multi-Board & Medien-Upgrade</span>
               <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
-              <li><strong class="text-white">Multi-Board-Unterstützung:</strong> Spiele über mehrere Runden hinweg hosten durch gleichzeitiges Auswählen von bis zu 3 Quiz-Vorlagen.</li>
-              <li><strong class="text-white">Nahtlose Rundenübergänge:</strong> Während des Spiels kann der Host komfortabel mit einem Klick das nächste Spielfeld (Board) laden.</li>
-              <li><strong class="text-white">Nummerierte Spielfeld-Wahl:</strong> Die ausgewählten Quizzen in der Lobby zeigen eine Nummerierung an, um die Runden-Reihenfolge anzuzeigen.</li>
+              <li><strong class="text-white">Multi-Board-Unterstützung:</strong> Spiele über mehrere Runden hinweg hosten durch gleichzeitiges Auswählen von bis zu 3 Quiz-Vorlagen mit automatischer Rundenüberleitung.</li>
+              <li><strong class="text-white">5MB Medien-Uploads:</strong> Unterstützung von hochauflösenden Bildern (bis zu 5MB pro Bild) mit angehobenem Server-Payload-Limit von 50MB.</li>
+              <li><strong class="text-white">Nummerierte Spielfeld-Wahl:</strong> Anzeige der gewählten Quizzen in einer nummerierten Abfolge zur klaren Runden-Reihenfolge.</li>
+            </ul>
+          </div>
+
+          <!-- Version 0.9.0 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-white uppercase tracking-wider">v0.9.0 - Sicherheits-Audit & Entwürfe</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">19. Juni 2026</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Unfertige Quizzes speichern:</strong> Speichere unfertige Quizzes als Entwurf ab mit deutlicher visueller Markierung im Quiz-Creator.</li>
+              <li><strong class="text-white">Sicherheits- & Validierungs-Härtung:</strong> Robuste Validierung aller Benutzereingaben (Namen, Chat, Quizzes), Profanitätsfilter und serverseitiges Rate Limiting.</li>
+              <li><strong class="text-white">Rechtliches:</strong> Direktlinks zu Impressum, Datenschutzerklärung und Nutzungsbedingungen direkt auf der Startseite.</li>
             </ul>
           </div>
 
           <!-- Version 0.8.5 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-white uppercase tracking-wider">v0.8.5 - Fragewerte & Anpassung</span>
+              <span class="text-sm font-black text-white uppercase tracking-wider">v0.8.5 - Sound-Effekte & Anpassungen</span>
               <span class="text-[10px] text-white/40 font-bold uppercase font-mono">19. Juni 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Web Audio Sound-Effekte:</strong> Dynamische Sounds für Klicks, Buzzern, Timer und Antworten über eigenen Audio-Synthesizer mit Lautstärke-Widget.</li>
               <li><strong class="text-white">Fragewerte anpassen:</strong> Bestimme die Punkteverteilung für jede Fragenreihe (Zeile) im Quiz-Creator individuell (Wertbegrenzung von 0 bis 10.000 $).</li>
-              <li><strong class="text-white">Custom Lösch-Warnungen:</strong> Schickes, eigens designtes Warnungs-Modal vor dem Löschen von Quizzen oder dem Konto.</li>
-              <li><strong class="text-white">Konto-Löschung:</strong> Option zum permanenten Löschen des eigenen Accounts in den Einstellungen (inkl. Kaskadenlöschung aller eigenen Quizzes).</li>
+              <li><strong class="text-white">Konto-Löschung & Custom Warnungen:</strong> Eigens designtes Warnungs-Modal vor dem Löschen von Quizzes oder dem Konto in den Einstellungen.</li>
             </ul>
           </div>
 
@@ -1278,9 +1291,9 @@
               <span class="text-[10px] text-white/40 font-bold uppercase font-mono">19. Juni 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
-              <li><strong class="text-white">Passwort vergessen Funktion:</strong> Wiederherstellung des Kontos über selbst gewählte Sicherheitsfragen & Antworten (kein Mailserver nötig).</li>
+              <li><strong class="text-white">Passwort vergessen Funktion:</strong> Wiederherstellung des Kontos über selbst gewählte Sicherheitsfragen & Antworten.</li>
               <li><strong class="text-white">Skalierung für 2K/4K Monitore:</strong> Fragenfenster, Bilder und Textdarstellung passen sich nun optimal an hochauflösende Monitore an.</li>
-              <li><strong class="text-white">Navigation per Logo:</strong> Ein Klick auf das Jeopardy-Logo führt auf Spiel- und Creator-Seiten direkt zurück zur Startseite.</li>
+              <li><strong class="text-white">Navigation per Logo:</strong> Ein Klick auf das Jeopardy-Logo führt direkt zurück zur Startseite.</li>
             </ul>
           </div>
 
