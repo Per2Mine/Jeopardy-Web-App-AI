@@ -44,7 +44,7 @@
       
       <!-- Logo Section -->
       <div class="flex flex-col items-center gap-2">
-        <app-logo size="lg"></app-logo>
+        <app-logo size="lg" [clickable]="false"></app-logo>
         <p class="text-sm text-white/50 text-center max-w-sm mt-2">
           Das ultimative Quizduell für deinen Spieleabend. Tritt einem Raum bei oder hoste dein eigenes Spiel.
         </p>
@@ -396,7 +396,7 @@
             {{ p2pService.isHost() ? 'Bereit zum Starten' : 'Warte auf Spielstart...' }}
           </h2>
         </div>
-        <app-logo size="sm"></app-logo>
+        <app-logo size="sm" [clickable]="false"></app-logo>
       </div>
 
       <!-- Room Code Card -->
