@@ -9,6 +9,8 @@ export interface Question {
   answer: string;
   value: number;
   image?: string;
+  pixelate?: boolean;
+  pixelateStrength?: number;
 }
 
 export interface Category {

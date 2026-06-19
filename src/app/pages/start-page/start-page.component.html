@@ -1210,7 +1210,7 @@
     <button 
       (click)="patchNotesModalOpen.set(true)"
       class="px-2.5 py-1 text-[10px] font-bold text-white/40 hover:text-jeopardy-accent bg-white/[0.01] hover:bg-white/[0.05] border border-white/10 hover:border-jeopardy-accent/30 rounded-full transition-all duration-300 flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-sm">
-      <span>v0.9.5</span>
+      <span>v0.9.6</span>
       <span class="w-1.5 h-1.5 rounded-full bg-jeopardy-accent animate-pulse"></span>
     </button>
   </div>
@@ -1245,11 +1245,24 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
+          <!-- Version 0.9.6 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.6 - Bild-Verpixelung & Quiz-Editor Feinschliff</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Bild-Verpixelung (Rate-Effekt):</strong> Optionale Verpixelung für Bilder im Quiz-Editor mit Schieberegler zur Stärkeregulierung. Das verpixelte Bild wird während der Frage-Phase angezeigt und erst bei Auflösung der Antwort enthüllt.</li>
+              <li><strong class="text-white">Fehlerbehebungen im Quiz-Editor:</strong> Vertauschte Labelbezeichnungen für Fragen und Antworten wurden korrigiert.</li>
+              <li><strong class="text-white">Host-Optimierung:</strong> Die korrekte Antwort wird dem Host nun während der Countdown-Phase direkt auf seinem Bildschirm angezeigt.</li>
+            </ul>
+          </div>
+
           <!-- Version 0.9.5 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.5 - Multi-Board & Medien-Upgrade</span>
-              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+              <span class="text-sm font-black text-white uppercase tracking-wider">v0.9.5 - Multi-Board & Medien-Upgrade</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">19. Juni 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Multi-Board-Unterstützung:</strong> Spiele über mehrere Runden hinweg hosten durch gleichzeitiges Auswählen von bis zu 3 Quiz-Vorlagen mit automatischer Rundenüberleitung.</li>

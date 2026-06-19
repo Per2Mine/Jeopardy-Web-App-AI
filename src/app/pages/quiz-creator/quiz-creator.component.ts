@@ -7,10 +7,12 @@ import { LogoComponent } from '../../shared/components/logo/logo.component';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizService, Category, Question } from '../../core/services/quiz.service';
 
+import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
+
 @Component({
   selector: 'app-quiz-creator',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent],
+  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent, PixelatedImageComponent],
   templateUrl: './quiz-creator.component.html',
   styleUrl: './quiz-creator.component.css'
 })
@@ -67,6 +69,8 @@ export class QuizCreatorComponent implements OnInit {
   modalAnswerText = signal('');
   modalImage = signal<string | null>(null);
   imageError = signal<string | null>(null);
+  modalPixelate = signal(false);
+  modalPixelateStrength = signal(15);
 
   onNumQuestionsChange(count: number) {
     this.numQuestions.set(count);
@@ -194,6 +198,8 @@ export class QuizCreatorComponent implements OnInit {
     this.modalQuestionText.set(q.text);
     this.modalAnswerText.set(q.answer);
     this.modalImage.set(q.image || null);
+    this.modalPixelate.set(q.pixelate || false);
+    this.modalPixelateStrength.set(q.pixelateStrength || 15);
     this.imageError.set(null);
   }
 
@@ -219,7 +225,9 @@ export class QuizCreatorComponent implements OnInit {
         ...newCats[cell.cIndex].questions[cell.qIndex],
         text: qText,
         answer: aText,
-        image: this.modalImage() || undefined
+        image: this.modalImage() || undefined,
+        pixelate: this.modalPixelate(),
+        pixelateStrength: this.modalPixelateStrength()
       };
       return newCats;
     });
@@ -261,6 +269,8 @@ export class QuizCreatorComponent implements OnInit {
 
   removeModalImage() {
     this.modalImage.set(null);
+    this.modalPixelate.set(false);
+    this.modalPixelateStrength.set(15);
     this.imageError.set(null);
   }
 

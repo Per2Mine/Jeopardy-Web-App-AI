@@ -26,6 +26,8 @@ export interface GameState {
     text: string;
     answer: string;
     image?: string;
+    pixelate?: boolean;
+    pixelateStrength?: number;
   } | null;
   buzzedPlayerId: string | null;
   buzzerLocked: boolean;
@@ -1713,11 +1715,13 @@ export class P2pService {
 
     const question = current.categories[categoryIndex]?.questions[questionIndex];
     const image = question?.image || undefined;
+    const pixelate = question?.pixelate || false;
+    const pixelateStrength = question?.pixelateStrength || 15;
 
     const nextState: GameState = {
       ...current,
       phase: 'QUESTION',
-      activeQuestion: { categoryIndex, questionIndex, value, text, answer, image },
+      activeQuestion: { categoryIndex, questionIndex, value, text, answer, image, pixelate, pixelateStrength },
       buzzedPlayerId: initialBuzzedPlayerId,
       buzzerLocked: true, // Lock the buzzer so others cannot buzz yet
       lockedOutPlayerIds: [],

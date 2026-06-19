@@ -17,10 +17,12 @@ interface TeamScoreInfo {
   players: Player[];
 }
 
+import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
+
 @Component({
   selector: 'app-game-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, LogoComponent, AvatarComponent, AudioSettingsComponent],
+  imports: [CommonModule, ButtonComponent, LogoComponent, AvatarComponent, AudioSettingsComponent, PixelatedImageComponent],
   templateUrl: './game-page.component.html',
   styleUrl: './game-page.component.css'
 })
