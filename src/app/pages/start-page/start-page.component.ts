@@ -73,6 +73,9 @@ export class StartPageComponent {
   confirmModalTitle = signal('');
   confirmModalText = signal('');
 
+  // Patch Notes Modal state
+  patchNotesModalOpen = signal(false);
+
   // Settings form states
   settingsModalOpen = signal(false);
   newUsername = signal('');
