@@ -25,6 +25,7 @@ async function getDatabase() {
       password_hash TEXT NOT NULL,
       security_question TEXT,
       security_answer_hash TEXT,
+      last_login_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -34,6 +35,7 @@ async function getDatabase() {
       user_email TEXT NOT NULL,
       categories TEXT NOT NULL,
       is_complete INTEGER DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
     );
@@ -54,6 +56,18 @@ async function getDatabase() {
 
   try {
     await db.run('ALTER TABLE quizzes ADD COLUMN is_complete INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.run('ALTER TABLE users ADD COLUMN last_login_at DATETIME');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.run('ALTER TABLE quizzes ADD COLUMN updated_at DATETIME');
   } catch (e) {
     // Column already exists, ignore
   }

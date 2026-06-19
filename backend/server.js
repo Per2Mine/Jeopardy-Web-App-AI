@@ -333,6 +333,13 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Ungültige E-Mail-Adresse oder Passwort.' });
     }
 
+    // Update last login timestamp
+    try {
+      await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE email = ?', [formattedEmail]);
+    } catch (dbErr) {
+      console.warn('Failed to update last_login_at for user:', formattedEmail, dbErr);
+    }
+
     const tokenPayload = { email: user.email, username: user.username };
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
 
@@ -546,7 +553,7 @@ app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => 
     }
 
     await db.run(
-      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ? WHERE id = ?',
+      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [name.trim(), JSON.stringify(categories), complete, id]
     );
     res.json({ success: true, isComplete: complete === 1 });
