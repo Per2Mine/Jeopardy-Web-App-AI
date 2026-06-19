@@ -11,6 +11,8 @@ export interface Question {
   image?: string;
   pixelate?: boolean;
   pixelateStrength?: number;
+  reducePixelationOnWrong?: boolean;
+  reducePixelationAmount?: number;
 }
 
 export interface Category {

@@ -71,6 +71,8 @@ export class QuizCreatorComponent implements OnInit {
   imageError = signal<string | null>(null);
   modalPixelate = signal(false);
   modalPixelateStrength = signal(15);
+  modalReducePixelation = signal(false);
+  modalReduceAmount = signal(5);
 
   onNumQuestionsChange(count: number) {
     this.numQuestions.set(count);
@@ -200,6 +202,8 @@ export class QuizCreatorComponent implements OnInit {
     this.modalImage.set(q.image || null);
     this.modalPixelate.set(q.pixelate || false);
     this.modalPixelateStrength.set(q.pixelateStrength || 15);
+    this.modalReducePixelation.set(q.reducePixelationOnWrong || false);
+    this.modalReduceAmount.set(q.reducePixelationAmount || 5);
     this.imageError.set(null);
   }
 
@@ -227,7 +231,9 @@ export class QuizCreatorComponent implements OnInit {
         answer: aText,
         image: this.modalImage() || undefined,
         pixelate: this.modalPixelate(),
-        pixelateStrength: this.modalPixelateStrength()
+        pixelateStrength: this.modalPixelateStrength(),
+        reducePixelationOnWrong: this.modalReducePixelation(),
+        reducePixelationAmount: this.modalReduceAmount()
       };
       return newCats;
     });
@@ -271,6 +277,8 @@ export class QuizCreatorComponent implements OnInit {
     this.modalImage.set(null);
     this.modalPixelate.set(false);
     this.modalPixelateStrength.set(15);
+    this.modalReducePixelation.set(false);
+    this.modalReduceAmount.set(5);
     this.imageError.set(null);
   }
 

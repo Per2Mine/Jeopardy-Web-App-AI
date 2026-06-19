@@ -309,6 +309,34 @@
                     />
                     <span class="text-jeopardy-gold font-mono w-6 text-right">{{ modalPixelateStrength() }}</span>
                   </div>
+
+                  <!-- Reduce Pixelation settings -->
+                  <div class="flex flex-col gap-2 pt-2 border-t border-white/5 mt-1">
+                    <label class="flex items-center gap-2 cursor-pointer text-[11px] font-semibold text-white/70 select-none">
+                      <input 
+                        type="checkbox" 
+                        [checked]="modalReducePixelation()" 
+                        (change)="modalReducePixelation.set($any($event.target).checked)"
+                        class="w-3.5 h-3.5 rounded border-white/10 bg-black/40 text-jeopardy-accent focus:ring-jeopardy-accent"
+                      />
+                      <span>Details nach falscher Antwort enthüllen</span>
+                    </label>
+
+                    @if (modalReducePixelation()) {
+                      <div class="flex items-center gap-3 mt-0.5 text-xs">
+                        <span class="text-white/50 shrink-0">Reduzierungsstufe:</span>
+                        <input 
+                          type="range" 
+                          min="1" 
+                          max="20" 
+                          [value]="modalReduceAmount()"
+                          (input)="modalReduceAmount.set(+$any($event.target).value)"
+                          class="flex-1 accent-jeopardy-accent h-1 bg-white/10 rounded-lg cursor-pointer appearance-none"
+                        />
+                        <span class="text-jeopardy-gold font-mono w-6 text-right">-{{ modalReduceAmount() }}</span>
+                      </div>
+                    }
+                  </div>
                 }
               </div>
             } @else {

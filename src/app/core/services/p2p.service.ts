@@ -28,6 +28,8 @@ export interface GameState {
     image?: string;
     pixelate?: boolean;
     pixelateStrength?: number;
+    reducePixelationOnWrong?: boolean;
+    reducePixelationAmount?: number;
   } | null;
   buzzedPlayerId: string | null;
   buzzerLocked: boolean;
@@ -1717,11 +1719,24 @@ export class P2pService {
     const image = question?.image || undefined;
     const pixelate = question?.pixelate || false;
     const pixelateStrength = question?.pixelateStrength || 15;
+    const reducePixelationOnWrong = question?.reducePixelationOnWrong || false;
+    const reducePixelationAmount = question?.reducePixelationAmount || 5;
 
     const nextState: GameState = {
       ...current,
       phase: 'QUESTION',
-      activeQuestion: { categoryIndex, questionIndex, value, text, answer, image, pixelate, pixelateStrength },
+      activeQuestion: { 
+        categoryIndex, 
+        questionIndex, 
+        value, 
+        text, 
+        answer, 
+        image, 
+        pixelate, 
+        pixelateStrength, 
+        reducePixelationOnWrong, 
+        reducePixelationAmount 
+      },
       buzzedPlayerId: initialBuzzedPlayerId,
       buzzerLocked: true, // Lock the buzzer so others cannot buzz yet
       lockedOutPlayerIds: [],
@@ -1782,6 +1797,18 @@ export class P2pService {
         }
       };
     } else {
+      // Calculate updated activeQuestion with reduced pixelateStrength if enabled
+      let updatedActiveQuestion = current.activeQuestion;
+      if (updatedActiveQuestion && updatedActiveQuestion.pixelate && updatedActiveQuestion.reducePixelationOnWrong) {
+        const currentStrength = updatedActiveQuestion.pixelateStrength ?? 15;
+        const amount = updatedActiveQuestion.reducePixelationAmount ?? 5;
+        const newStrength = Math.max(2, currentStrength - amount);
+        updatedActiveQuestion = {
+          ...updatedActiveQuestion,
+          pixelateStrength: newStrength
+        };
+      }
+
       // Incorrect answer: lock this player / team out of buzzing
       const lockedOutPlayers = [...(current.lockedOutPlayerIds || [])];
       if (!lockedOutPlayers.includes(playerId)) {
@@ -1811,6 +1838,7 @@ export class P2pService {
         const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
         nextState = {
           ...current,
+          activeQuestion: updatedActiveQuestion,
           showAnswer: true,
           buzzedPlayerId: null,
           buzzerLocked: true,
@@ -1828,6 +1856,7 @@ export class P2pService {
       } else {
         nextState = {
           ...current,
+          activeQuestion: updatedActiveQuestion,
           buzzedPlayerId: null,
           buzzerLocked: current.isInitialTurn,
           timerSeconds: null,
