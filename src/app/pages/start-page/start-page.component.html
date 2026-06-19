@@ -674,10 +674,14 @@
         <div class="flex justify-between items-center pb-4 border-b border-white/10">
           <div>
             <h3 class="text-xl font-black text-white">
-              {{ authMode() === 'login' ? 'Anmelden' : 'Registrieren' }}
+              @if (authMode() === 'login') { Anmelden }
+              @else if (authMode() === 'register') { Registrieren }
+              @else { Passwort zurücksetzen }
             </h3>
             <p class="text-xs text-white/50 mt-1">
-              {{ authMode() === 'login' ? 'Melde dich an, um eigene Quiz-Vorlagen zu erstellen.' : 'Erstelle ein Konto, um eigene Quiz-Vorlagen zu speichern.' }}
+              @if (authMode() === 'login') { Melde dich an, um eigene Quiz-Vorlagen zu erstellen. }
+              @else if (authMode() === 'register') { Erstelle ein Konto, um eigene Quiz-Vorlagen zu speichern. }
+              @else { Setze dein Passwort mithilfe deiner Sicherheitsfrage zurück. }
             </p>
           </div>
           <button 
@@ -697,57 +701,186 @@
             </div>
           }
 
-          @if (authMode() === 'register') {
-            <div class="w-full">
-              <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
-                Benutzername
-              </label>
-              <input 
-                #usernameInput
-                type="text"
-                placeholder="z.B. QuizKönig" 
-                [value]="authUsername()"
-                (input)="authUsername.set(usernameInput.value)"
-                maxlength="14"
-                class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+          @if (forgotSuccess()) {
+            <div class="p-3 bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold rounded-xl animate-fade-in flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse animate-duration-1000"></span>
+              <span>Passwort erfolgreich geändert! Du wirst weitergeleitet...</span>
             </div>
           }
 
-          <div class="w-full">
-            <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
-              E-Mail-Adresse
-            </label>
-            <input 
-              #emailInput
-              type="email"
-              placeholder="name@beispiel.de" 
-              [value]="authEmail()"
-              (input)="authEmail.set(emailInput.value)"
-              class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
-          </div>
+          @if (authMode() === 'forgot') {
+            <!-- FORGOT PASSWORD FLOW -->
+            @if (forgotStep() === 1) {
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  E-Mail-Adresse
+                </label>
+                <input 
+                  #forgotEmailInput
+                  type="email"
+                  placeholder="name@beispiel.de" 
+                  [value]="authEmail()"
+                  (input)="authEmail.set(forgotEmailInput.value)"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+              </div>
 
-          <div class="w-full">
-            <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
-              Passwort
-            </label>
-            <input 
-              #passwordInput
-              type="password"
-              placeholder="••••••••" 
-              [value]="authPassword()"
-              (input)="authPassword.set(passwordInput.value)"
-              class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
-          </div>
+              <div class="mt-2">
+                <app-button 
+                  variant="primary" 
+                  size="lg" 
+                  [fullWidth]="true"
+                  (click)="onFetchForgotPasswordQuestion()">
+                  Sicherheitsfrage abrufen
+                </app-button>
+              </div>
+            } @else if (forgotStep() === 2 && !forgotSuccess()) {
+              <div class="w-full bg-white/[0.02] border border-white/5 p-4 rounded-xl text-center">
+                <span class="block text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Deine Sicherheitsfrage</span>
+                <span class="text-sm font-black text-jeopardy-gold">„{{ forgotQuestion() }}“</span>
+              </div>
 
-          <div class="mt-2">
-            <app-button 
-              variant="primary" 
-              size="lg" 
-              [fullWidth]="true"
-              (click)="onAuthSubmit()">
-              {{ authMode() === 'login' ? 'Anmelden' : 'Konto erstellen' }}
-            </app-button>
-          </div>
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  Sicherheitsantwort
+                </label>
+                <input 
+                  #forgotAnswerInput
+                  type="text"
+                  placeholder="Deine Antwort" 
+                  [value]="forgotAnswer()"
+                  (input)="forgotAnswer.set(forgotAnswerInput.value)"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+              </div>
+
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  Neues Passwort
+                </label>
+                <input 
+                  #newPasswordInput
+                  type="password"
+                  placeholder="••••••••" 
+                  [value]="forgotNewPassword()"
+                  (input)="forgotNewPassword.set(newPasswordInput.value)"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+              </div>
+
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  Neues Passwort bestätigen
+                </label>
+                <input 
+                  #confirmPasswordInput
+                  type="password"
+                  placeholder="••••••••" 
+                  [value]="forgotConfirmPassword()"
+                  (input)="forgotConfirmPassword.set(confirmPasswordInput.value)"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+              </div>
+
+              <div class="mt-2">
+                <app-button 
+                  variant="primary" 
+                  size="lg" 
+                  [fullWidth]="true"
+                  (click)="onResetPasswordSubmit()">
+                  Passwort zurücksetzen
+                </app-button>
+              </div>
+            }
+          } @else {
+            <!-- STANDARD LOGIN / REGISTER FLOW -->
+            @if (authMode() === 'register') {
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  Benutzername
+                </label>
+                <input 
+                  #usernameInput
+                  type="text"
+                  placeholder="z.B. QuizKönig" 
+                  [value]="authUsername()"
+                  (input)="authUsername.set(usernameInput.value)"
+                  maxlength="14"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+              </div>
+            }
+
+            <div class="w-full">
+              <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                E-Mail-Adresse
+              </label>
+              <input 
+                #emailInput
+                type="email"
+                placeholder="name@beispiel.de" 
+                [value]="authEmail()"
+                (input)="authEmail.set(emailInput.value)"
+                class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+            </div>
+
+            <div class="w-full">
+              <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                Passwort
+              </label>
+              <input 
+                #passwordInput
+                type="password"
+                placeholder="••••••••" 
+                [value]="authPassword()"
+                (input)="authPassword.set(passwordInput.value)"
+                class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+            </div>
+
+            @if (authMode() === 'register') {
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  Sicherheitsfrage (Wiederherstellung)
+                </label>
+                <select 
+                  #questionSelect
+                  (change)="securityQuestion.set(questionSelect.value)"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white rounded-lg outline-none transition-all duration-300 appearance-none cursor-pointer">
+                  @for (q of securityQuestionsList; track q) {
+                    <option [value]="q" class="bg-jeopardy-dark text-white">{{ q }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="w-full">
+                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+                  Sicherheitsantwort
+                </label>
+                <input 
+                  #answerInput
+                  type="text"
+                  placeholder="Deine Antwort" 
+                  [value]="securityAnswer()"
+                  (input)="securityAnswer.set(answerInput.value)"
+                  class="w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20 text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300">
+              </div>
+            }
+
+            @if (authMode() === 'login') {
+              <div class="text-right">
+                <button 
+                  (click)="authMode.set('forgot'); authError.set(''); forgotStep.set(1)"
+                  class="text-xs text-white/40 hover:text-jeopardy-accent transition-colors font-semibold cursor-pointer underline">
+                  Passwort vergessen?
+                </button>
+              </div>
+            }
+
+            <div class="mt-2">
+              <app-button 
+                variant="primary" 
+                size="lg" 
+                [fullWidth]="true"
+                (click)="onAuthSubmit()">
+                {{ authMode() === 'login' ? 'Anmelden' : 'Konto erstellen' }}
+              </app-button>
+            </div>
+          }
         </div>
 
         <!-- Toggle link -->

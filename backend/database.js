@@ -23,6 +23,8 @@ async function getDatabase() {
       email TEXT PRIMARY KEY,
       username TEXT NOT NULL,
       password_hash TEXT NOT NULL,
+      security_question TEXT,
+      security_answer_hash TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -37,7 +39,19 @@ async function getDatabase() {
     );
   `);
 
-  // Migration: Add is_complete column if it doesn't exist yet (for existing databases)
+  // Migrations for existing databases
+  try {
+    await db.run('ALTER TABLE users ADD COLUMN security_question TEXT');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.run('ALTER TABLE users ADD COLUMN security_answer_hash TEXT');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   try {
     await db.run('ALTER TABLE quizzes ADD COLUMN is_complete INTEGER DEFAULT 0');
   } catch (e) {

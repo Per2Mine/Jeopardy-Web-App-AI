@@ -180,7 +180,7 @@ function authenticateToken(req, res, next) {
 
 // 1. Register User
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, securityQuestion, securityAnswer } = req.body;
   
   const formattedEmail = email ? email.toLowerCase().trim() : '';
   const formattedUsername = username ? username.trim() : '';
@@ -214,6 +214,14 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Das Passwort muss mindestens 6 Zeichen lang sein.' });
   }
 
+  if (!securityQuestion || !securityQuestion.trim()) {
+    return res.status(400).json({ error: 'Bitte wähle eine Sicherheitsfrage aus.' });
+  }
+
+  if (!securityAnswer || !securityAnswer.trim()) {
+    return res.status(400).json({ error: 'Bitte gib eine Antwort auf deine Sicherheitsfrage ein.' });
+  }
+
   try {
     const existingUser = await db.get('SELECT * FROM users WHERE email = ?', [formattedEmail]);
     if (existingUser) {
@@ -221,9 +229,12 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const formattedAnswer = securityAnswer.trim().toLowerCase();
+    const securityAnswerHash = await bcrypt.hash(formattedAnswer, 10);
+
     await db.run(
-      'INSERT INTO users (email, username, password_hash) VALUES (?, ?, ?)',
-      [formattedEmail, formattedUsername, passwordHash]
+      'INSERT INTO users (email, username, password_hash, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?)',
+      [formattedEmail, formattedUsername, passwordHash, securityQuestion.trim(), securityAnswerHash]
     );
 
     const tokenPayload = { email: formattedEmail, username: formattedUsername };
@@ -236,6 +247,69 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   } catch (err) {
     console.error('Registration Error:', err);
     res.status(500).json({ error: 'Registrierung fehlgeschlagen. Bitte versuche es später noch einmal.' });
+  }
+});
+
+// 1.5 Get User's Security Question
+app.post('/api/auth/security-question', authLimiter, async (req, res) => {
+  const { email } = req.body;
+  const formattedEmail = email ? email.toLowerCase().trim() : '';
+
+  if (!formattedEmail) {
+    return res.status(400).json({ error: 'Bitte gib eine E-Mail-Adresse ein.' });
+  }
+
+  try {
+    const user = await db.get('SELECT security_question FROM users WHERE email = ?', [formattedEmail]);
+    if (!user) {
+      return res.status(404).json({ error: 'Es wurde kein Konto mit dieser E-Mail-Adresse gefunden.' });
+    }
+    if (!user.security_question) {
+      return res.status(400).json({ error: 'Für dieses Konto ist keine Sicherheitsfrage eingerichtet.' });
+    }
+    res.json({ securityQuestion: user.security_question });
+  } catch (err) {
+    console.error('Security Question Fetch Error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Sicherheitsfrage.' });
+  }
+});
+
+// 1.6 Reset Password
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  const { email, securityAnswer, newPassword } = req.body;
+  const formattedEmail = email ? email.toLowerCase().trim() : '';
+  const formattedAnswer = securityAnswer ? securityAnswer.trim().toLowerCase() : '';
+
+  if (!formattedEmail || !formattedAnswer || !newPassword) {
+    return res.status(400).json({ error: 'Bitte fülle alle Pflichtfelder aus.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Das neue Passwort muss mindestens 6 Zeichen lang sein.' });
+  }
+
+  try {
+    const user = await db.get('SELECT * FROM users WHERE email = ?', [formattedEmail]);
+    if (!user) {
+      return res.status(404).json({ error: 'Es wurde kein Konto mit dieser E-Mail-Adresse gefunden.' });
+    }
+
+    if (!user.security_answer_hash) {
+      return res.status(400).json({ error: 'Für dieses Konto ist keine Sicherheitsfrage eingerichtet.' });
+    }
+
+    const match = await bcrypt.compare(formattedAnswer, user.security_answer_hash);
+    if (!match) {
+      return res.status(400).json({ error: 'Die Antwort auf die Sicherheitsfrage ist falsch.' });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    await db.run('UPDATE users SET password_hash = ? WHERE email = ?', [newPasswordHash, formattedEmail]);
+
+    res.json({ message: 'Passwort erfolgreich zurückgesetzt.' });
+  } catch (err) {
+    console.error('Password Reset Error:', err);
+    res.status(500).json({ error: 'Fehler beim Zurücksetzen des Passworts.' });
   }
 });
 

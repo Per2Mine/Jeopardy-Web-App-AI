@@ -40,11 +40,31 @@ export class StartPageComponent {
 
   // Auth form states
   authModalOpen = signal(false);
-  authMode = signal<'login' | 'register'>('login');
+  authMode = signal<'login' | 'register' | 'forgot'>('login');
   authUsername = signal('');
   authEmail = signal('');
   authPassword = signal('');
   authError = signal('');
+
+  // Predefined security questions list
+  securityQuestionsList = [
+    'Name deines ersten Haustiers?',
+    'Geburtsort deiner Mutter?',
+    'Name deiner ersten Schule?',
+    'Lieblings-Videospiel als Kind?',
+    'Marke deines ersten Autos?'
+  ];
+
+  // Added signals for forgot password & registration security questions
+  securityQuestion = signal('Name deines ersten Haustiers?');
+  securityAnswer = signal('');
+  
+  forgotStep = signal<1 | 2>(1);
+  forgotQuestion = signal('');
+  forgotAnswer = signal('');
+  forgotNewPassword = signal('');
+  forgotConfirmPassword = signal('');
+  forgotSuccess = signal(false);
 
   // Settings form states
   settingsModalOpen = signal(false);
@@ -408,11 +428,19 @@ export class StartPageComponent {
     this.selectedColor.set(randomColorObj.hex);
   }
 
-  openAuthModal(mode: 'login' | 'register') {
+  openAuthModal(mode: 'login' | 'register' | 'forgot') {
     this.authMode.set(mode);
     this.authUsername.set('');
     this.authEmail.set('');
     this.authPassword.set('');
+    this.securityQuestion.set(this.securityQuestionsList[0]);
+    this.securityAnswer.set('');
+    this.forgotStep.set(1);
+    this.forgotQuestion.set('');
+    this.forgotAnswer.set('');
+    this.forgotNewPassword.set('');
+    this.forgotConfirmPassword.set('');
+    this.forgotSuccess.set(false);
     this.authError.set('');
     this.authModalOpen.set(true);
   }
@@ -424,7 +452,9 @@ export class StartPageComponent {
         await this.authService.register(
           this.authUsername(),
           this.authEmail(),
-          this.authPassword()
+          this.authPassword(),
+          this.securityQuestion(),
+          this.securityAnswer()
         );
       } else {
         await this.authService.login(
@@ -435,6 +465,45 @@ export class StartPageComponent {
       this.authModalOpen.set(false);
     } catch (err: any) {
       this.authError.set(err.message || 'Ein Fehler ist aufgetreten.');
+    }
+  }
+
+  async onFetchForgotPasswordQuestion() {
+    this.authError.set('');
+    try {
+      const question = await this.authService.getSecurityQuestion(this.authEmail());
+      this.forgotQuestion.set(question);
+      this.forgotStep.set(2);
+    } catch (err: any) {
+      this.authError.set(err.message || 'Die Sicherheitsfrage konnte nicht geladen werden.');
+    }
+  }
+
+  async onResetPasswordSubmit() {
+    this.authError.set('');
+    if (this.forgotNewPassword() !== this.forgotConfirmPassword()) {
+      this.authError.set('Die Passwörter stimmen nicht überein.');
+      return;
+    }
+
+    try {
+      await this.authService.resetPassword(
+        this.authEmail(),
+        this.forgotAnswer(),
+        this.forgotNewPassword()
+      );
+      this.forgotSuccess.set(true);
+      setTimeout(() => {
+        this.authMode.set('login');
+        this.forgotStep.set(1);
+        this.forgotQuestion.set('');
+        this.forgotAnswer.set('');
+        this.forgotNewPassword.set('');
+        this.forgotConfirmPassword.set('');
+        this.forgotSuccess.set(false);
+      }, 2000);
+    } catch (err: any) {
+      this.authError.set(err.message || 'Passwort-Zurücksetzen fehlgeschlagen.');
     }
   }
 

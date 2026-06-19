@@ -30,7 +30,7 @@ export class AuthService {
   /**
    * Register a new user
    */
-  async register(username: string, email: string, password: string): Promise<void> {
+  async register(username: string, email: string, password: string, securityQuestion: string, securityAnswer: string): Promise<void> {
     const formattedEmail = email.toLowerCase().trim();
     const formattedUsername = username.trim();
 
@@ -43,18 +43,76 @@ export class AuthService {
     if (!password || password.length < 6) {
       throw new Error('Das Passwort muss mindestens 6 Zeichen lang sein.');
     }
+    if (!securityQuestion || !securityQuestion.trim()) {
+      throw new Error('Bitte wähle eine Sicherheitsfrage aus.');
+    }
+    if (!securityAnswer || !securityAnswer.trim()) {
+      throw new Error('Bitte beantworte deine Sicherheitsfrage.');
+    }
 
     try {
       const res = await firstValueFrom(
         this.http.post<AuthResponse>('/api/auth/register', {
           username: formattedUsername,
           email: formattedEmail,
-          password
+          password,
+          securityQuestion,
+          securityAnswer
         })
       );
       this.handleAuthSuccess(res);
     } catch (err: any) {
       const errorMsg = err.error?.error || 'Registrierung fehlgeschlagen.';
+      throw new Error(errorMsg);
+    }
+  }
+
+  /**
+   * Fetch the security question for a given email
+   */
+  async getSecurityQuestion(email: string): Promise<string> {
+    const formattedEmail = email.toLowerCase().trim();
+    if (!formattedEmail) {
+      throw new Error('Bitte gib deine E-Mail-Adresse ein.');
+    }
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ securityQuestion: string }>('/api/auth/security-question', {
+          email: formattedEmail
+        })
+      );
+      return res.securityQuestion;
+    } catch (err: any) {
+      const errorMsg = err.error?.error || 'Fehler beim Laden der Sicherheitsfrage.';
+      throw new Error(errorMsg);
+    }
+  }
+
+  /**
+   * Reset user's password using the security answer
+   */
+  async resetPassword(email: string, securityAnswer: string, newPassword: string): Promise<void> {
+    const formattedEmail = email.toLowerCase().trim();
+    const formattedAnswer = securityAnswer.trim();
+
+    if (!formattedEmail || !formattedAnswer || !newPassword) {
+      throw new Error('Bitte fülle alle Felder aus.');
+    }
+
+    if (newPassword.length < 6) {
+      throw new Error('Das neue Passwort muss mindestens 6 Zeichen lang sein.');
+    }
+
+    try {
+      await firstValueFrom(
+        this.http.post<{ message: string }>('/api/auth/reset-password', {
+          email: formattedEmail,
+          securityAnswer: formattedAnswer,
+          newPassword
+        })
+      );
+    } catch (err: any) {
+      const errorMsg = err.error?.error || 'Fehler beim Zurücksetzen des Passworts.';
       throw new Error(errorMsg);
     }
   }
