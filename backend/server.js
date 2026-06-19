@@ -473,8 +473,8 @@ function validateQuizPayloadDraft(name, categories) {
             return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
           }
           const approximateSizeBytes = q.image.length * 0.75;
-          if (approximateSizeBytes > 1.2 * 1024 * 1024) {
-            return 'Die Bildgröße darf 1 MB nicht überschreiten.';
+          if (approximateSizeBytes > 6.8 * 1024 * 1024) {
+            return 'Die Bildgröße darf 5 MB nicht überschreiten.';
           }
         }
       }
