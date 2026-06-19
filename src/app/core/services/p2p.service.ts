@@ -45,6 +45,8 @@ export interface GameState {
   deductPointsOnTimeout: boolean;
   timerSeconds: number | null;
   isInitialTurn: boolean;
+  boards?: Category[][];
+  currentBoardIndex?: number;
 }
 
 export interface ChatMessage {
@@ -1580,7 +1582,7 @@ export class P2pService {
     });
   }
 
-  startGame(categories: Category[]) {
+  startGame(boards: Category[][]) {
     if (!this.isHost()) return;
     
     // Reset all player scores to 0
@@ -1589,6 +1591,7 @@ export class P2pService {
     this.broadcastPlayerList();
 
     const current = this.gameState();
+    const categories = boards[0] || [];
 
     const tempStateForSelector: GameState = {
       phase: 'BOARD',
@@ -1606,7 +1609,9 @@ export class P2pService {
       buzzerTimeout: current.buzzerTimeout,
       deductPointsOnTimeout: current.deductPointsOnTimeout,
       timerSeconds: null,
-      isInitialTurn: false
+      isInitialTurn: false,
+      boards,
+      currentBoardIndex: 0
     };
     const firstSelector = this.getNextSelectorId(tempStateForSelector);
 
@@ -1626,7 +1631,9 @@ export class P2pService {
       buzzerTimeout: current.buzzerTimeout,
       deductPointsOnTimeout: current.deductPointsOnTimeout,
       timerSeconds: null,
-      isInitialTurn: false
+      isInitialTurn: false,
+      boards,
+      currentBoardIndex: 0
     };
     this.gameState.set(initialState);
     
@@ -1637,6 +1644,54 @@ export class P2pService {
     });
 
     this.router.navigate(['/game']);
+  }
+
+  nextBoard() {
+    if (!this.isHost()) return;
+    
+    const current = this.gameState();
+    if (!current.boards || current.currentBoardIndex === undefined) return;
+    const nextIdx = current.currentBoardIndex + 1;
+    if (nextIdx >= current.boards.length) return;
+
+    const categories = current.boards[nextIdx];
+
+    const tempStateForSelector: GameState = {
+      ...current,
+      categories,
+      answeredQuestions: [],
+      lockedOutPlayerIds: [],
+      lockedOutTeamIds: [],
+      currentBoardIndex: nextIdx,
+      votes: {}
+    };
+    const nextSelector = this.getNextSelectorId(tempStateForSelector);
+
+    const nextState: GameState = {
+      ...current,
+      phase: 'BOARD',
+      activeQuestion: null,
+      showAnswer: false,
+      buzzedPlayerId: null,
+      buzzerLocked: false,
+      timerSeconds: null,
+      isInitialTurn: false,
+      answeredQuestions: [],
+      lockedOutPlayerIds: [],
+      lockedOutTeamIds: [],
+      votes: {},
+      categories,
+      currentBoardIndex: nextIdx,
+      activeSelectorId: nextSelector,
+      lastAnswerResult: null
+    };
+
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
   }
 
   selectQuestion(categoryIndex: number, questionIndex: number, value: number, text: string, answer: string) {

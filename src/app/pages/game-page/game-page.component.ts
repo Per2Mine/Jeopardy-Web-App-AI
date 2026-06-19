@@ -430,4 +430,21 @@ export class GamePageComponent implements OnInit {
     this.p2pService.disconnect();
     this.router.navigate(['/']);
   }
+
+  isBoardComplete(): boolean {
+    const state = this.p2pService.gameState();
+    if (!state || !state.categories) return false;
+    const totalQuestions = state.categories.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0);
+    return state.answeredQuestions.length === totalQuestions;
+  }
+
+  hasNextBoard(): boolean {
+    const state = this.p2pService.gameState();
+    if (!state || !state.boards || state.currentBoardIndex === undefined) return false;
+    return this.isBoardComplete() && (state.currentBoardIndex + 1 < state.boards.length);
+  }
+
+  onNextBoard() {
+    this.p2pService.nextBoard();
+  }
 }

@@ -20,6 +20,11 @@
             Host / Moderator
           </span>
           @if (p2pService.gameState().phase === 'BOARD') {
+            @if (hasNextBoard()) {
+              <app-button variant="primary" size="sm" (click)="onNextBoard()">
+                Nächstes Board
+              </app-button>
+            }
             <app-button variant="danger" size="sm" (click)="onEndGame()">
               Spiel beenden
             </app-button>
@@ -40,7 +45,14 @@
         <div class="w-full max-w-[95%] xl:max-w-[90%] flex flex-col gap-6 animate-fade-in">
           
           <div class="text-center md:text-left">
-            <h2 class="text-xl md:text-2xl font-black tracking-wide">Jeopardy Spielfeld</h2>
+            <h2 class="text-xl md:text-2xl font-black tracking-wide">
+              Jeopardy Spielfeld
+              @if (p2pService.gameState().boards && p2pService.gameState().boards!.length > 1) {
+                <span class="text-jeopardy-accent text-sm md:text-base font-bold ml-2">
+                  (Board {{ p2pService.gameState().currentBoardIndex! + 1 }} von {{ p2pService.gameState().boards!.length }})
+                </span>
+              }
+            </h2>
             <p class="text-xs text-white/40 mt-1">
               {{ getBoardInstructionText() }}
             </p>
@@ -156,7 +168,14 @@
 
             <div class="flex gap-2">
               @if (p2pService.isHost()) {
-                @if (canIConfirmSelection()) {
+                @if (hasNextBoard()) {
+                  <app-button 
+                    variant="primary" 
+                    size="sm" 
+                    (click)="onNextBoard()">
+                    Nächstes Board starten
+                  </app-button>
+                } @else if (canIConfirmSelection()) {
                   <app-button 
                     variant="primary" 
                     size="sm" 
@@ -167,10 +186,16 @@
                   <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Auswahl...</span>
                 }
               } @else {
-                @if (canISelectOrVote()) {
-                  <span class="text-[10px] text-jeopardy-gold font-bold animate-pulse uppercase tracking-wider">Warte auf Freigabe durch Host...</span>
+                @if (isBoardComplete() && hasNextBoard()) {
+                  <span class="text-xs text-jeopardy-gold font-bold animate-pulse uppercase tracking-wider">Warte darauf, dass der Host das nächste Board startet...</span>
+                } @else if (isBoardComplete() && !hasNextBoard()) {
+                  <span class="text-xs text-red-400 font-bold uppercase tracking-wider">Spiel beendet! Warte auf Auswertung...</span>
                 } @else {
-                  <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Host...</span>
+                  @if (canISelectOrVote()) {
+                    <span class="text-[10px] text-jeopardy-gold font-bold animate-pulse uppercase tracking-wider">Warte auf Freigabe durch Host...</span>
+                  } @else {
+                    <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Host...</span>
+                  }
                 }
               }
             </div>

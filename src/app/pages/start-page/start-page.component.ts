@@ -142,12 +142,15 @@ export class StartPageComponent {
   maxPlayers = signal('8');
   teamSize = signal('2');
   teamMode = signal(false);
-  selectedTemplate = signal('general');
+  selectedTemplates = signal<string[]>(['general']);
   buzzerTimeout = signal('10');
   deductPointsOnTimeout = signal(false);
   incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
 
   canStartGame = computed(() => {
+    if (this.selectedTemplates().length === 0) {
+      return false;
+    }
     const guests = this.p2pService.players().filter(p => !p.isHost);
     if (this.p2pService.teamMode()) {
       const maxTeams = this.p2pService.maxTeamsLimit();
@@ -164,6 +167,9 @@ export class StartPageComponent {
   });
 
   getStartGameDisabledReason = computed(() => {
+    if (this.selectedTemplates().length === 0) {
+      return 'Bitte wähle mindestens eine Quiz-Vorlage aus.';
+    }
     const guests = this.p2pService.players().filter(p => !p.isHost);
     if (this.p2pService.teamMode()) {
       const maxTeams = this.p2pService.maxTeamsLimit();
@@ -222,8 +228,11 @@ export class StartPageComponent {
       if (!id) return;
       this.quizService.deleteQuiz(id).subscribe({
         next: () => {
-          if (this.selectedTemplate() === id) {
-            this.selectedTemplate.set('general');
+          if (this.selectedTemplates().includes(id)) {
+            this.selectedTemplates.set(this.selectedTemplates().filter(tid => tid !== id));
+            if (this.selectedTemplates().length === 0) {
+              this.selectedTemplates.set(['general']);
+            }
           }
           this.refreshTrigger.update(n => n + 1);
         },
@@ -236,7 +245,7 @@ export class StartPageComponent {
       this.settingsModalOpen.set(false);
       this.authService.deleteAccount().then(() => {
         this.playerName.set('');
-        this.selectedTemplate.set('general');
+        this.selectedTemplates.set(['general']);
       }).catch(err => {
         alert(err.message || 'Fehler beim Löschen des Kontos.');
       });
@@ -267,7 +276,16 @@ export class StartPageComponent {
       return;
     }
     this.incompleteQuizWarning.set(null);
-    this.selectedTemplate.set(templateId);
+    
+    const current = this.selectedTemplates();
+    if (current.includes(templateId)) {
+      this.selectedTemplates.set(current.filter(id => id !== templateId));
+    } else {
+      if (current.length >= 3) {
+        return;
+      }
+      this.selectedTemplates.set([...current, templateId]);
+    }
   }
 
   dismissIncompleteWarning() {
@@ -447,12 +465,13 @@ export class StartPageComponent {
   }
 
   onStartGame() {
-    const template = this.quizService.getTemplateById(
-      this.selectedTemplate(),
-      this.authService.currentUser()?.email
-    );
-    if (template) {
-      this.p2pService.startGame(template.categories);
+    const templates = this.selectedTemplates().map(id => 
+      this.quizService.getTemplateById(id, this.authService.currentUser()?.email)
+    ).filter((t): t is Exclude<typeof t, null> => !!t);
+
+    if (templates.length > 0) {
+      const boards = templates.map(t => t.categories);
+      this.p2pService.startGame(boards);
     }
   }
 
@@ -549,7 +568,7 @@ export class StartPageComponent {
   onLogout() {
     this.authService.logout();
     this.playerName.set('');
-    this.selectedTemplate.set('general');
+    this.selectedTemplates.set(['general']);
   }
 
   openSettingsModal() {
