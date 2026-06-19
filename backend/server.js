@@ -43,7 +43,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10mb' })); // Support larger custom quiz payloads
+app.use(express.json({ limit: '50mb' })); // Support larger custom quiz payloads
 app.use('/api/', globalLimiter); // Apply global rate limiter to all API endpoints
 
 // --- VALIDATION UTILITIES ---

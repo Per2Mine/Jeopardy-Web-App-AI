@@ -297,8 +297,8 @@ export class QuizService {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Bildformat bei ${q.value} $.`);
           }
           const approximateSize = q.image.length * 0.75;
-          if (approximateSize > 1.2 * 1024 * 1024) {
-            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein zu großes Bild bei ${q.value} $ (max. 1 MB).`);
+          if (approximateSize > 6.8 * 1024 * 1024) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein zu großes Bild bei ${q.value} $ (max. 5 MB).`);
           }
         }
       });

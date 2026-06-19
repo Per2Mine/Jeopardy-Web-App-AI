@@ -239,10 +239,10 @@ export class QuizCreatorComponent implements OnInit {
         return;
       }
 
-      // Validate size (1 MB limit)
-      const maxSize = 1 * 1024 * 1024;
+      // Validate size (5 MB limit)
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
-        this.imageError.set('Die Bilddatei ist zu groß. Maximale Größe ist 1 MB.');
+        this.imageError.set('Die Bilddatei ist zu groß. Maximale Größe ist 5 MB.');
         return;
       }
 
