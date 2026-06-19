@@ -66,6 +66,13 @@ export class StartPageComponent {
   forgotConfirmPassword = signal('');
   forgotSuccess = signal(false);
 
+  // Confirmation Modal states (for custom delete warnings)
+  confirmModalOpen = signal(false);
+  confirmModalType = signal<'quiz' | 'account'>('quiz');
+  confirmModalTargetId = signal<string | null>(null);
+  confirmModalTitle = signal('');
+  confirmModalText = signal('');
+
   // Settings form states
   settingsModalOpen = signal(false);
   newUsername = signal('');
@@ -186,9 +193,33 @@ export class StartPageComponent {
     return this.quizService.getTemplates(email);
   });
 
-  onDeleteQuiz(id: string, event: Event) {
+  triggerQuizDelete(id: string, name: string, event: Event) {
     event.stopPropagation();
-    if (confirm('Möchtest du diese Quiz-Vorlage wirklich löschen?')) {
+    this.confirmModalType.set('quiz');
+    this.confirmModalTargetId.set(id);
+    this.confirmModalTitle.set('Quiz-Vorlage löschen');
+    this.confirmModalText.set(`Möchtest du die Quiz-Vorlage „${name}“ wirklich unwiderruflich löschen?`);
+    this.confirmModalOpen.set(true);
+  }
+
+  triggerAccountDelete() {
+    this.confirmModalType.set('account');
+    this.confirmModalTargetId.set(null);
+    this.confirmModalTitle.set('Konto unwiderruflich löschen');
+    this.confirmModalText.set('Möchtest du dein Benutzerkonto wirklich löschen? Alle deine erstellten Quiz-Vorlagen werden unwiderruflich mitgelöscht.');
+    this.confirmModalOpen.set(true);
+  }
+
+  onCancelDelete() {
+    this.confirmModalOpen.set(false);
+    this.confirmModalTargetId.set(null);
+  }
+
+  onConfirmDelete() {
+    this.confirmModalOpen.set(false);
+    if (this.confirmModalType() === 'quiz') {
+      const id = this.confirmModalTargetId();
+      if (!id) return;
       this.quizService.deleteQuiz(id).subscribe({
         next: () => {
           if (this.selectedTemplate() === id) {
@@ -200,6 +231,14 @@ export class StartPageComponent {
           console.error('Failed to delete quiz:', err);
           alert('Fehler beim Löschen des Quizzes.');
         }
+      });
+    } else if (this.confirmModalType() === 'account') {
+      this.settingsModalOpen.set(false);
+      this.authService.deleteAccount().then(() => {
+        this.playerName.set('');
+        this.selectedTemplate.set('general');
+      }).catch(err => {
+        alert(err.message || 'Fehler beim Löschen des Kontos.');
       });
     }
   }

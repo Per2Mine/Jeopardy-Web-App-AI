@@ -302,7 +302,7 @@
                         </button>
                         <!-- Delete Button -->
                         <button
-                          (click)="onDeleteQuiz(tmpl.id, $event)"
+                          (click)="triggerQuizDelete(tmpl.id, tmpl.name, $event)"
                           class="p-1 text-white/30 hover:text-red-500 rounded hover:bg-white/5 cursor-pointer"
                           title="Vorlage löschen">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -970,6 +970,19 @@
               Speichern
             </app-button>
           </div>
+
+          <div class="border-t border-white/10 pt-4 mt-2 flex flex-col gap-3">
+            <span class="block text-xs font-bold text-red-500/80 uppercase tracking-widest">
+              Gefahrenzone
+            </span>
+            <app-button 
+              variant="danger" 
+              size="md" 
+              [fullWidth]="true"
+              (click)="triggerAccountDelete()">
+              Konto unwiderruflich löschen
+            </app-button>
+          </div>
         </div>
 
       </div>
@@ -1128,6 +1141,56 @@
             size="md"
             (click)="legalModalOpen.set(false)">
             Schließen
+          </app-button>
+        </div>
+
+      </div>
+    </div>
+  }
+  <!-- 8. CUSTOM DANGER CONFIRMATION MODAL -->
+  @if (confirmModalOpen()) {
+    <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <!-- Backdrop -->
+      <div 
+        (click)="onCancelDelete()"
+        class="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity z-40">
+      </div>
+      
+      <!-- Modal Box -->
+      <div class="relative max-w-sm w-full bg-jeopardy-dark/95 border border-red-500/20 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-50 animate-scale-in">
+        
+        <!-- Header -->
+        <div class="flex items-center gap-3 pb-4 border-b border-white/10">
+          <div class="p-3 bg-red-500/10 text-red-500 rounded-2xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-black text-white leading-tight">
+              {{ confirmModalTitle() }}
+            </h3>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <p class="text-sm text-white/70 leading-relaxed">
+          {{ confirmModalText() }}
+        </p>
+
+        <!-- Actions -->
+        <div class="flex gap-3 justify-end border-t border-white/5 pt-4">
+          <app-button 
+            variant="ghost" 
+            size="md" 
+            (click)="onCancelDelete()">
+            Abbrechen
+          </app-button>
+          <app-button 
+            variant="danger" 
+            size="md" 
+            (click)="onConfirmDelete()">
+            Ja, löschen
           </app-button>
         </div>
 

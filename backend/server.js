@@ -393,6 +393,17 @@ app.put('/api/auth/username', authenticateToken, async (req, res) => {
   }
 });
 
+// 4.5 Delete Account
+app.delete('/api/auth/account', authenticateToken, async (req, res) => {
+  try {
+    await db.run('DELETE FROM users WHERE email = ?', [req.user.email]);
+    res.json({ success: true, message: 'Konto erfolgreich gelöscht.' });
+  } catch (err) {
+    console.error('Delete Account Error:', err);
+    res.status(500).json({ error: 'Fehler beim Löschen des Kontos.' });
+  }
+});
+
 // 5. Get Custom Quizzes
 app.get('/api/quizzes', authenticateToken, async (req, res) => {
   try {

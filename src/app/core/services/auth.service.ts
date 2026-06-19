@@ -180,6 +180,21 @@ export class AuthService {
     }
   }
 
+  /**
+   * Delete current user's account permanently
+   */
+  async deleteAccount(): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.delete<any>('/api/auth/account')
+      );
+      this.logout();
+    } catch (err: any) {
+      const errorMsg = err.error?.error || 'Fehler beim Löschen des Kontos.';
+      throw new Error(errorMsg);
+    }
+  }
+
   private async restoreSession() {
     const token = localStorage.getItem(this.TOKEN_KEY);
     if (!token) return;
