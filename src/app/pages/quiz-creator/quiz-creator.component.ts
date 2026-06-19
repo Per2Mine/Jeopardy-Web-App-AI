@@ -70,7 +70,7 @@ export class QuizCreatorComponent implements OnInit {
   modalImage = signal<string | null>(null);
   imageError = signal<string | null>(null);
   modalPixelate = signal(false);
-  modalPixelateStrength = signal(15);
+  modalPixelateStrength = signal(80);
   modalReducePixelation = signal(false);
   modalReduceAmount = signal(5);
 
@@ -201,7 +201,7 @@ export class QuizCreatorComponent implements OnInit {
     this.modalAnswerText.set(q.answer);
     this.modalImage.set(q.image || null);
     this.modalPixelate.set(q.pixelate || false);
-    this.modalPixelateStrength.set(q.pixelateStrength || 15);
+    this.modalPixelateStrength.set(q.pixelateStrength || 80);
     this.modalReducePixelation.set(q.reducePixelationOnWrong || false);
     this.modalReduceAmount.set(q.reducePixelationAmount || 5);
     this.imageError.set(null);
@@ -276,7 +276,7 @@ export class QuizCreatorComponent implements OnInit {
   removeModalImage() {
     this.modalImage.set(null);
     this.modalPixelate.set(false);
-    this.modalPixelateStrength.set(15);
+    this.modalPixelateStrength.set(80);
     this.modalReducePixelation.set(false);
     this.modalReduceAmount.set(5);
     this.imageError.set(null);

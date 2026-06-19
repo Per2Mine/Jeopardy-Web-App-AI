@@ -1718,7 +1718,7 @@ export class P2pService {
     const question = current.categories[categoryIndex]?.questions[questionIndex];
     const image = question?.image || undefined;
     const pixelate = question?.pixelate || false;
-    const pixelateStrength = question?.pixelateStrength || 15;
+    const pixelateStrength = question?.pixelateStrength || 80;
     const reducePixelationOnWrong = question?.reducePixelationOnWrong || false;
     const reducePixelationAmount = question?.reducePixelationAmount || 5;
 
@@ -1800,9 +1800,9 @@ export class P2pService {
       // Calculate updated activeQuestion with reduced pixelateStrength if enabled
       let updatedActiveQuestion = current.activeQuestion;
       if (updatedActiveQuestion && updatedActiveQuestion.pixelate && updatedActiveQuestion.reducePixelationOnWrong) {
-        const currentStrength = updatedActiveQuestion.pixelateStrength ?? 15;
+        const currentStrength = updatedActiveQuestion.pixelateStrength ?? 80;
         const amount = updatedActiveQuestion.reducePixelationAmount ?? 5;
-        const newStrength = Math.max(2, currentStrength - amount);
+        const newStrength = Math.max(1, currentStrength - amount);
         updatedActiveQuestion = {
           ...updatedActiveQuestion,
           pixelateStrength: newStrength

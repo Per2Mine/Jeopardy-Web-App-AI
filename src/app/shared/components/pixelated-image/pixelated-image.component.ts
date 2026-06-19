@@ -25,7 +25,7 @@ import { CommonModule } from '@angular/common';
 export class PixelatedImageComponent implements OnChanges, AfterViewInit {
   @Input() src?: string | null;
   @Input() pixelate = false;
-  @Input() strength = 15; // strength slider value (2 to 80)
+  @Input() strength = 80; // strength slider value (1 to 100)
   @Input() customClass = '';
 
   @ViewChild('canvas') canvasRef?: ElementRef<HTMLCanvasElement>;
@@ -57,20 +57,22 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Map strength to a divisor. The higher the strength, the smaller the canvas, hence the more pixelated.
-      // Range: strength is between 2 and 80.
-      const divisor = Math.max(2, Math.min(80, this.strength));
+      // Map strength (range 1 to 100) to targetWidth (range 300px down to 4px) using a power curve.
+      // This gives fine-grained control over the highly-pixelated guessing range (4px - 50px)
+      // and ensures even high-res 2K images become completely unrecognizable at high settings.
+      const strengthClamped = Math.max(1, Math.min(100, this.strength));
       
-      const w = Math.max(1, Math.round(img.width / divisor));
-      const h = Math.max(1, Math.round(img.height / divisor));
+      const targetWidth = Math.max(4, Math.min(img.width, Math.round(4 + 296 * Math.pow(1 - (strengthClamped / 100), 2.5))));
+      const aspectRatio = img.height / img.width;
+      const targetHeight = Math.max(1, Math.round(targetWidth * aspectRatio));
 
       // 1. Draw image small to an offscreen canvas
       const offscreen = document.createElement('canvas');
-      offscreen.width = w;
-      offscreen.height = h;
+      offscreen.width = targetWidth;
+      offscreen.height = targetHeight;
       const offscreenCtx = offscreen.getContext('2d');
       if (!offscreenCtx) return;
-      offscreenCtx.drawImage(img, 0, 0, w, h);
+      offscreenCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
       // 2. Draw scaled up back to the main canvas (matching original dimensions)
       canvas.width = img.width;
@@ -82,7 +84,7 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
       (ctx as any).webkitImageSmoothingEnabled = false;
       (ctx as any).msImageSmoothingEnabled = false;
 
-      ctx.drawImage(offscreen, 0, 0, w, h, 0, 0, img.width, img.height);
+      ctx.drawImage(offscreen, 0, 0, targetWidth, targetHeight, 0, 0, img.width, img.height);
     };
     img.src = this.src;
   }
