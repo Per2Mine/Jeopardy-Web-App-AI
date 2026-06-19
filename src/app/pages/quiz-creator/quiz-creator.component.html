@@ -80,6 +80,36 @@
 
     </div>
 
+    <!-- Point Distribution Config Card -->
+    <div class="bg-white/[0.02] border border-white/5 p-6 rounded-3xl backdrop-blur-md flex flex-col gap-4">
+      <div>
+        <h4 class="text-sm font-black text-white uppercase tracking-wider">Fragewerte anpassen ($)</h4>
+        <p class="text-xs text-white/50 mt-1">
+          Passe hier die Fragewerte (Punkte) für jede Fragenreihe (Zeile) an. Die Änderungen werden sofort für alle Kategorien übernommen.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+        @for (count of [0, 1, 2, 3, 4, 5].slice(0, numQuestions()); track count; let idx = $index) {
+          <div class="flex flex-col gap-1.5">
+            <span class="block text-[10px] font-bold text-white/60 uppercase tracking-widest text-center">Reihe {{ idx + 1 }}</span>
+            <div class="flex items-center bg-jeopardy-blue/20 border border-white/10 hover:border-white/20 focus-within:border-jeopardy-accent rounded-xl px-3 py-1.5 transition-all duration-300">
+              <input 
+                #valInput
+                type="number"
+                min="0"
+                max="10000"
+                step="50"
+                [value]="rowValues()[idx]"
+                (input)="updateRowValue(idx, +valInput.value)"
+                class="w-full bg-transparent text-white font-extrabold text-sm outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+              <span class="text-jeopardy-gold font-bold text-xs ml-1">$</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
     <!-- Error Banner -->
     @if (errorMessage()) {
       <div class="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm font-semibold flex items-center gap-3 animate-fade-in">

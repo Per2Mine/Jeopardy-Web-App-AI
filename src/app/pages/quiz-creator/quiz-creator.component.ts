@@ -23,6 +23,7 @@ export class QuizCreatorComponent implements OnInit {
   editingId = signal<string | null>(null);
   quizName = signal('');
   errorMessage = signal('');
+  rowValues = signal<number[]>([100, 200, 300, 400, 500, 600]);
 
   ngOnInit() {
     const id = this.route.snapshot.queryParamMap.get('id');
@@ -37,6 +38,15 @@ export class QuizCreatorComponent implements OnInit {
         const count = template.categories[0]?.questions?.length || 5;
         this.numQuestions.set(count);
         
+        if (template.categories[0]?.questions) {
+          const existingVals = template.categories[0].questions.map(q => q.value);
+          const fullVals = [...existingVals];
+          for (let i = fullVals.length; i < 6; i++) {
+            fullVals.push((i + 1) * 100);
+          }
+          this.rowValues.set(fullVals);
+        }
+
         // Deep copy the categories so edits do not modify original state until saved
         const copiedCategories = JSON.parse(JSON.stringify(template.categories)) as Category[];
         this.categories.set(copiedCategories);
@@ -70,7 +80,7 @@ export class QuizCreatorComponent implements OnInit {
             newQs.push({
               text: '',
               answer: '',
-              value: (i + 1) * 100
+              value: this.rowValues()[i] || (i + 1) * 100
             });
           }
           return {
@@ -94,7 +104,7 @@ export class QuizCreatorComponent implements OnInit {
     const newQs: Question[] = Array.from({ length: maxQsInMemory }, (_, i) => ({
       text: '',
       answer: '',
-      value: (i + 1) * 100
+      value: this.rowValues()[i] || (i + 1) * 100
     }));
 
     this.categories.update(cats => [
@@ -116,15 +126,39 @@ export class QuizCreatorComponent implements OnInit {
     this.categories.update(cats => cats.filter((_, i) => i !== index));
   }
 
+  updateRowValue(qIndex: number, newValue: number) {
+    if (isNaN(newValue)) return;
+    let clampedValue = newValue;
+    if (clampedValue < 0) clampedValue = 0;
+    if (clampedValue > 10000) clampedValue = 10000;
+
+    this.rowValues.update(vals => {
+      const copy = [...vals];
+      copy[qIndex] = clampedValue;
+      return copy;
+    });
+    this.categories.update(cats => cats.map(cat => {
+      const updatedQs = [...cat.questions];
+      if (updatedQs[qIndex]) {
+        updatedQs[qIndex] = {
+          ...updatedQs[qIndex],
+          value: clampedValue
+        };
+      }
+      return {
+        ...cat,
+        questions: updatedQs
+      };
+    }));
+  }
 
   private initCategories(): Category[] {
-    const values = [100, 200, 300, 400, 500];
     const cats: Category[] = [];
     for (let c = 0; c < 5; c++) {
-      const questions: Question[] = values.map(v => ({
+      const questions: Question[] = Array.from({ length: 6 }, (_, i) => ({
         text: '',
         answer: '',
-        value: v
+        value: this.rowValues()[i]
       }));
       cats.push({
         name: '',
