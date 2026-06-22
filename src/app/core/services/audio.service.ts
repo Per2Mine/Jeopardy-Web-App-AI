@@ -8,6 +8,30 @@ export class AudioService {
   private p2pService = inject(P2pService);
   private audioCtx: AudioContext | null = null;
 
+  // Question-specific audio player state
+  private currentAudioUrl: string | null = null;
+  private audioStart = 0;
+  private audioEnd = 10;
+  private audioSpeed = 1.0;
+  private audioPitch = 0;
+  questionAudioPlaying = signal<boolean>(false);
+
+  // Web Audio Nodes for Altered Playback
+  private decodedBuffer: AudioBuffer | null = null;
+  private sourceNode: AudioBufferSourceNode | null = null;
+  private jungleNode: any = null;
+  private gainNode: GainNode | null = null;
+  
+  // Web Audio Nodes for Solution Playback (Unaltered)
+  private solutionSourceNode: AudioBufferSourceNode | null = null;
+  private solutionGainNode: GainNode | null = null;
+
+  private playStartTime = 0;
+  private elapsedOffset = 0; // Offset in seconds from audioStart
+  private isCurrentlyPlaying = false;
+  private isSolutionPlaying = false;
+  private manualStop = false;
+
   // Local settings signals
   volume = signal<number>(0.5);
   muted = signal<boolean>(false);
@@ -17,6 +41,9 @@ export class AudioService {
   private lastResultId: string | null = null;
   private lastPhase: string = 'LOBBY';
   private lastTimerSeconds: number | null = null;
+  private lastQuestionBuzzedId: string | null = null;
+  private lastAudioPlayingState = false;
+  private hasFinishedPlaying = false;
 
   constructor() {
     // Load settings from localStorage
@@ -36,6 +63,17 @@ export class AudioService {
     });
     effect(() => {
       localStorage.setItem('jeopardy_audio_muted', this.muted().toString());
+    });
+
+    // Update active question audio volume/mute settings
+    effect(() => {
+      const finalVolume = this.muted() ? 0 : this.volume();
+      if (this.gainNode) {
+        this.gainNode.gain.setValueAtTime(finalVolume, this.getAudioContext().currentTime);
+      }
+      if (this.solutionGainNode) {
+        this.solutionGainNode.gain.setValueAtTime(finalVolume, this.getAudioContext().currentTime);
+      }
     });
 
     // Auto-unlock AudioContext on first click or keypress
@@ -93,6 +131,47 @@ export class AudioService {
         }
       }
       this.lastTimerSeconds = state.timerSeconds;
+
+      // 5. Custom Audio Question Playback
+      const activeQ = state.activeQuestion;
+      if (state.phase === 'QUESTION' && activeQ && activeQ.audio) {
+        if (this.currentAudioUrl !== activeQ.audio) {
+          this.setupQuestionAudio(activeQ.audio, activeQ.audioStart, activeQ.audioEnd, activeQ.audioSpeed, activeQ.audioPitch);
+          this.lastQuestionBuzzedId = state.buzzedPlayerId;
+          this.hasFinishedPlaying = false;
+        }
+
+        // Reset offset if the buzzed player changed (meaning someone new buzzed)
+        if (state.buzzedPlayerId !== this.lastQuestionBuzzedId) {
+          if (state.buzzedPlayerId !== null) {
+            // Someone buzzed (or initial turn started) - reset offset to play from beginning!
+            this.elapsedOffset = 0;
+            this.hasFinishedPlaying = false;
+          }
+          this.lastQuestionBuzzedId = state.buzzedPlayerId;
+        }
+
+        // Reset finished flag if host manually toggled audioPlaying to true
+        if (!!state.audioPlaying && !this.lastAudioPlayingState) {
+          this.hasFinishedPlaying = false;
+        }
+        this.lastAudioPlayingState = !!state.audioPlaying;
+
+        const showAnswer = state.showAnswer;
+
+        if (showAnswer) {
+          this.playSolutionAudio();
+        } else if (!state.audioPlaying || this.hasFinishedPlaying) {
+          this.pauseQuestionAudio();
+        } else {
+          this.playQuestionAudio();
+        }
+      } else {
+        this.stopQuestionAudio();
+        this.lastQuestionBuzzedId = null;
+        this.lastAudioPlayingState = false;
+        this.hasFinishedPlaying = false;
+      }
     });
   }
 
@@ -291,5 +370,459 @@ export class AudioService {
     } catch (e) {
       console.warn('Failed to play transition sound:', e);
     }
+  }
+
+  /**
+   * Question audio playback helper methods
+   */
+  private async decodeBase64Audio(base64: string): Promise<AudioBuffer> {
+    const ctx = this.getAudioContext();
+    const base64Data = base64.split(',')[1];
+    const binaryStr = window.atob(base64Data);
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return await ctx.decodeAudioData(bytes.buffer);
+  }
+
+  async setupQuestionAudio(base64Url: string, start?: number, end?: number, speed?: number, pitch?: number) {
+    this.stopQuestionAudio();
+    this.currentAudioUrl = base64Url;
+    this.audioStart = start !== undefined ? start : 0;
+    this.audioEnd = end !== undefined ? end : 10;
+    this.audioSpeed = speed !== undefined ? speed : 1.0;
+    this.audioPitch = pitch !== undefined ? pitch : 0;
+
+    try {
+      const buffer = await this.decodeBase64Audio(base64Url);
+      if (this.currentAudioUrl === base64Url) {
+        this.decodedBuffer = buffer;
+
+        // Auto-start playback if game is still in the correct phase and audioPlaying is true
+        const state = this.p2pService.gameState();
+        if (state && state.phase === 'QUESTION' && state.activeQuestion?.audio === base64Url) {
+          const showAnswer = state.showAnswer;
+
+          if (showAnswer) {
+            this.playSolutionAudio();
+          } else if (!state.audioPlaying || this.hasFinishedPlaying) {
+            this.pauseQuestionAudio();
+          } else {
+            this.playQuestionAudio();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to decode question audio buffer:', e);
+    }
+  }
+
+  playQuestionAudio() {
+    if (!this.decodedBuffer) return;
+    if (this.isCurrentlyPlaying || this.isSolutionPlaying) return;
+
+    this.isCurrentlyPlaying = true;
+    this.questionAudioPlaying.set(true);
+    this.manualStop = false;
+
+    const ctx = this.getAudioContext();
+    this.playStartTime = ctx.currentTime;
+
+    // Calculate remaining duration
+    const durationLimit = this.audioEnd - this.audioStart;
+    const remainingDuration = durationLimit - this.elapsedOffset;
+
+    if (remainingDuration <= 0) {
+      this.elapsedOffset = 0;
+      this.playQuestionAudio();
+      return;
+    }
+
+    // 1. Source Node
+    this.sourceNode = ctx.createBufferSource();
+    this.sourceNode.buffer = this.decodedBuffer;
+    this.sourceNode.playbackRate.value = this.audioSpeed;
+
+    // 2. Volume Gain Node
+    this.gainNode = ctx.createGain();
+    const finalVolume = this.muted() ? 0 : this.volume();
+    this.gainNode.gain.setValueAtTime(finalVolume, ctx.currentTime);
+
+    // 3. Pitch Shifter Node (Jungle)
+    this.jungleNode = new Jungle(ctx);
+    
+    // Connect nodes: source -> jungle -> gain -> destination
+    this.sourceNode.connect(this.jungleNode.input);
+    this.jungleNode.output.connect(this.gainNode);
+    this.gainNode.connect(ctx.destination);
+
+    // Apply Pitch shift.
+    // Calculate the compensation offset for speed changes:
+    // If playbackRate = S, it shifts the pitch by 12 * log2(S) semitones.
+    // We adjust setPitchTranspose to target exactly this.audioPitch semitones.
+    const speedPitchShift = 12 * Math.log2(this.audioSpeed);
+    const targetTranspose = this.audioPitch - speedPitchShift;
+    this.jungleNode.setPitchTranspose(targetTranspose);
+
+    // Start playback
+    const startPositionInFile = this.audioStart + this.elapsedOffset;
+    this.sourceNode.start(0, startPositionInFile, remainingDuration);
+
+    this.sourceNode.onended = () => {
+      if (!this.manualStop) {
+        this.questionAudioPlaying.set(false);
+        this.isCurrentlyPlaying = false;
+        this.elapsedOffset = 0; // reset
+        this.hasFinishedPlaying = true;
+      }
+    };
+  }
+
+  pauseQuestionAudio() {
+    if (!this.isCurrentlyPlaying) return;
+    this.manualStop = true;
+
+    const ctx = this.getAudioContext();
+    const playedSeconds = (ctx.currentTime - this.playStartTime) * this.audioSpeed;
+    this.elapsedOffset += playedSeconds;
+
+    this.stopQuestionAudioPlayback();
+  }
+
+  playSolutionAudio() {
+    if (!this.decodedBuffer) return;
+    if (this.isSolutionPlaying) return;
+
+    this.stopQuestionAudioPlayback();
+    this.stopSolutionAudioPlayback();
+
+    this.isSolutionPlaying = true;
+    this.questionAudioPlaying.set(true);
+
+    const ctx = this.getAudioContext();
+    this.solutionSourceNode = ctx.createBufferSource();
+    this.solutionSourceNode.buffer = this.decodedBuffer;
+    this.solutionSourceNode.playbackRate.value = 1.0; // Unmodified speed
+
+    this.solutionGainNode = ctx.createGain();
+    const finalVolume = this.muted() ? 0 : this.volume();
+    this.solutionGainNode.gain.setValueAtTime(finalVolume, ctx.currentTime);
+
+    // Bypasses pitch shifter to play original unmodified sound
+    this.solutionSourceNode.connect(this.solutionGainNode);
+    this.solutionGainNode.connect(ctx.destination);
+
+    const playDuration = this.audioEnd - this.audioStart;
+    this.solutionSourceNode.start(0, this.audioStart, playDuration);
+
+    this.solutionSourceNode.onended = () => {
+      this.questionAudioPlaying.set(false);
+      this.isSolutionPlaying = false;
+    };
+  }
+
+  stopQuestionAudio() {
+    this.stopQuestionAudioPlayback();
+    this.stopSolutionAudioPlayback();
+    this.currentAudioUrl = null;
+    this.decodedBuffer = null;
+    this.elapsedOffset = 0;
+    this.questionAudioPlaying.set(false);
+  }
+
+  private stopQuestionAudioPlayback() {
+    this.manualStop = true;
+    if (this.sourceNode) {
+      try {
+        this.sourceNode.onended = null;
+        this.sourceNode.stop();
+      } catch (e) {}
+      this.sourceNode = null;
+    }
+    if (this.jungleNode) {
+      this.jungleNode.disconnect();
+      this.jungleNode = null;
+    }
+    this.gainNode = null;
+    this.isCurrentlyPlaying = false;
+    this.questionAudioPlaying.set(false);
+  }
+
+  private stopSolutionAudioPlayback() {
+    if (this.solutionSourceNode) {
+      try {
+        this.solutionSourceNode.onended = null;
+        this.solutionSourceNode.stop();
+      } catch (e) {}
+      this.solutionSourceNode = null;
+    }
+    this.solutionGainNode = null;
+    this.isSolutionPlaying = false;
+  }
+
+  // Preview properties
+  private previewSourceNode: AudioBufferSourceNode | null = null;
+  private previewJungleNode: any = null;
+  private previewGainNode: GainNode | null = null;
+  private isPreviewPlaying = false;
+
+  async playPreview(base64Url: string, start: number, end: number, speed: number, pitch: number, onEndedCallback: () => void) {
+    this.stopPreview();
+    this.isPreviewPlaying = true;
+
+    try {
+      const buffer = await this.decodeBase64Audio(base64Url);
+      if (!this.isPreviewPlaying) return; // stopped while decoding
+
+      const ctx = this.getAudioContext();
+      this.previewSourceNode = ctx.createBufferSource();
+      this.previewSourceNode.buffer = buffer;
+      this.previewSourceNode.playbackRate.value = speed;
+
+      this.previewGainNode = ctx.createGain();
+      this.previewGainNode.gain.setValueAtTime(0.5, ctx.currentTime); // default preview volume
+
+      this.previewJungleNode = new Jungle(ctx);
+
+      this.previewSourceNode.connect(this.previewJungleNode.input);
+      this.previewJungleNode.output.connect(this.previewGainNode);
+      this.previewGainNode.connect(ctx.destination);
+
+      const speedPitchShift = 12 * Math.log2(speed);
+      const targetTranspose = pitch - speedPitchShift;
+      this.previewJungleNode.setPitchTranspose(targetTranspose);
+
+      const duration = end - start;
+      this.previewSourceNode.start(0, start, duration);
+
+      this.previewSourceNode.onended = () => {
+        this.isPreviewPlaying = false;
+        onEndedCallback();
+      };
+    } catch (e) {
+      console.warn('Preview playback failed:', e);
+      this.isPreviewPlaying = false;
+      onEndedCallback();
+    }
+  }
+
+  stopPreview() {
+    this.isPreviewPlaying = false;
+    if (this.previewSourceNode) {
+      try {
+        this.previewSourceNode.onended = null;
+        this.previewSourceNode.stop();
+      } catch (e) {}
+      this.previewSourceNode = null;
+    }
+    if (this.previewJungleNode) {
+      this.previewJungleNode.disconnect();
+      this.previewJungleNode = null;
+    }
+    this.previewGainNode = null;
+  }
+}
+
+/**
+ * Jungle.js pitch shifter helper utilities and classes (Web Audio delay line synthesis)
+ */
+function createFadeBuffer(context: AudioContext, activeTime: number, fadeTime: number): AudioBuffer {
+  const length1 = activeTime * context.sampleRate;
+  const length2 = (activeTime - 2 * fadeTime) * context.sampleRate;
+  const length = length1 + length2;
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const p = buffer.getChannelData(0);
+  const fadeLength = fadeTime * context.sampleRate;
+  const fadeIndex1 = fadeLength;
+  const fadeIndex2 = length1 - fadeLength;
+
+  for (let i = 0; i < length1; ++i) {
+    let value;
+    if (i < fadeIndex1) {
+      value = Math.sqrt(i / fadeLength);
+    } else if (i >= fadeIndex2) {
+      value = Math.sqrt(1 - (i - fadeIndex2) / fadeLength);
+    } else {
+      value = 1;
+    }
+    p[i] = value;
+  }
+
+  for (let i = length1; i < length; ++i) {
+    p[i] = 0;
+  }
+
+  return buffer;
+}
+
+function createDelayTimeBuffer(context: AudioContext, activeTime: number, fadeTime: number, shiftUp: boolean): AudioBuffer {
+  const length1 = activeTime * context.sampleRate;
+  const length2 = (activeTime - 2 * fadeTime) * context.sampleRate;
+  const length = length1 + length2;
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const p = buffer.getChannelData(0);
+
+  for (let i = 0; i < length1; ++i) {
+    if (shiftUp) {
+      p[i] = (length1 - i) / length;
+    } else {
+      p[i] = i / length1;
+    }
+  }
+
+  for (let i = length1; i < length; ++i) {
+    p[i] = 0;
+  }
+
+  return buffer;
+}
+
+const delayTimeConst = 0.100;
+const fadeTimeConst = 0.050;
+const bufferTimeConst = 0.100;
+
+class Jungle {
+  context: AudioContext;
+  input: GainNode;
+  output: GainNode;
+  shiftDownBuffer: AudioBuffer;
+  shiftUpBuffer: AudioBuffer;
+  mod1: AudioBufferSourceNode;
+  mod2: AudioBufferSourceNode;
+  mod3: AudioBufferSourceNode;
+  mod4: AudioBufferSourceNode;
+  mod1Gain: GainNode;
+  mod2Gain: GainNode;
+  mod3Gain: GainNode;
+  mod4Gain: GainNode;
+  modGain1: GainNode;
+  modGain2: GainNode;
+  delay1: DelayNode;
+  delay2: DelayNode;
+  fade1: AudioBufferSourceNode;
+  fade2: AudioBufferSourceNode;
+  mix1: GainNode;
+  mix2: GainNode;
+
+  constructor(context: AudioContext) {
+    this.context = context;
+    this.input = context.createGain();
+    this.output = context.createGain();
+
+    this.mod1 = context.createBufferSource();
+    this.mod2 = context.createBufferSource();
+    this.mod3 = context.createBufferSource();
+    this.mod4 = context.createBufferSource();
+    this.shiftDownBuffer = createDelayTimeBuffer(context, bufferTimeConst, fadeTimeConst, false);
+    this.shiftUpBuffer = createDelayTimeBuffer(context, bufferTimeConst, fadeTimeConst, true);
+    this.mod1.buffer = this.shiftDownBuffer;
+    this.mod2.buffer = this.shiftDownBuffer;
+    this.mod3.buffer = this.shiftUpBuffer;
+    this.mod4.buffer = this.shiftUpBuffer;
+    this.mod1.loop = true;
+    this.mod2.loop = true;
+    this.mod3.loop = true;
+    this.mod4.loop = true;
+
+    this.mod1Gain = context.createGain();
+    this.mod2Gain = context.createGain();
+    this.mod3Gain = context.createGain();
+    this.mod3Gain.gain.value = 0;
+    this.mod4Gain = context.createGain();
+    this.mod4Gain.gain.value = 0;
+
+    this.mod1.connect(this.mod1Gain);
+    this.mod2.connect(this.mod2Gain);
+    this.mod3.connect(this.mod3Gain);
+    this.mod4.connect(this.mod4Gain);
+
+    this.modGain1 = context.createGain();
+    this.modGain2 = context.createGain();
+
+    this.delay1 = context.createDelay();
+    this.delay2 = context.createDelay();
+    this.mod1Gain.connect(this.modGain1);
+    this.mod2Gain.connect(this.modGain2);
+    this.mod3Gain.connect(this.modGain1);
+    this.mod4Gain.connect(this.modGain2);
+    this.modGain1.connect(this.delay1.delayTime);
+    this.modGain2.connect(this.delay2.delayTime);
+
+    this.fade1 = context.createBufferSource();
+    this.fade2 = context.createBufferSource();
+    const fadeBuffer = createFadeBuffer(context, bufferTimeConst, fadeTimeConst);
+    this.fade1.buffer = fadeBuffer;
+    this.fade2.buffer = fadeBuffer;
+    this.fade1.loop = true;
+    this.fade2.loop = true;
+
+    this.mix1 = context.createGain();
+    this.mix2 = context.createGain();
+    this.mix1.gain.value = 0;
+    this.mix2.gain.value = 0;
+
+    this.fade1.connect(this.mix1.gain);
+    this.fade2.connect(this.mix2.gain);
+
+    this.input.connect(this.delay1);
+    this.input.connect(this.delay2);
+    this.delay1.connect(this.mix1);
+    this.delay2.connect(this.mix2);
+    this.mix1.connect(this.output);
+    this.mix2.connect(this.output);
+
+    const t = context.currentTime + 0.050;
+    const t2 = t + bufferTimeConst - fadeTimeConst;
+    this.mod1.start(t);
+    this.mod2.start(t2);
+    this.mod3.start(t);
+    this.mod4.start(t2);
+    this.fade1.start(t);
+    this.fade2.start(t2);
+
+    this.setDelay(delayTimeConst);
+  }
+
+  setDelay(delayTime: number) {
+    this.modGain1.gain.setTargetAtTime(0.5 * delayTime, this.context.currentTime, 0.010);
+    this.modGain2.gain.setTargetAtTime(0.5 * delayTime, this.context.currentTime, 0.010);
+  }
+
+  setPitchOffset(mult: number) {
+    if (mult > 0) {
+      this.mod1Gain.gain.value = 0;
+      this.mod2Gain.gain.value = 0;
+      this.mod3Gain.gain.value = 1;
+      this.mod4Gain.gain.value = 1;
+    } else {
+      this.mod1Gain.gain.value = 1;
+      this.mod2Gain.gain.value = 1;
+      this.mod3Gain.gain.value = 0;
+      this.mod4Gain.gain.value = 0;
+    }
+    this.setDelay(delayTimeConst * Math.abs(mult));
+  }
+
+  mapPitchFromSemitone(semitones: number): number {
+    return semitones / 12;
+  }
+
+  setPitchTranspose(semitones: number) {
+    const pitchOffset = this.mapPitchFromSemitone(semitones);
+    this.setPitchOffset(pitchOffset);
+  }
+
+  disconnect() {
+    try { this.mod1.stop(); } catch (e) {}
+    try { this.mod2.stop(); } catch (e) {}
+    try { this.mod3.stop(); } catch (e) {}
+    try { this.mod4.stop(); } catch (e) {}
+    try { this.fade1.stop(); } catch (e) {}
+    try { this.fade2.stop(); } catch (e) {}
+
+    try { this.input.disconnect(); } catch (e) {}
+    try { this.output.disconnect(); } catch (e) {}
   }
 }

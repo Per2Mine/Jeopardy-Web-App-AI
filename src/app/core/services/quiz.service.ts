@@ -13,6 +13,11 @@ export interface Question {
   pixelateStrength?: number;
   reducePixelationOnWrong?: boolean;
   reducePixelationAmount?: number;
+  audio?: string;
+  audioStart?: number;
+  audioEnd?: number;
+  audioSpeed?: number;
+  audioPitch?: number;
 }
 
 export interface Category {
@@ -293,7 +298,7 @@ export class QuizService {
       throw new Error('Ein Quiz darf maximal 10 Kategorien besitzen.');
     }
 
-    // Validate images if present
+    // Validate images and audio if present
     categories.forEach((cat) => {
       cat.questions.forEach((q) => {
         if (q.image) {
@@ -303,6 +308,21 @@ export class QuizService {
           const approximateSize = q.image.length * 0.75;
           if (approximateSize > 6.8 * 1024 * 1024) {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein zu großes Bild bei ${q.value} $ (max. 5 MB).`);
+          }
+        }
+        if (q.audio) {
+          if (!q.audio.startsWith('data:audio/mp3') && !q.audio.startsWith('data:audio/mpeg')) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Audioformat bei ${q.value} $. Nur MP3 erlaubt.`);
+          }
+          const approximateSize = q.audio.length * 0.75;
+          if (approximateSize > 2 * 1024 * 1024) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat eine zu große Audiodatei bei ${q.value} $ (max. 2 MB).`);
+          }
+          if (q.audioPitch !== undefined && (q.audioPitch < -12 || q.audioPitch > 12)) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat einen ungültigen Tonhöhenwert bei ${q.value} $.`);
+          }
+          if (q.audioStart !== undefined && q.audioEnd !== undefined && q.audioEnd - q.audioStart > 10.1) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat einen zu langen Audio-Ausschnitt bei ${q.value} $ (max. 10 Sekunden).`);
           }
         }
       });

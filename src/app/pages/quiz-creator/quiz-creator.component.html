@@ -127,7 +127,7 @@
       (cdkDropListDropped)="onDropCdk($event)"
       [style.--grid-cols-dynamic]="'repeat(' + (categories().length < 10 ? categories().length + 1 : categories().length) + ', minmax(0, 1fr))'"
       class="grid grid-cols-1 sm:grid dynamic-quiz-grid gap-4">
-      @for (cat of categories(); track cat; let cIndex = $index) {
+      @for (cat of categories(); track $index; let cIndex = $index) {
         <div 
           cdkDrag
           cdkDragLockAxis="x"
@@ -238,7 +238,7 @@
       </div>
 
       <!-- Modal Box -->
-      <div class="relative max-w-lg w-full bg-jeopardy-dark/95 border border-white/10 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-50 animate-scale-in">
+      <div class="relative max-w-lg w-full max-h-[90vh] bg-jeopardy-dark/95 border border-white/10 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-50 animate-scale-in">
         
         <!-- Header -->
         <div class="flex justify-between items-center pb-4 border-b border-white/10">
@@ -260,7 +260,7 @@
         </div>
 
         <!-- Form Fields -->
-        <div class="flex flex-col gap-5">
+        <div class="flex-1 flex flex-col gap-5 overflow-y-auto pr-2 min-h-0">
           
           <app-input
             label="Die Frage (wird den Spielern gezeigt)"
@@ -380,6 +380,151 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                 </svg>
                 {{ imageError() }}
+              </span>
+            }
+          </div>
+
+          <!-- Audio Upload Area -->
+          <div class="flex flex-col gap-1.5">
+            <span class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1.5">
+              Musik / Sound hinzufügen (optional)
+            </span>
+
+            @if (modalAudio()) {
+              <!-- Audio Edit State -->
+              <div class="flex flex-col gap-3 p-4 bg-white/[0.02] border border-white/10 rounded-2xl">
+                <div class="flex items-center gap-3">
+                  <!-- Play/Pause Preview Button -->
+                  <button 
+                    type="button" 
+                    (click)="toggleModalAudioPreview()"
+                    class="w-10 h-10 flex items-center justify-center bg-jeopardy-accent hover:bg-jeopardy-accent/80 text-white rounded-full shadow-lg transition-transform transform hover:scale-105 cursor-pointer shrink-0">
+                    @if (modalAudioPlaying()) {
+                      <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                      </svg>
+                    } @else {
+                      <svg class="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    }
+                  </button>
+
+                  <div class="flex-1 min-w-0">
+                    <span class="block text-xs font-bold text-white truncate font-sans">Audiodatei geladen</span>
+                    <span class="block text-[10px] text-white/45 font-mono mt-0.5">
+                      Dauer: {{ modalAudioDuration().toFixed(1) }}s • Trim: {{ modalAudioStart().toFixed(1) }}s - {{ modalAudioEnd().toFixed(1) }}s
+                    </span>
+                  </div>
+
+                  <!-- Remove Audio Button -->
+                  <button 
+                    type="button" 
+                    (click)="removeModalAudio()"
+                    class="p-2 bg-red-600/10 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded-xl transition-all cursor-pointer"
+                    title="Audio entfernen">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Trim Controls -->
+                <div class="flex flex-col gap-2 pt-2 border-t border-white/5 mt-1">
+                  <!-- Start Trim Slider -->
+                  <div class="flex items-center gap-3 text-xs">
+                    <span class="text-white/60 shrink-0 w-16">Startzeit:</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      [max]="modalAudioDuration()" 
+                      step="0.1"
+                      [value]="modalAudioStart()"
+                      (input)="onAudioStartChange(+$any($event.target).value)"
+                      class="flex-1 accent-jeopardy-accent h-1 bg-white/10 rounded-lg cursor-pointer appearance-none font-sans"
+                    />
+                    <span class="text-jeopardy-gold font-mono w-10 text-right">{{ modalAudioStart().toFixed(1) }}s</span>
+                  </div>
+
+                  <!-- End Trim Slider -->
+                  <div class="flex items-center gap-3 text-xs">
+                    <span class="text-white/60 shrink-0 w-16">Endzeit:</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      [max]="modalAudioDuration()" 
+                      step="0.1"
+                      [value]="modalAudioEnd()"
+                      (input)="onAudioEndChange(+$any($event.target).value)"
+                      class="flex-1 accent-jeopardy-accent h-1 bg-white/10 rounded-lg cursor-pointer appearance-none font-sans"
+                    />
+                    <span class="text-jeopardy-gold font-mono w-10 text-right">{{ modalAudioEnd().toFixed(1) }}s</span>
+                  </div>
+                </div>
+
+                <!-- Speed & Pitch Sliders (Separated) -->
+                <div class="flex flex-col gap-2 pt-2 border-t border-white/5 mt-1">
+                  <!-- Speed Slider -->
+                  <div class="flex items-center gap-3 text-xs">
+                    <span class="text-white/60 shrink-0 w-16">Tempo:</span>
+                    <input 
+                      type="range" 
+                      min="0.5" 
+                      max="2.0" 
+                      step="0.1"
+                      [value]="modalAudioSpeed()"
+                      (input)="onAudioSpeedChange(+$any($event.target).value)"
+                      class="flex-1 accent-jeopardy-accent h-1 bg-white/10 rounded-lg cursor-pointer appearance-none font-sans"
+                    />
+                    <span class="text-jeopardy-gold font-mono w-10 text-right">{{ modalAudioSpeed().toFixed(1) }}x</span>
+                  </div>
+
+                  <!-- Pitch Slider -->
+                  <div class="flex items-center gap-3 text-xs">
+                    <span class="text-white/60 shrink-0 w-16">Tonhöhe:</span>
+                    <input 
+                      type="range" 
+                      min="-12" 
+                      max="12" 
+                      step="1"
+                      [value]="modalAudioPitch()"
+                      (input)="onAudioPitchChange(+$any($event.target).value)"
+                      class="flex-1 accent-jeopardy-accent h-1 bg-white/10 rounded-lg cursor-pointer appearance-none font-sans"
+                    />
+                    <span class="text-jeopardy-gold font-mono w-10 text-right">
+                      {{ modalAudioPitch() > 0 ? '+' : '' }}{{ modalAudioPitch() }}
+                    </span>
+                  </div>
+                  <span class="text-[9px] text-white/35 uppercase tracking-wider block ml-16 font-sans">
+                    Verändere Tempo und Tonhöhe getrennt (z. B. für "Errate den Sound"-Effekte).
+                  </span>
+                </div>
+
+              </div>
+            } @else {
+              <!-- Drop / Select Audio State -->
+              <label 
+                class="flex flex-col items-center justify-center border-2 border-dashed border-white/10 hover:border-jeopardy-accent/50 rounded-2xl p-4 cursor-pointer bg-white/[0.01] hover:bg-white/[0.03] transition-all duration-300 group">
+                <input 
+                  type="file" 
+                  class="hidden" 
+                  accept="audio/mp3, audio/mpeg"
+                  (change)="onAudioFileSelected($event)"
+                />
+                <svg class="w-8 h-8 text-white/30 group-hover:text-jeopardy-accent mb-2 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                </svg>
+                <span class="text-xs font-bold text-white/60 group-hover:text-white transition-colors font-sans">Sound auswählen</span>
+                <span class="text-[9px] text-white/40 mt-1 uppercase tracking-wider font-sans">Erlaubt: MP3 (max. 2MB, Ausschnitt max. 10s)</span>
+              </label>
+            }
+
+            @if (audioError()) {
+              <span class="text-xs font-semibold text-red-400 mt-1 flex items-center gap-1 animate-pulse font-sans">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                {{ audioError() }}
               </span>
             }
           </div>

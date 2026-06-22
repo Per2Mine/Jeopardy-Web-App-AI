@@ -6,6 +6,7 @@ import { InputComponent } from '../../shared/components/input/input.component';
 import { LogoComponent } from '../../shared/components/logo/logo.component';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizService, Category, Question } from '../../core/services/quiz.service';
+import { AudioService } from '../../core/services/audio.service';
 
 import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
 import { CdkDropList, CdkDrag, CdkDragHandle, CdkDragDrop, CdkDragStart, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -22,6 +23,7 @@ export class QuizCreatorComponent implements OnInit {
   private authService = inject(AuthService);
   private quizService = inject(QuizService);
   private route = inject(ActivatedRoute);
+  private audioService = inject(AudioService);
 
   editingId = signal<string | null>(null);
   quizName = signal('');
@@ -74,6 +76,16 @@ export class QuizCreatorComponent implements OnInit {
   modalPixelateStrength = signal(80);
   modalReducePixelation = signal(false);
   modalReduceAmount = signal(5);
+
+  // Modal Audio State
+  modalAudio = signal<string | null>(null);
+  modalAudioStart = signal<number>(0);
+  modalAudioEnd = signal<number>(10);
+  modalAudioSpeed = signal<number>(1.0);
+  modalAudioPitch = signal<number>(0);
+  modalAudioDuration = signal<number>(0);
+  audioError = signal<string | null>(null);
+  modalAudioPlaying = signal<boolean>(false);
 
   onNumQuestionsChange(count: number) {
     this.numQuestions.set(count);
@@ -206,6 +218,26 @@ export class QuizCreatorComponent implements OnInit {
     this.modalReducePixelation.set(q.reducePixelationOnWrong || false);
     this.modalReduceAmount.set(q.reducePixelationAmount || 5);
     this.imageError.set(null);
+
+    // Audio state
+    this.modalAudio.set(q.audio || null);
+    this.modalAudioStart.set(q.audioStart || 0);
+    this.modalAudioEnd.set(q.audioEnd || 10);
+    this.modalAudioSpeed.set(q.audioSpeed || 1.0);
+    this.modalAudioPitch.set(q.audioPitch || 0);
+    this.modalAudioDuration.set(0);
+    this.audioError.set(null);
+    this.modalAudioPlaying.set(false);
+
+    if (q.audio) {
+      const audio = new Audio(q.audio);
+      audio.addEventListener('loadedmetadata', () => {
+        this.modalAudioDuration.set(audio.duration);
+        if (this.modalAudioEnd() > audio.duration) {
+          this.modalAudioEnd.set(audio.duration);
+        }
+      });
+    }
   }
 
   saveActiveCell() {
@@ -224,6 +256,16 @@ export class QuizCreatorComponent implements OnInit {
       return;
     }
 
+    if (this.modalAudio()) {
+      const duration = this.modalAudioEnd() - this.modalAudioStart();
+      if (duration > 10.1) {
+        this.audioError.set('Der ausgewählte Ausschnitt darf maximal 10 Sekunden lang sein (aktuell: ' + duration.toFixed(1) + 's).');
+        return;
+      }
+    }
+
+    this.stopModalAudioPreview();
+
     this.categories.update(cats => {
       const newCats = [...cats];
       newCats[cell.cIndex].questions[cell.qIndex] = {
@@ -234,7 +276,14 @@ export class QuizCreatorComponent implements OnInit {
         pixelate: this.modalPixelate(),
         pixelateStrength: this.modalPixelateStrength(),
         reducePixelationOnWrong: this.modalReducePixelation(),
-        reducePixelationAmount: this.modalReduceAmount()
+        reducePixelationAmount: this.modalReduceAmount(),
+        
+        // Save Audio state
+        audio: this.modalAudio() || undefined,
+        audioStart: this.modalAudio() ? this.modalAudioStart() : undefined,
+        audioEnd: this.modalAudio() ? this.modalAudioEnd() : undefined,
+        audioSpeed: this.modalAudio() ? this.modalAudioSpeed() : undefined,
+        audioPitch: this.modalAudio() ? this.modalAudioPitch() : undefined
       };
       return newCats;
     });
@@ -283,7 +332,122 @@ export class QuizCreatorComponent implements OnInit {
     this.imageError.set(null);
   }
 
+  onAudioFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+
+      // Validate format (MP3 only)
+      if (file.type !== 'audio/mp3' && file.type !== 'audio/mpeg') {
+        this.audioError.set('Ungültiges Audio-Dateiformat. Bitte verwende nur MP3.');
+        return;
+      }
+
+      // Validate size (2 MB limit)
+      const maxSize = 2 * 1024 * 1024;
+      if (file.size > maxSize) {
+        this.audioError.set('Die Audiodatei ist zu groß. Maximale Größe ist 2 MB.');
+        return;
+      }
+
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(file);
+      audio.addEventListener('loadedmetadata', () => {
+        this.audioError.set(null);
+        const reader = new FileReader();
+        reader.onload = () => {
+          this.modalAudio.set(reader.result as string);
+          this.modalAudioStart.set(0);
+          this.modalAudioEnd.set(Math.min(10, audio.duration));
+          this.modalAudioDuration.set(audio.duration);
+          this.modalAudioSpeed.set(1.0);
+          this.modalAudioPitch.set(0);
+          URL.revokeObjectURL(audio.src);
+        };
+        reader.onerror = () => {
+          this.audioError.set('Fehler beim Lesen der Datei.');
+          URL.revokeObjectURL(audio.src);
+        };
+        reader.readAsDataURL(file);
+      });
+      audio.addEventListener('error', () => {
+        this.audioError.set('Fehler beim Analysieren der Audiodatei. Eventuell ist die Datei beschädigt.');
+        URL.revokeObjectURL(audio.src);
+      });
+    }
+  }
+
+  removeModalAudio() {
+    this.stopModalAudioPreview();
+    this.modalAudio.set(null);
+    this.modalAudioStart.set(0);
+    this.modalAudioEnd.set(10);
+    this.modalAudioSpeed.set(1.0);
+    this.modalAudioPitch.set(0);
+    this.modalAudioDuration.set(0);
+    this.audioError.set(null);
+  }
+
+  toggleModalAudioPreview() {
+    if (this.modalAudioPlaying()) {
+      this.stopModalAudioPreview();
+    } else {
+      this.startModalAudioPreview();
+    }
+  }
+
+  startModalAudioPreview() {
+    if (!this.modalAudio()) return;
+    this.stopModalAudioPreview();
+
+    this.modalAudioPlaying.set(true);
+    this.audioService.playPreview(
+      this.modalAudio()!,
+      this.modalAudioStart(),
+      this.modalAudioEnd(),
+      this.modalAudioSpeed(),
+      this.modalAudioPitch(),
+      () => {
+        this.modalAudioPlaying.set(false);
+      }
+    );
+  }
+
+  stopModalAudioPreview() {
+    this.audioService.stopPreview();
+    this.modalAudioPlaying.set(false);
+  }
+
+  onAudioStartChange(val: number) {
+    this.stopModalAudioPreview();
+    if (val >= this.modalAudioEnd()) {
+      this.modalAudioStart.set(Math.max(0, this.modalAudioEnd() - 0.1));
+    } else {
+      this.modalAudioStart.set(val);
+    }
+  }
+
+  onAudioEndChange(val: number) {
+    this.stopModalAudioPreview();
+    if (val <= this.modalAudioStart()) {
+      this.modalAudioEnd.set(Math.min(this.modalAudioDuration(), this.modalAudioStart() + 0.1));
+    } else {
+      this.modalAudioEnd.set(val);
+    }
+  }
+
+  onAudioSpeedChange(val: number) {
+    this.stopModalAudioPreview();
+    this.modalAudioSpeed.set(val);
+  }
+
+  onAudioPitchChange(val: number) {
+    this.stopModalAudioPreview();
+    this.modalAudioPitch.set(val);
+  }
+
   closeEditModal() {
+    this.stopModalAudioPreview();
     this.activeCell.set(null);
   }
 
