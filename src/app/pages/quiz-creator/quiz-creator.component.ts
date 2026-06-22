@@ -26,7 +26,7 @@ export class QuizCreatorComponent implements OnInit {
   editingId = signal<string | null>(null);
   quizName = signal('');
   errorMessage = signal('');
-  rowValues = signal<number[]>([100, 200, 300, 400, 500, 600]);
+  rowValues = signal<number[]>([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
 
   ngOnInit() {
     const id = this.route.snapshot.queryParamMap.get('id');
@@ -44,7 +44,7 @@ export class QuizCreatorComponent implements OnInit {
         if (template.categories[0]?.questions) {
           const existingVals = template.categories[0].questions.map(q => q.value);
           const fullVals = [...existingVals];
-          for (let i = fullVals.length; i < 6; i++) {
+          for (let i = fullVals.length; i < 10; i++) {
             fullVals.push((i + 1) * 100);
           }
           this.rowValues.set(fullVals);
@@ -162,7 +162,7 @@ export class QuizCreatorComponent implements OnInit {
   private initCategories(): Category[] {
     const cats: Category[] = [];
     for (let c = 0; c < 5; c++) {
-      const questions: Question[] = Array.from({ length: 6 }, (_, i) => ({
+      const questions: Question[] = Array.from({ length: 10 }, (_, i) => ({
         text: '',
         answer: '',
         value: this.rowValues()[i]
