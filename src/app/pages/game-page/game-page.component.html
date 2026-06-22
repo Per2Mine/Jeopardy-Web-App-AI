@@ -241,16 +241,64 @@
             }
           </div>
 
-          <!-- Question Text & Optional Image -->
+          <!-- Question Text & Optional Image / Audio -->
           <div class="w-full py-6 flex flex-col items-center justify-center min-h-[140px] text-center border-b border-white/5 gap-6">
             @if (activeQ?.image) {
               <div class="relative group max-w-full">
+                <!-- Audio Badge Overlay -->
+                @if (activeQ?.audio) {
+                  <div 
+                    [class.border-jeopardy-gold]="audioService.questionAudioPlaying()"
+                    class="absolute top-4 right-4 z-10 px-3.5 py-1.5 bg-black/85 border border-white/10 rounded-full flex items-center gap-2 shadow-lg backdrop-blur-md transition-all">
+                    <span class="relative flex h-2 w-2">
+                      @if (audioService.questionAudioPlaying()) {
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-jeopardy-gold opacity-75"></span>
+                      }
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-jeopardy-gold"></span>
+                    </span>
+                    <span class="text-[10px] font-black uppercase tracking-wider text-white">Audio</span>
+                  </div>
+                }
+
                 <app-pixelated-image 
                   [src]="activeQ?.image" 
                   [pixelate]="!!(activeQ?.pixelate && !p2pService.gameState().showAnswer)"
                   [strength]="activeQ?.pixelateStrength || 15"
                   customClass="max-h-64 md:max-h-80 lg:max-h-[450px] xl:max-h-[550px] 2xl:max-h-[650px] w-auto max-w-full object-contain rounded-2xl border border-white/15 shadow-2xl transition-all duration-300 hover:scale-[1.02]"
                 ></app-pixelated-image>
+              </div>
+            } @else if (activeQ?.audio) {
+              <!-- Audio-Only Visualizer Dashboard -->
+              <div class="relative w-full max-w-sm aspect-video rounded-3xl overflow-hidden border border-white/10 bg-black/40 p-6 flex flex-col items-center justify-center gap-4 shadow-2xl transition-all duration-300">
+                <!-- Glow Background -->
+                <div class="absolute -inset-10 bg-jeopardy-accent/10 blur-3xl rounded-full"></div>
+                
+                <!-- Glowing Speaker Icon -->
+                <div 
+                  [class.animate-pulse]="audioService.questionAudioPlaying()"
+                  class="relative z-10 w-20 h-20 bg-white/[0.03] border border-white/10 rounded-full flex items-center justify-center shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] transition-all">
+                  <svg class="w-10 h-10 text-jeopardy-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+                  </svg>
+                </div>
+
+                <!-- Soundwave Animation -->
+                <div class="z-10 mt-2 flex items-center gap-1.5 h-6" [class.paused]="!audioService.questionAudioPlaying()">
+                  <span class="w-1.5 h-full bg-jeopardy-gold rounded-full transition-all animate-soundwave-bar"></span>
+                  <span class="w-1.5 h-full bg-jeopardy-gold rounded-full transition-all animate-soundwave-bar delay-75"></span>
+                  <span class="w-1.5 h-full bg-jeopardy-gold rounded-full transition-all animate-soundwave-bar delay-150"></span>
+                  <span class="w-1.5 h-full bg-jeopardy-gold rounded-full transition-all animate-soundwave-bar delay-300"></span>
+                  <span class="w-1.5 h-full bg-jeopardy-gold rounded-full transition-all animate-soundwave-bar delay-200"></span>
+                </div>
+
+                <!-- Status text -->
+                <span class="z-10 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                  @if (audioService.questionAudioPlaying()) {
+                    Spielt Audio...
+                  } @else {
+                    Audio pausiert
+                  }
+                </span>
               </div>
             }
             <p class="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold leading-relaxed text-white max-w-4xl xl:max-w-5xl filter drop-shadow-[0_2px_10px_rgba(255,255,255,0.1)]">
@@ -370,6 +418,31 @@
                     </div>
                     
                     <div class="h-[1px] w-full bg-white/5"></div>
+
+                    @if (activeQ?.audio) {
+                      <div class="w-full flex flex-col gap-2">
+                        <app-button 
+                          [variant]="p2pService.gameState().audioPlaying ? 'secondary' : 'primary'"
+                          size="sm"
+                          [fullWidth]="true"
+                          (click)="onToggleAudio()">
+                          <div class="flex items-center justify-center gap-2">
+                            @if (p2pService.gameState().audioPlaying) {
+                              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z" clip-rule="evenodd" />
+                              </svg>
+                              Audio pausieren
+                            } @else {
+                              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
+                              </svg>
+                              Audio abspielen
+                            }
+                          </div>
+                        </app-button>
+                        <div class="h-[1px] w-full bg-white/5 my-1"></div>
+                      </div>
+                    }
                     
                     @if (p2pService.gameState().buzzerLocked) {
                       <!-- Buzzer is locked after selector failed: Host must choose to release it or end the question -->

@@ -30,6 +30,11 @@ export interface GameState {
     pixelateStrength?: number;
     reducePixelationOnWrong?: boolean;
     reducePixelationAmount?: number;
+    audio?: string;
+    audioStart?: number;
+    audioEnd?: number;
+    audioSpeed?: number;
+    audioPitch?: number;
   } | null;
   buzzedPlayerId: string | null;
   buzzerLocked: boolean;
@@ -49,6 +54,7 @@ export interface GameState {
   deductPointsOnTimeout: boolean;
   timerSeconds: number | null;
   isInitialTurn: boolean;
+  audioPlaying?: boolean;
   boards?: Category[][];
   currentBoardIndex?: number;
 }
@@ -176,7 +182,8 @@ export class P2pService {
     buzzerTimeout: 10,
     deductPointsOnTimeout: false,
     timerSeconds: null,
-    isInitialTurn: false
+    isInitialTurn: false,
+    audioPlaying: false
   });
   chatMessages = signal<ChatMessage[]>([]);
 
@@ -1229,7 +1236,25 @@ export class P2pService {
     const current = this.gameState();
     const nextState: GameState = {
       ...current,
-      buzzerLocked: false
+      buzzerLocked: false,
+      audioPlaying: false
+    };
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
+  toggleQuestionAudio() {
+    if (!this.isHost()) return;
+    const current = this.gameState();
+    if (!current.activeQuestion) return;
+
+    const nextState: GameState = {
+      ...current,
+      audioPlaying: !current.audioPlaying
     };
     this.gameState.set(nextState);
     this.broadcast({
@@ -1386,7 +1411,8 @@ export class P2pService {
         timerSeconds: null,
         isInitialTurn: false, // Initial turn is over after first failure/timeout
         lockedOutPlayerIds: lockedOutPlayers,
-        lockedOutTeamIds: lockedOutTeams
+        lockedOutTeamIds: lockedOutTeams,
+        audioPlaying: false
       };
     }
 
@@ -1421,7 +1447,8 @@ export class P2pService {
       const nextState: GameState = {
         ...current,
         buzzedPlayerId: playerId,
-        buzzerLocked: true
+        buzzerLocked: true,
+        audioPlaying: true
       };
       this.gameState.set(nextState);
       
@@ -1687,7 +1714,8 @@ export class P2pService {
       categories,
       currentBoardIndex: nextIdx,
       activeSelectorId: nextSelector,
-      lastAnswerResult: null
+      lastAnswerResult: null,
+      audioPlaying: false
     };
 
     this.gameState.set(nextState);
@@ -1721,6 +1749,11 @@ export class P2pService {
     const pixelateStrength = question?.pixelateStrength || 80;
     const reducePixelationOnWrong = question?.reducePixelationOnWrong || false;
     const reducePixelationAmount = question?.reducePixelationAmount || 5;
+    const audio = question?.audio || undefined;
+    const audioStart = question?.audioStart;
+    const audioEnd = question?.audioEnd;
+    const audioSpeed = question?.audioSpeed;
+    const audioPitch = question?.audioPitch;
 
     const nextState: GameState = {
       ...current,
@@ -1735,7 +1768,12 @@ export class P2pService {
         pixelate, 
         pixelateStrength, 
         reducePixelationOnWrong, 
-        reducePixelationAmount 
+        reducePixelationAmount,
+        audio,
+        audioStart,
+        audioEnd,
+        audioSpeed,
+        audioPitch
       },
       buzzedPlayerId: initialBuzzedPlayerId,
       buzzerLocked: true, // Lock the buzzer so others cannot buzz yet
@@ -1744,7 +1782,8 @@ export class P2pService {
       showAnswer: false,
       lastAnswerResult: null,
       isInitialTurn: true, // Initial turn is active
-      timerSeconds: current.buzzerTimeout === 0 ? null : current.buzzerTimeout
+      timerSeconds: current.buzzerTimeout === 0 ? null : current.buzzerTimeout,
+      audioPlaying: true
     };
     this.gameState.set(nextState);
 
@@ -1862,7 +1901,8 @@ export class P2pService {
           timerSeconds: null,
           isInitialTurn: false, // Initial turn is over after first failure
           lockedOutPlayerIds: lockedOutPlayers,
-          lockedOutTeamIds: lockedOutTeams
+          lockedOutTeamIds: lockedOutTeams,
+          audioPlaying: false
         };
       }
     }
