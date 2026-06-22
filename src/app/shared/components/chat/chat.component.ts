@@ -205,7 +205,7 @@ export class ChatComponent {
         this.seenMessagesCount.set(msgs.length);
         setTimeout(() => this.scrollToBottom(), 30);
       }
-    }, { allowSignalWrites: true });
+    });
   }
 
   toggleChat() {
