@@ -457,8 +457,8 @@ function validateQuizPayloadDraft(name, categories) {
         if (q.text && (typeof q.text !== 'string' || q.text.trim().length > 160)) {
           return `Der Frage-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 160 Zeichen lang sein.`;
         }
-        if (q.answer && (typeof q.answer !== 'string' || q.answer.trim().length > 50)) {
-          return `Der Antwort-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 50 Zeichen lang sein.`;
+        if (q.answer && (typeof q.answer !== 'string' || q.answer.trim().length > 100)) {
+          return `Der Antwort-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 100 Zeichen lang sein.`;
         }
         if (q.image) {
           if (typeof q.image !== 'string') {

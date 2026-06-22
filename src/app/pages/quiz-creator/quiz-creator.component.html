@@ -122,11 +122,28 @@
 
     <!-- Dynamic Board Grid -->
     <div 
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="onDropCdk($event)"
       [style.--grid-cols-dynamic]="'repeat(' + (categories().length < 10 ? categories().length + 1 : categories().length) + ', minmax(0, 1fr))'"
       class="grid grid-cols-1 sm:grid dynamic-quiz-grid gap-4">
-      
-      @for (cat of categories(); track cIndex; let cIndex = $index) {
-        <div class="flex flex-col gap-4 bg-white/[0.01] border border-white/5 p-4 rounded-2xl backdrop-blur-sm">
+      @for (cat of categories(); track cat; let cIndex = $index) {
+        <div 
+          cdkDrag
+          cdkDragLockAxis="x"
+          cdkDragBoundary=".dynamic-quiz-grid"
+          class="flex flex-col gap-4 bg-white/[0.01] border border-white/5 p-4 rounded-2xl backdrop-blur-sm transition-colors duration-300">
+          
+          <!-- Drag Handle -->
+          <div 
+            cdkDragHandle
+            (pointerdown)="onDragHandlePointerDown($event)"
+            class="drag-handle cursor-grab active:cursor-grabbing flex justify-center items-center py-1 border-b border-white/5 -mt-2 -mx-2 text-white/20 hover:text-white/50 transition-colors"
+            title="Kategorie verschieben (Spalte ziehen)">
+            <svg class="w-6 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"></path>
+            </svg>
+          </div>
           
           <!-- Category Header Name Input & Delete Button -->
           <div class="pb-2 border-b border-white/5 flex gap-2 items-end">
@@ -371,7 +388,7 @@
             label="Die Antwort (das gesuchte Lösungswort / Name)"
             placeholder="z.B. Mario"
             [(value)]="modalAnswerText"
-            [maxLength]="50">
+            [maxLength]="100">
           </app-input>
 
         </div>

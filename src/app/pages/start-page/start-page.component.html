@@ -1210,7 +1210,7 @@
     <button 
       (click)="patchNotesModalOpen.set(true)"
       class="px-2.5 py-1 text-[10px] font-bold text-white/40 hover:text-jeopardy-accent bg-white/[0.01] hover:bg-white/[0.05] border border-white/10 hover:border-jeopardy-accent/30 rounded-full transition-all duration-300 flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-sm">
-      <span>v0.9.7</span>
+      <span>v0.9.8</span>
       <span class="w-1.5 h-1.5 rounded-full bg-jeopardy-accent animate-pulse"></span>
     </button>
   </div>
@@ -1245,11 +1245,23 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
+          <!-- Version 0.9.8 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.8 - Spalten Drag & Drop & Limit-Erhöhung</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Kategorie Drag & Drop:</strong> Spalten (Kategorien) können nun im Quiz-Creator per Drag & Drop mit einem dedizierten Anfasser-Symbol flüssig horizontal verschoben und neu angeordnet werden.</li>
+              <li><strong class="text-white">Höheres Antwortlimit:</strong> Das maximale Zeichenlimit für Antworten im Quiz-Creator wurde sowohl clientseitig als auch serverseitig auf 100 Zeichen erhöht.</li>
+            </ul>
+          </div>
+          
           <!-- Version 0.9.7 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.7 - Dynamische Bildenthüllung</span>
-              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+              <span class="text-sm font-black text-white uppercase tracking-wider">v0.9.7 - Dynamische Bildenthüllung</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">22. Juni 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Pixelungs-Reduzierung bei Fehlantworten:</strong> Optionale Einstellung, um Bilder bei jeder falschen Spielerantwort schrittweise zu enthüllen.</li>

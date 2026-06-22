@@ -41,3 +41,62 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+/* Angular CDK Drag & Drop Global Styles */
+.cdk-drag-preview {
+  box-sizing: border-box !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: #03081e !important; /* matches jeopardy-dark */
+  opacity: 0.95 !important;
+  border-radius: 1rem !important;
+  padding: 1rem !important;
+  
+  /* Dynamic width and height matching the exact column size measured on drag start */
+  width: var(--dragged-width) !important;
+  height: var(--dragged-height) !important;
+  
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+  pointer-events: none !important;
+  
+  /* CRITICAL: Disable transitions on the clone itself so it follows the mouse instantly without lag */
+  transition: none !important;
+}
+
+/* Ensure child elements inside the preview style correctly */
+.cdk-drag-preview button,
+.cdk-drag-preview input,
+.cdk-drag-preview textarea {
+  pointer-events: none !important;
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.15 !important;
+  border: 2px dashed rgba(255, 255, 255, 0.25) !important;
+  background: transparent !important;
+  border-radius: 1rem !important;
+  box-sizing: border-box !important;
+  
+  /* Disable transitions on the placeholder */
+  transition: none !important;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+/* Allow the preview element to animate smoothly when released and flying back */
+.cdk-drag-preview.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+/* CRITICAL: Disable transitions on the card that is currently active and being dragged */
+.cdk-drag-dragging {
+  transition: none !important;
+}
+
+.cdk-drop-list-dragging .cdk-drag {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}

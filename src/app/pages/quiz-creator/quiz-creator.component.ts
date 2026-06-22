@@ -8,11 +8,12 @@ import { AuthService } from '../../core/services/auth.service';
 import { QuizService, Category, Question } from '../../core/services/quiz.service';
 
 import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
+import { CdkDropList, CdkDrag, CdkDragHandle, CdkDragDrop, CdkDragStart, moveItemInArray } from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-quiz-creator',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent, PixelatedImageComponent],
+  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent, PixelatedImageComponent, CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './quiz-creator.component.html',
   styleUrl: './quiz-creator.component.css'
 })
@@ -218,8 +219,8 @@ export class QuizCreatorComponent implements OnInit {
       this.imageError.set('Der Frage-Text darf maximal 160 Zeichen lang sein.');
       return;
     }
-    if (aText.length > 30) {
-      this.imageError.set('Der Antwort-Text darf maximal 30 Zeichen lang sein.');
+    if (aText.length > 100) {
+      this.imageError.set('Der Antwort-Text darf maximal 100 Zeichen lang sein.');
       return;
     }
 
@@ -337,8 +338,8 @@ export class QuizCreatorComponent implements OnInit {
           this.errorMessage.set(`Der Frage-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 160 Zeichen lang sein.`);
           return;
         }
-        if (q.answer && q.answer.trim().length > 30) {
-          this.errorMessage.set(`Der Antwort-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 30 Zeichen lang sein.`);
+        if (q.answer && q.answer.trim().length > 100) {
+          this.errorMessage.set(`Der Antwort-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 100 Zeichen lang sein.`);
           return;
         }
       }
@@ -356,6 +357,24 @@ export class QuizCreatorComponent implements OnInit {
     } catch (err: any) {
       this.errorMessage.set(err.message || 'Speichern fehlgeschlagen.');
     }
+  }
+
+  onDragHandlePointerDown(event: PointerEvent) {
+    const handle = event.currentTarget as HTMLElement;
+    const card = handle.closest('.cdk-drag') as HTMLElement;
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      document.documentElement.style.setProperty('--dragged-width', `${rect.width}px`);
+      document.documentElement.style.setProperty('--dragged-height', `${rect.height}px`);
+    }
+  }
+
+  onDropCdk(event: CdkDragDrop<Category[]>) {
+    this.categories.update(cats => {
+      const updated = [...cats];
+      moveItemInArray(updated, event.previousIndex, event.currentIndex);
+      return updated;
+    });
   }
 
   onCancel() {
