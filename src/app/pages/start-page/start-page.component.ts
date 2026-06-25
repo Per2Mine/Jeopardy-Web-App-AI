@@ -147,6 +147,7 @@ export class StartPageComponent {
   teamSize = signal('2');
   teamMode = signal(false);
   selectedTemplates = signal<string[]>([]);
+  showTemplateWarning = signal(false);
   buzzerTimeout = signal('20');
   deductPointsOnTimeout = signal(false);
   incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
@@ -335,6 +336,9 @@ export class StartPageComponent {
       }
       this.selectedTemplates.set([...current, templateId]);
     }
+    if (this.selectedTemplates().length > 0) {
+      this.showTemplateWarning.set(false);
+    }
   }
 
   dismissIncompleteWarning() {
@@ -470,10 +474,12 @@ export class StartPageComponent {
       return;
     }
     if (this.selectedTemplates().length === 0) {
+      this.showTemplateWarning.set(true);
       this.joinError.set('Bitte wähle mindestens eine Quiz-Vorlage aus, um einen Spielraum zu erstellen.');
       return;
     }
     
+    this.showTemplateWarning.set(false);
     this.joinError.set('');
 
     // Generate a unique 6-character room code (e.g. JEOP55 or random uppercase alphanumeric)

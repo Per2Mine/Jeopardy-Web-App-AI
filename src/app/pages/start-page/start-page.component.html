@@ -460,6 +460,12 @@
               (click)="onHostSubmit()">
               Spielraum erstellen
             </app-button>
+            @if (showTemplateWarning()) {
+              <p class="text-[12px] text-red-400 text-center font-bold mt-2 select-none flex items-center justify-center gap-1.5 animate-pulse">
+                <span>⚠️</span>
+                <span>Wähle mindestens eine Quiz-Vorlage aus, bevor du einen Spielraum erstellst.</span>
+              </p>
+            }
           </div>
         }
       </div>
