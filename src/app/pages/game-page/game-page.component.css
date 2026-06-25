@@ -188,6 +188,7 @@
     gold-shimmer 8s infinite ease-in-out;
   border-width: 2px !important;
   border-style: solid !important;
+  border-color: rgba(234, 179, 8, 0.6) !important;
   transform: scale(1.04) !important;
   z-index: 10;
   overflow: hidden;

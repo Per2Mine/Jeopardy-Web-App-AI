@@ -550,6 +550,9 @@
                                        team.id === 5 ? 'bg-pink-500' : 'bg-yellow-500')">
                         </span>
                         <span class="text-base font-black text-white font-sans uppercase tracking-wider">Team {{ team.id }}</span>
+                        @if (index === 0) {
+                          <span class="bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-yellow-500/30 tracking-widest animate-pulse ml-2">🏆 GEWINNER</span>
+                        }
                       </div>
                     </div>
 
@@ -589,7 +592,12 @@
 
                   <!-- Profile -->
                   <div class="flex-1 min-w-0">
-                    <span class="text-sm font-bold text-white truncate block">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</span>
+                    <span class="text-sm font-bold text-white truncate block flex items-center gap-2">
+                      {{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}
+                      @if (index === 0) {
+                        <span class="bg-yellow-500/20 text-yellow-400 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border border-yellow-500/30 tracking-widest animate-pulse">🏆 Gewinner</span>
+                      }
+                    </span>
                     <span class="text-[9px] uppercase tracking-wider text-white/40 font-bold">
                       {{ player.isHost ? 'Host' : 'Spieler' }}
                     </span>
