@@ -1350,7 +1350,7 @@
     <button 
       (click)="patchNotesModalOpen.set(true)"
       class="px-2.5 py-1 text-[10px] font-bold text-white/40 hover:text-jeopardy-accent bg-white/[0.01] hover:bg-white/[0.05] border border-white/10 hover:border-jeopardy-accent/30 rounded-full transition-all duration-300 flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-sm">
-      <span>v0.9.9</span>
+      <span>v1.0</span>
       <span class="w-1.5 h-1.5 rounded-full bg-jeopardy-accent animate-pulse"></span>
     </button>
   </div>
@@ -1385,11 +1385,30 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
+          <!-- Version 1.0 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-jeopardy-accent/10 border border-jeopardy-accent/20 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.0 — Der große Release 🎉</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Spielstart- & Spielende-Fanfare:</strong> Angenehme, warme Synthesizer-Melodien beim Start und Ende eines Spiels für ein immersiveres Spielerlebnis.</li>
+              <li><strong class="text-white">Gewinner-Hervorhebung:</strong> Der Erstplatzierte erhält im Endergebnis eine goldene Glitter-Karte mit „🏆 Gewinner“-Badge und einer eleganten Lichtstreifen-Animation.</li>
+              <li><strong class="text-white">Host-Disconnect-Erkennung:</strong> Verlässt der Host unerwartet das Spiel, erhalten alle Spieler eine Benachrichtigung und werden sicher zur Startseite zurückgeleitet.</li>
+              <li><strong class="text-white">Quiz-Pflichtauswahl:</strong> Ein Spielraum kann nur noch erstellt werden, wenn mindestens eine Quiz-Vorlage ausgewählt wurde. Bei fehlendem Quiz erscheint eine deutliche Warnung unter dem Button.</li>
+              <li><strong class="text-white">Neue Avatare — Oktopus & Stern:</strong> Zwei neue Körperformen im Avatar-Creator: ein süßer Oktopus mit 6 geschwungenen Tentakeln und ein niedlicher 5-Zacken-Stern mit abgerundeten Spitzen.</li>
+              <li><strong class="text-white">Erweiterte Farbpalette:</strong> Die Avatar-Farbauswahl umfasst jetzt 18 handverlesene Farben inklusive Waldgrün, Crimson, Amber, Bronze und Silber.</li>
+              <li><strong class="text-white">Design-Überarbeitung:</strong> Neuer Lautstärke-Slider mit modernem Glassmorphism-Look, verbesserte Kategorie-Header mit automatischem Textumbruch bei langen Namen, und überarbeitete Buzzer-Ästhetik mit weichem Leuchteffekt.</li>
+              <li><strong class="text-white">Optimierte Standardeinstellungen:</strong> Quiz-Vorlagen werden nicht mehr automatisch vorausgewählt und der Standard-Buzzer-Timeout wurde auf 20 Sekunden gesetzt für ein besseres Spieltempo.</li>
+              <li><strong class="text-white">Buzzer-Feinschliff:</strong> Weichere Pulsanimation und optimierte GPU-Komposition für flackerfreie Darstellung des Buzzers.</li>
+            </ul>
+          </div>
+
           <!-- Version 0.9.9 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.9 - Sound- & Musikunterstützung</span>
-              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+              <span class="text-sm font-black text-white uppercase tracking-wider">v0.9.9 - Sound- & Musikunterstützung</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">24. Juni 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Audio-Upload & Editor:</strong> Lade MP3s bis 10 MB im Quiz-Creator hoch und bearbeite Start-/Endzeit (max. 10s Ausschnitt), Wiedergabe-Tempo und Tonhöhe völlig unabhängig voneinander.</li>

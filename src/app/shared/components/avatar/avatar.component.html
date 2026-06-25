@@ -41,6 +41,47 @@
         <ellipse cx="63" cy="91" rx="8" ry="4.5" fill="rgba(0,0,0,0.18)"/>
         <!-- Cute Tail -->
         <path d="M 73 75 Q 85 70 82 55" fill="none" [attr.stroke]="color()" stroke-width="6" stroke-linecap="round"/>
+      } @else if (av.base === 3) {
+        <!-- Cute Octopus -->
+        <!-- Ground shadow -->
+        <ellipse cx="50" cy="92" rx="28" ry="5" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- 6 Tentacles (thick stroked curves, drawn BEHIND the head) -->
+        <!-- Outer left -->
+        <path d="M 27 56 Q 12 68, 18 82" fill="none" [attr.stroke]="color()" stroke-width="8" stroke-linecap="round"/>
+        <!-- Middle left -->
+        <path d="M 35 62 Q 24 78, 30 90" fill="none" [attr.stroke]="color()" stroke-width="7" stroke-linecap="round"/>
+        <!-- Inner left -->
+        <path d="M 44 64 Q 38 80, 43 92" fill="none" [attr.stroke]="color()" stroke-width="7" stroke-linecap="round"/>
+        <!-- Inner right -->
+        <path d="M 56 64 Q 62 80, 57 92" fill="none" [attr.stroke]="color()" stroke-width="7" stroke-linecap="round"/>
+        <!-- Middle right -->
+        <path d="M 65 62 Q 76 78, 70 90" fill="none" [attr.stroke]="color()" stroke-width="7" stroke-linecap="round"/>
+        <!-- Outer right -->
+        <path d="M 73 56 Q 88 68, 82 82" fill="none" [attr.stroke]="color()" stroke-width="8" stroke-linecap="round"/>
+
+        <!-- Big round dome head -->
+        <ellipse cx="50" cy="44" rx="27" ry="26" [attr.fill]="color()"/>
+
+        <!-- Head highlight (glossy 3D shine on upper-left) -->
+        <ellipse cx="40" cy="34" rx="12" ry="8" fill="rgba(255,255,255,0.22)" transform="rotate(-20,40,34)"/>
+
+      } @else if (av.base === 4) {
+        <!-- Cute Star -->
+        <!-- Ground shadow -->
+        <ellipse cx="50" cy="86" rx="22" ry="5" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- Star body: proper 5-pointed star polygon with puffy rounded corners -->
+        <polygon
+          points="50,10 61,35 88,38 68,57 73,82 50,68 27,82 32,57 12,38 39,35"
+          [attr.fill]="color()"
+          [attr.stroke]="color()"
+          stroke-width="6"
+          stroke-linejoin="round"
+        />
+
+        <!-- Highlight shimmer on upper-left star arm -->
+        <ellipse cx="40" cy="28" rx="7" ry="5" fill="rgba(255,255,255,0.3)" transform="rotate(-35,40,28)"/>
       }
 
       <!-- Eyes Selection -->

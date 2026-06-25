@@ -1016,6 +1016,12 @@ export class P2pService {
 
     conn.on('close', () => {
       this.stopHeartbeat();
+      // If we never reached 'connected' state, the close was caused by a rejected join (name_taken, lobby_full, etc.)
+      // In that case, do NOT set hostDisconnected — the correct error is already in errorMessage from JOIN_ACK.
+      if (this.connectionState() === 'connecting' || this.errorMessage()) {
+        this.disconnect();
+        return;
+      }
       const hasSavedSession = sessionStorage.getItem('jeopardy_p2p_session');
       if (hasSavedSession && !this.wasKicked()) {
         console.log('Connection closed unexpectedly. Attempting to reconnect...');

@@ -535,7 +535,7 @@ export class StartPageComponent {
   }
 
   randomizeAvatar() {
-    this.avatarBase.set(Math.floor(Math.random() * 3));
+    this.avatarBase.set(Math.floor(Math.random() * 5));
     this.avatarEyes.set(Math.floor(Math.random() * 8));
     this.avatarMouth.set(Math.floor(Math.random() * 6));
     this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
@@ -656,7 +656,7 @@ export class StartPageComponent {
   }
 
   cycleBase(direction: number) {
-    const total = 3; // 0, 1, 2
+    const total = 5; // 0, 1, 2, 3, 4
     let next = this.avatarBase() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
