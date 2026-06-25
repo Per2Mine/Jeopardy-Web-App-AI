@@ -65,7 +65,7 @@
             
             <!-- Category Headers -->
             @for (cat of categories; track cat.name; let catIdx = $index) {
-              <div class="bg-jeopardy-blue/30 border border-jeopardy-accent/30 rounded-xl p-3 flex items-center justify-center text-center font-extrabold text-[10px] sm:text-xs md:text-sm lg:text-base uppercase tracking-wider text-white min-h-[50px] md:min-h-[70px] lg:min-h-[80px] shadow-lg">
+              <div class="bg-jeopardy-blue/30 border border-jeopardy-accent/30 rounded-xl p-3 flex items-center justify-center text-center font-extrabold text-[10px] sm:text-xs md:text-sm lg:text-base uppercase tracking-wider text-white min-h-[50px] md:min-h-[70px] lg:min-h-[80px] shadow-lg break-words [word-break:break-word] w-full overflow-hidden">
                 {{ cat.name }}
               </div>
             }
