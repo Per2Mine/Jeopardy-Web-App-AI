@@ -448,8 +448,8 @@ function validateQuizPayloadDraft(name, categories) {
   // Validate fields and images if present
   for (let c = 0; c < categories.length; c++) {
     const cat = categories[c];
-    if (cat.name && (typeof cat.name !== 'string' || cat.name.trim().length > 18)) {
-      return `Der Kategorie-Name von Kategorie ${c + 1} darf maximal 18 Zeichen lang sein.`;
+    if (cat.name && (typeof cat.name !== 'string' || cat.name.trim().length > 30)) {
+      return `Der Kategorie-Name von Kategorie ${c + 1} darf maximal 30 Zeichen lang sein.`;
     }
     if (cat.questions && Array.isArray(cat.questions)) {
       for (let qIdx = 0; qIdx < cat.questions.length; qIdx++) {

@@ -452,7 +452,7 @@ export class QuizCreatorComponent implements OnInit {
   }
 
   onCategoryNameChange(cIndex: number, value: string) {
-    const truncated = value ? value.substring(0, 18) : '';
+    const truncated = value ? value.substring(0, 30) : '';
     this.categories.update(cats => {
       const newCats = [...cats];
       newCats[cIndex] = {
@@ -492,8 +492,8 @@ export class QuizCreatorComponent implements OnInit {
     for (let cIndex = 0; cIndex < finalCategories.length; cIndex++) {
       const cat = finalCategories[cIndex];
       const catName = cat.name ? cat.name.trim() : '';
-      if (catName.length > 18) {
-        this.errorMessage.set(`Der Name für Kategorie ${cIndex + 1} darf maximal 18 Zeichen lang sein.`);
+      if (catName.length > 30) {
+        this.errorMessage.set(`Der Name für Kategorie ${cIndex + 1} darf maximal 30 Zeichen lang sein.`);
         return;
       }
       for (let qIndex = 0; qIndex < cat.questions.length; qIndex++) {
