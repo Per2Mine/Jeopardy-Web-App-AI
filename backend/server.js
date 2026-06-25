@@ -477,6 +477,33 @@ function validateQuizPayloadDraft(name, categories) {
             return 'Die Bildgröße darf 5 MB nicht überschreiten.';
           }
         }
+        if (q.audio) {
+          if (typeof q.audio !== 'string') {
+            return 'Ungültiges Audio-Format.';
+          }
+          if (!q.audio.startsWith('data:audio/mp3') && !q.audio.startsWith('data:audio/mpeg')) {
+            return 'Unterstütztes Audioformat ist nur MP3.';
+          }
+          const approximateSizeBytes = q.audio.length * 0.75;
+          if (approximateSizeBytes > 2 * 1024 * 1024) {
+            return 'Die Audiodatei darf 2 MB nicht überschreiten.';
+          }
+          if (q.audioStart !== undefined && (typeof q.audioStart !== 'number' || q.audioStart < 0)) {
+            return 'Ungültiger Audio-Startwert.';
+          }
+          if (q.audioEnd !== undefined && (typeof q.audioEnd !== 'number' || q.audioEnd < 0)) {
+            return 'Ungültiger Audio-Endwert.';
+          }
+          if (q.audioSpeed !== undefined && (typeof q.audioSpeed !== 'number' || q.audioSpeed < 0.5 || q.audioSpeed > 2.0)) {
+            return 'Ungültiger Audio-Geschwindigkeitswert.';
+          }
+          if (q.audioPitch !== undefined && (typeof q.audioPitch !== 'number' || q.audioPitch < -12 || q.audioPitch > 12)) {
+            return 'Ungültiger Audio-Tonhöhenwert.';
+          }
+          if (q.audioStart !== undefined && q.audioEnd !== undefined && q.audioEnd - q.audioStart > 10.1) {
+            return 'Der ausgewählte Audio-Ausschnitt darf maximal 10 Sekunden lang sein.';
+          }
+        }
       }
     }
   }

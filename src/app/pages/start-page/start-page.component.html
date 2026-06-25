@@ -1220,7 +1220,7 @@
     <button 
       (click)="patchNotesModalOpen.set(true)"
       class="px-2.5 py-1 text-[10px] font-bold text-white/40 hover:text-jeopardy-accent bg-white/[0.01] hover:bg-white/[0.05] border border-white/10 hover:border-jeopardy-accent/30 rounded-full transition-all duration-300 flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-sm">
-      <span>v0.9.8</span>
+      <span>v0.9.9</span>
       <span class="w-1.5 h-1.5 rounded-full bg-jeopardy-accent animate-pulse"></span>
     </button>
   </div>
@@ -1255,11 +1255,25 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
+          <!-- Version 0.9.9 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.9 - Sound- & Musikunterstützung</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Audio-Upload & Editor:</strong> Lade MP3s bis 2 MB im Quiz-Creator hoch und bearbeite Start-/Endzeit (max. 10s Ausschnitt), Wiedergabe-Tempo und Tonhöhe völlig unabhängig voneinander.</li>
+              <li><strong class="text-white">Automatische Buzzer-Steuerung:</strong> Musik startet bei Fragebeginn automatisch, pausiert beim Buzzern und startet bei einem neuen Buzz von vorn.</li>
+              <li><strong class="text-white">Unalterierte Lösungswiedergabe:</strong> Bei Aufdecken der Antwort wird das Original-Lied ohne Tempo- oder Tonhöhenänderung abgespielt.</li>
+              <li><strong class="text-white">Host-Play/Pause & Editor-UX:</strong> Moderatoren können Audio manuell im Spiel steuern. Zudem wurden Eingabefokus-Verluste bei Kategorienamen behoben und das Bearbeitungsfenster scrollbar gestaltet.</li>
+            </ul>
+          </div>
+
           <!-- Version 0.9.8 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v0.9.8 - Spalten Drag & Drop & Limit-Erhöhung</span>
-              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+              <span class="text-sm font-black text-white uppercase tracking-wider">v0.9.8 - Spalten Drag & Drop & Limit-Erhöhung</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">22. Juni 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Kategorie Drag & Drop:</strong> Spalten (Kategorien) können nun im Quiz-Creator per Drag & Drop mit einem dedizierten Anfasser-Symbol flüssig horizontal verschoben und neu angeordnet werden.</li>
