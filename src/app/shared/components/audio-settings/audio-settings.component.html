@@ -27,6 +27,7 @@
 
   <!-- Slider: Slides open smoothly when parent is hovered -->
   <div class="w-0 overflow-hidden group-hover:w-20 transition-all duration-300 flex items-center pr-1.5">
+    @let activeVol = muted() ? 0 : volume();
     <input 
       type="range" 
       min="0" 
@@ -34,7 +35,9 @@
       step="0.05"
       [value]="volume()"
       (input)="onVolumeChange($event)"
-      [class]="'w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-jeopardy-gold transition-opacity ' + (muted() ? 'opacity-30' : 'opacity-100')"
+      class="volume-slider"
+      [class.muted]="muted()"
+      [style.background]="'linear-gradient(to right, #f1b814 0%, #f1b814 ' + (activeVol * 100) + '%, rgba(255, 255, 255, 0.15) ' + (activeVol * 100) + '%, rgba(255, 255, 255, 0.15) 100%)'"
       title="Lautstärke">
   </div>
 </div>

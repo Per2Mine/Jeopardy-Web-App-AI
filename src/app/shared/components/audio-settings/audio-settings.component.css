@@ -1,36 +1,84 @@
-/* Custom range slider styling for WebKit/Blink and Firefox */
-
-input[type="range"]::-webkit-slider-thumb {
+/* Premium custom styling for the volume slider track and thumb */
+.volume-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.volume-slider.muted {
+  opacity: 0.45;
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+.volume-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #f1b814; /* Jeopardy Gold */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), 0 0 6px rgba(241, 184, 20, 0.4);
   cursor: pointer;
-  transition: transform 0.15s ease;
-  box-shadow: 0 0 4px rgba(241, 184, 20, 0.4);
+  margin-top: -4px; /* Centering the thumb on the track */
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.3);
+.volume-slider::-webkit-slider-thumb:hover {
+  background: #ffd256; /* Lighter Gold */
+  transform: scale(1.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 10px rgba(241, 184, 20, 0.8);
 }
 
-input[type="range"]::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
+.volume-slider.muted::-webkit-slider-thumb {
+  background: #a3a3a3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.volume-slider.muted::-webkit-slider-thumb:hover {
+  background: #c3c3c3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Firefox */
+.volume-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
   border: none;
   border-radius: 50%;
   background: #f1b814; /* Jeopardy Gold */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), 0 0 6px rgba(241, 184, 20, 0.4);
   cursor: pointer;
-  transition: transform 0.15s ease;
-  box-shadow: 0 0 4px rgba(241, 184, 20, 0.4);
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-input[type="range"]::-moz-range-thumb:hover {
-  transform: scale(1.3);
+.volume-slider::-moz-range-thumb:hover {
+  background: #ffd256; /* Lighter Gold */
+  transform: scale(1.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 10px rgba(241, 184, 20, 0.8);
 }
 
-input[type="range"] {
-  outline: none;
+.volume-slider.muted::-moz-range-thumb {
+  background: #a3a3a3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.volume-slider.muted::-moz-range-thumb:hover {
+  background: #c3c3c3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }

@@ -145,8 +145,8 @@ export class StartPageComponent {
   maxPlayers = signal('8');
   teamSize = signal('2');
   teamMode = signal(false);
-  selectedTemplates = signal<string[]>(['general']);
-  buzzerTimeout = signal('10');
+  selectedTemplates = signal<string[]>([]);
+  buzzerTimeout = signal('20');
   deductPointsOnTimeout = signal(false);
   incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
 
@@ -233,9 +233,6 @@ export class StartPageComponent {
         next: () => {
           if (this.selectedTemplates().includes(id)) {
             this.selectedTemplates.set(this.selectedTemplates().filter(tid => tid !== id));
-            if (this.selectedTemplates().length === 0) {
-              this.selectedTemplates.set(['general']);
-            }
           }
           this.refreshTrigger.update(n => n + 1);
         },
@@ -248,7 +245,7 @@ export class StartPageComponent {
       this.settingsModalOpen.set(false);
       this.authService.deleteAccount().then(() => {
         this.playerName.set('');
-        this.selectedTemplates.set(['general']);
+        this.selectedTemplates.set([]);
       }).catch(err => {
         alert(err.message || 'Fehler beim Löschen des Kontos.');
       });
@@ -571,7 +568,7 @@ export class StartPageComponent {
   onLogout() {
     this.authService.logout();
     this.playerName.set('');
-    this.selectedTemplates.set(['general']);
+    this.selectedTemplates.set([]);
   }
 
   openSettingsModal() {

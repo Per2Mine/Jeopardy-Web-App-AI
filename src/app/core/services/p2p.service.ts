@@ -173,7 +173,7 @@ export class P2pService {
     votes: {},
     showAnswer: false,
     lastAnswerResult: null,
-    buzzerTimeout: 10,
+    buzzerTimeout: 20,
     deductPointsOnTimeout: false,
     timerSeconds: null,
     isInitialTurn: false
