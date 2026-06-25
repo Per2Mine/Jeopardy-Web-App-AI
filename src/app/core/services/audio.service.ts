@@ -627,6 +627,112 @@ export class AudioService {
     }
     this.previewGainNode = null;
   }
+
+  /**
+   * Sound effect 6: Game Start Fanfare (Triumphant ascending arpeggio with retro synth warmth)
+   */
+  playGameStart() {
+    try {
+      const ctx = this.getAudioContext();
+      const now = ctx.currentTime;
+      const baseVol = this.muted() ? 0 : this.volume() * 0.22;
+
+      // Soft ascending warm major chord leading to a rich, pleasant C-dur chord:
+      const notes = [
+        { freq: 196.00, time: 0.0, dur: 0.22 },   // G3
+        { freq: 261.63, time: 0.08, dur: 0.22 },  // C4
+        { freq: 329.63, time: 0.16, dur: 0.22 },  // E4
+        { freq: 392.00, time: 0.24, dur: 0.22 },  // G4
+        { freq: 523.25, time: 0.32, dur: 0.9 }    // C5 (final soft root tone)
+      ];
+
+      // Soft harmonies to round out the final chord (no high-pitched piercing frequencies)
+      const harmonies = [
+        { freq: 261.63, time: 0.32, dur: 0.9 },   // C4
+        { freq: 329.63, time: 0.32, dur: 0.9 },   // E4
+        { freq: 392.00, time: 0.32, dur: 0.9 }    // G4
+      ];
+
+      const playFanfareNote = (freq: number, startOffset: number, duration: number, isFinal = false) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        // Use pure sine waves for all notes to keep the sound clean, smooth, and free of harsh harmonics
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + startOffset);
+
+        gainNode.gain.setValueAtTime(0, now + startOffset);
+        gainNode.gain.linearRampToValueAtTime(baseVol * (isFinal ? 0.75 : 1.0), now + startOffset + 0.04);
+        
+        // Gentle fade-out curve
+        gainNode.gain.setValueAtTime(baseVol * (isFinal ? 0.75 : 1.0), now + startOffset + duration - 0.25);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration);
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc.start(now + startOffset);
+        osc.stop(now + startOffset + duration);
+      };
+
+      notes.forEach((n, idx) => {
+        playFanfareNote(n.freq, n.time, n.dur, idx === notes.length - 1);
+      });
+
+      harmonies.forEach((h) => {
+        playFanfareNote(h.freq, h.time, h.dur, true);
+      });
+    } catch (e) {
+      console.warn('Failed to play game start fanfare:', e);
+    }
+  }
+
+  /**
+   * Sound effect 7: Game End Victory Fanfare (Celebratory chord progression with retro wave warmth)
+   */
+  playGameEnd() {
+    try {
+      const ctx = this.getAudioContext();
+      const now = ctx.currentTime;
+      const baseVol = this.muted() ? 0 : this.volume() * 0.18;
+
+      const playChord = (freqs: number[], timeOffset: number, duration: number) => {
+        freqs.forEach((freq) => {
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + timeOffset);
+
+          gainNode.gain.setValueAtTime(0, now + timeOffset);
+          gainNode.gain.linearRampToValueAtTime(baseVol, now + timeOffset + 0.05);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + duration);
+
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+
+          osc.start(now + timeOffset);
+          osc.stop(now + timeOffset + duration);
+        });
+      };
+
+      // Celebratory chord cadence:
+      // 1. C4 Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
+      playChord([261.63, 329.63, 392.00, 523.25], 0.0, 0.45);
+
+      // 2. F4 Major: F4 (349.23), A4 (440.00), C5 (523.25), F5 (698.46)
+      playChord([349.23, 440.00, 523.25, 698.46], 0.35, 0.45);
+
+      // 3. G4 Major: G4 (392.00), B4 (493.88), D5 (587.33), G5 (783.99)
+      playChord([392.00, 493.88, 587.33, 783.99], 0.7, 0.45);
+
+      // 4. C5 Major (Resolving and sustained): C4 (261.63), G4 (392.00), C5 (523.25), E5 (659.25), G5 (783.99)
+      playChord([261.63, 392.00, 523.25, 659.25, 783.99], 1.05, 1.6);
+
+    } catch (e) {
+      console.warn('Failed to play game end fanfare:', e);
+    }
+  }
 }
 
 /**
@@ -830,109 +936,4 @@ class Jungle {
     try { this.output.disconnect(); } catch (e) {}
   }
 
-  /**
-   * Sound effect 6: Game Start Fanfare (Triumphant ascending arpeggio with retro synth warmth)
-   */
-  playGameStart() {
-    try {
-      const ctx = this.getAudioContext();
-      const now = ctx.currentTime;
-      const baseVol = this.muted() ? 0 : this.volume() * 0.22;
-
-      // Soft ascending warm major chord leading to a rich, pleasant C-dur chord:
-      const notes = [
-        { freq: 196.00, time: 0.0, dur: 0.22 },   // G3
-        { freq: 261.63, time: 0.08, dur: 0.22 },  // C4
-        { freq: 329.63, time: 0.16, dur: 0.22 },  // E4
-        { freq: 392.00, time: 0.24, dur: 0.22 },  // G4
-        { freq: 523.25, time: 0.32, dur: 0.9 }    // C5 (final soft root tone)
-      ];
-
-      // Soft harmonies to round out the final chord (no high-pitched piercing frequencies)
-      const harmonies = [
-        { freq: 261.63, time: 0.32, dur: 0.9 },   // C4
-        { freq: 329.63, time: 0.32, dur: 0.9 },   // E4
-        { freq: 392.00, time: 0.32, dur: 0.9 }    // G4
-      ];
-
-      const playFanfareNote = (freq: number, startOffset: number, duration: number, isFinal = false) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-
-        // Use pure sine waves for all notes to keep the sound clean, smooth, and free of harsh harmonics
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + startOffset);
-
-        gainNode.gain.setValueAtTime(0, now + startOffset);
-        gainNode.gain.linearRampToValueAtTime(baseVol * (isFinal ? 0.75 : 1.0), now + startOffset + 0.04);
-        
-        // Gentle fade-out curve
-        gainNode.gain.setValueAtTime(baseVol * (isFinal ? 0.75 : 1.0), now + startOffset + duration - 0.25);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration);
-
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-
-        osc.start(now + startOffset);
-        osc.stop(now + startOffset + duration);
-      };
-
-      notes.forEach((n, idx) => {
-        playFanfareNote(n.freq, n.time, n.dur, idx === notes.length - 1);
-      });
-
-      harmonies.forEach((h) => {
-        playFanfareNote(h.freq, h.time, h.dur, true);
-      });
-    } catch (e) {
-      console.warn('Failed to play game start fanfare:', e);
-    }
-  }
-
-  /**
-   * Sound effect 7: Game End Victory Fanfare (Celebratory chord progression with retro wave warmth)
-   */
-  playGameEnd() {
-    try {
-      const ctx = this.getAudioContext();
-      const now = ctx.currentTime;
-      const baseVol = this.muted() ? 0 : this.volume() * 0.18;
-
-      const playChord = (freqs: number[], timeOffset: number, duration: number) => {
-        freqs.forEach((freq) => {
-          const osc = ctx.createOscillator();
-          const gainNode = ctx.createGain();
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + timeOffset);
-
-          gainNode.gain.setValueAtTime(0, now + timeOffset);
-          gainNode.gain.linearRampToValueAtTime(baseVol, now + timeOffset + 0.05);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + duration);
-
-          osc.connect(gainNode);
-          gainNode.connect(ctx.destination);
-
-          osc.start(now + timeOffset);
-          osc.stop(now + timeOffset + duration);
-        });
-      };
-
-      // Celebratory chord cadence:
-      // 1. C4 Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
-      playChord([261.63, 329.63, 392.00, 523.25], 0.0, 0.45);
-
-      // 2. F4 Major: F4 (349.23), A4 (440.00), C5 (523.25), F5 (698.46)
-      playChord([349.23, 440.00, 523.25, 698.46], 0.35, 0.45);
-
-      // 3. G4 Major: G4 (392.00), B4 (493.88), D5 (587.33), G5 (783.99)
-      playChord([392.00, 493.88, 587.33, 783.99], 0.7, 0.45);
-
-      // 4. C5 Major (Resolving and sustained): C4 (261.63), G4 (392.00), C5 (523.25), E5 (659.25), G5 (783.99)
-      playChord([261.63, 392.00, 523.25, 659.25, 783.99], 1.05, 1.6);
-
-    } catch (e) {
-      console.warn('Failed to play game end fanfare:', e);
-    }
-  }
 }
