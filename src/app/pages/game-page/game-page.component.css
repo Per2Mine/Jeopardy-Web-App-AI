@@ -32,3 +32,183 @@
 .delay-300 {
   animation-delay: 0.6s;
 }
+
+/* Timer warning heartbeat scale and glow animation */
+@keyframes timer-warning {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4), 0 2px 5px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5);
+    background-color: rgba(239, 68, 68, 0.3);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4), 0 2px 5px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.timer-critical {
+  animation: timer-warning 1s ease-in-out infinite;
+  border-color: rgba(239, 68, 68, 0.8) !important;
+  color: #f87171 !important;
+}
+
+/* Spherical 3D Buzzer pulse glow animation on a GPU composite layer */
+@keyframes buzzer-glow-pulse {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate3d(0, 0, 0) scale(1.25);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+    opacity: 0.35;
+  }
+}
+
+.buzzer-glow-active {
+  position: relative;
+  /* Spherical 3D gloss gradient - soft highlight center at 30% */
+  background: radial-gradient(circle at 50% 28%, #ff8f8f 0%, #ff4d4d 25%, #d61c1c 65%, #800a0a 100%) !important;
+  border: 6px solid #630c0c !important;
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  
+  /* 3D button physical depth */
+  box-shadow: 
+    0 8px 0 #520707,
+    0 15px 25px rgba(0, 0, 0, 0.5) !important;
+  
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+  
+  /* GPU hardware compositor properties */
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+/* Pulse glow using a pseudo-element to prevent flickering of text/gradients and avoid layout shifts */
+.buzzer-glow-active::before {
+  content: '';
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  right: -15px;
+  bottom: -15px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0) 70%);
+  border-radius: 50%;
+  z-index: -1;
+  animation: buzzer-glow-pulse 2s infinite ease-in-out;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+.buzzer-glow-active:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 10px 0 #520707,
+    0 20px 30px rgba(239, 68, 68, 0.35),
+    0 15px 25px rgba(0, 0, 0, 0.5) !important;
+}
+
+.buzzer-glow-active:active {
+  transform: translateY(6px);
+  box-shadow: 
+    0 2px 0 #520707,
+    0 4px 10px rgba(0, 0, 0, 0.6) !important;
+}
+
+.buzzer-glow-disabled {
+  background: radial-gradient(circle at 50% 30%, #3a3a3a 0%, #222222 65%, #141414 100%) !important;
+  border: 6px solid #2d2d2d !important;
+  color: rgba(255, 255, 255, 0.15) !important;
+  text-shadow: none;
+  box-shadow: 
+    0 4px 0 #1a1a1a,
+    0 8px 15px rgba(0, 0, 0, 0.4) !important;
+  cursor: not-allowed !important;
+  transform: translateY(4px) !important; /* pressed down when disabled */
+  will-change: auto;
+}
+
+/* Winner Card styling with dynamic shimmering gold gradient and pulsing glow shadow */
+@keyframes gold-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes winner-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(234, 179, 8, 0.2), inset 0 0 15px rgba(234, 179, 8, 0.05);
+    border-color: rgba(234, 179, 8, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(234, 179, 8, 0.65), inset 0 0 25px rgba(234, 179, 8, 0.25);
+    border-color: rgba(234, 179, 8, 1);
+  }
+}
+
+@keyframes sweep {
+  0% {
+    left: -150%;
+  }
+  50%, 100% {
+    left: 150%;
+  }
+}
+
+.winner-card {
+  position: relative;
+  background: linear-gradient(
+    135deg, 
+    rgba(234, 179, 8, 0.25) 0%, 
+    rgba(161, 98, 7, 0.15) 50%, 
+    rgba(254, 240, 138, 0.3) 100%
+  ) !important;
+  background-size: 200% 200%;
+  animation: 
+    winner-glow-pulse 3s infinite ease-in-out,
+    gold-shimmer 8s infinite ease-in-out;
+  border-width: 2px !important;
+  border-style: solid !important;
+  transform: scale(1.04) !important;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Shiny light sweep line crossing the winner card periodically */
+.winner-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-25deg);
+  animation: sweep 4s infinite ease-in-out;
+  pointer-events: none;
+}
+}

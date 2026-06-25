@@ -29,14 +29,15 @@ export class StartPageComponent {
 
   // Player Profile
   playerName = signal(this.authService.currentUser()?.username || '');
-  selectedColor = signal('#f1b814'); // Default gold
-
+  selectedColor = signal('#0ea5e9'); // Default bright blue
+ 
   // Avatar Customization Parts
-  avatarBase = signal(0);
-  avatarEyes = signal(0);
-  avatarMouth = signal(0);
+  avatarBase = signal(2); // Cat / Kitty
+  avatarEyes = signal(1); // Happy Curved (^^) Eyes
+  avatarMouth = signal(1); // Open Smile Mouth
   avatarAccessory = signal(0);
   selectedAvatar = computed(() => `b${this.avatarBase()}e${this.avatarEyes()}m${this.avatarMouth()}a${this.avatarAccessory()}`);
+  selectedColorHue = computed(() => this.getHueFromHex(this.selectedColor()));
 
   // Auth form states
   authModalOpen = signal(false);
@@ -265,6 +266,54 @@ export class StartPageComponent {
   selectColor(color: string) {
     this.selectedColor.set(color);
   }
+
+  getHueFromHex(hex: string): number {
+    if (!hex || hex.charAt(0) !== '#') return 45; // default to yellow hue
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0;
+
+    if (max !== min) {
+      let d = max - min;
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return Math.round(h * 360);
+  }
+
+  hslToHex(h: number, s: number, l: number): string {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  }
+
+  onSliderChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const hue = parseInt(input.value, 10);
+    const hex = this.hslToHex(hue, 85, 50);
+    this.selectedColor.set(hex);
+  }
+
+  presetColors = [
+    { name: 'Gelb', hex: '#f1b814' },
+    { name: 'Orange', hex: '#f97316' },
+    { name: 'Rot', hex: '#ef4444' },
+    { name: 'Grün', hex: '#10b981' },
+    { name: 'Blau', hex: '#0ea5e9' },
+    { name: 'Violett', hex: '#a855f7' }
+  ];
 
   selectTemplate(templateId: string) {
     const template = this.quizService.getTemplateById(

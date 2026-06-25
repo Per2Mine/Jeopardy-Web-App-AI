@@ -235,7 +235,7 @@
             @if (p2pService.gameState().timerSeconds !== null) {
               <div 
                 [class]="'px-4 py-2 rounded-full text-xs font-black tracking-wider border transition-all duration-300 flex items-center gap-1.5 shadow-md ' + 
-                         (p2pService.gameState().timerSeconds! <= 3 ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' : 'bg-black/40 border-white/10 text-white')">
+                         (p2pService.gameState().timerSeconds! <= 3 ? 'timer-critical bg-red-500/20 shadow-red-500/20' : 'bg-black/40 border-white/10 text-white')">
                 ⏱️ {{ p2pService.gameState().timerSeconds }}s
               </div>
             }
@@ -491,13 +491,12 @@
                   <!-- Guest screen: Big satisfy buzzer button -->
                   <div class="flex flex-col items-center gap-2">
                     <button 
-                      [disabled]="isBuzzerDisabled()"
-                      (click)="p2pService.buzz()"
-                      [class]="isBuzzerDisabled() ? 
-                        'w-40 h-40 rounded-full bg-neutral-850 border-8 border-neutral-750 shadow-none flex items-center justify-center text-white/10 text-2xl font-black uppercase tracking-widest cursor-not-allowed select-none transition-all' : 
-                        'w-40 h-40 rounded-full bg-red-600 hover:bg-red-500 active:scale-90 border-8 border-red-800 shadow-xl shadow-red-600/30 flex items-center justify-center text-white text-2xl font-black uppercase tracking-widest cursor-pointer select-none transition-all duration-200 transform hover:-translate-y-1'">
-                      BUZZ!
-                    </button>
+                       [disabled]="isBuzzerDisabled()"
+                       (click)="p2pService.buzz()"
+                       [class]="'w-40 h-40 rounded-full flex items-center justify-center text-2xl font-black uppercase tracking-widest select-none ' + 
+                                (isBuzzerDisabled() ? 'buzzer-glow-disabled' : 'buzzer-glow-active')">
+                       BUZZ!
+                     </button>
                     <span 
                       [class]="isBuzzerDisabled() ? 'text-[10px] text-red-500 font-bold uppercase tracking-widest mt-2 text-center max-w-[200px]' : 'text-[10px] text-white/40 uppercase tracking-widest mt-2 animate-pulse'">
                       {{ getBuzzerSubtext() }}
@@ -530,7 +529,7 @@
               @for (team of sortedTeams(); track team.id; let index = $index) {
                 <div 
                   [class]="'flex flex-col gap-3 p-4 border rounded-2xl transition-all duration-300 ' + 
-                           (index === 0 ? 'bg-jeopardy-gold/15 border-jeopardy-gold shadow-lg shadow-jeopardy-gold/5 scale-105' : 'bg-white/[0.01] border-white/10')">
+                           (index === 0 ? 'winner-card' : 'bg-white/[0.01] border-white/10')">
                   
                   <!-- Team Header Info -->
                   <div class="flex items-center justify-between pb-2 border-b border-white/5">
@@ -577,7 +576,7 @@
               @for (player of sortedPlayers(); track player.id; let index = $index) {
                 <div 
                   [class]="'flex items-center gap-4 p-4 border rounded-2xl transition-all duration-300 ' + 
-                           (index === 0 ? 'bg-jeopardy-gold/15 border-jeopardy-gold shadow-lg shadow-jeopardy-gold/5 scale-105' : 'bg-white/[0.01] border-white/10') + 
+                           (index === 0 ? 'winner-card' : 'bg-white/[0.01] border-white/10') + 
                            (player.isOffline ? ' opacity-40' : '')">
                   
                   <!-- Rank Badge -->

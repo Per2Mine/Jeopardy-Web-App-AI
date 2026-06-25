@@ -166,6 +166,7 @@ export class P2pService {
   players = signal<Player[]>([]);
   errorMessage = signal<string>('');
   wasKicked = signal<boolean>(false);
+  hostDisconnected = signal<boolean>(false);
   gameState = signal<GameState>({
     phase: 'LOBBY',
     activeQuestion: null,
@@ -592,6 +593,7 @@ export class P2pService {
       this.maxTeamsLimit.set(session.maxTeamsLimit);
       this.maxPlayersPerTeam.set(session.maxPlayersPerTeam);
       this.wasKicked.set(false);
+      this.hostDisconnected.set(false);
       this.connectionState.set('connecting');
       this.errorMessage.set('');
 
@@ -661,6 +663,7 @@ export class P2pService {
     return new Promise((resolve) => {
       this.cleanupForReconnection();
       this.wasKicked.set(false);
+      this.hostDisconnected.set(false);
       this.connectionState.set('connecting');
       this.errorMessage.set('');
 
@@ -778,6 +781,7 @@ export class P2pService {
       });
 
       this.wasKicked.set(false);
+      this.hostDisconnected.set(false);
       this.connectionState.set('connecting');
       this.errorMessage.set('');
 
@@ -838,6 +842,7 @@ export class P2pService {
     return new Promise((resolve, reject) => {
       this.disconnect();
       this.wasKicked.set(false);
+      this.hostDisconnected.set(false);
       this.connectionState.set('connecting');
       this.errorMessage.set('');
 
@@ -1015,11 +1020,27 @@ export class P2pService {
       if (hasSavedSession && !this.wasKicked()) {
         console.log('Connection closed unexpectedly. Attempting to reconnect...');
         this.connectionState.set('connecting');
-        setTimeout(() => {
-          this.tryRestoreSession();
-        }, 2000);
+        
+        const reconnectTimeout = setTimeout(() => {
+          if (this.connectionState() === 'connecting') {
+            console.log('Reconnection failed (host unavailable). Disconnecting.');
+            this.disconnect();
+            this.hostDisconnected.set(true);
+          }
+        }, 3500);
+
+        this.tryRestoreSession().then((success) => {
+          if (!success) {
+            clearTimeout(reconnectTimeout);
+            this.disconnect();
+            this.hostDisconnected.set(true);
+          }
+        });
       } else {
         this.disconnect();
+        if (!this.wasKicked()) {
+          this.hostDisconnected.set(true);
+        }
       }
     });
 

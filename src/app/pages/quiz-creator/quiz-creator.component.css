@@ -3,3 +3,43 @@
     grid-template-columns: var(--grid-cols-dynamic);
   }
 }
+
+/* Card depth and subtle glow on hover */
+.quiz-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.quiz-card-hover:hover {
+  border-color: rgba(0, 82, 204, 0.3) !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 82, 204, 0.15) !important;
+}
+
+/* Glowing inputs on focus */
+.glow-input-focus {
+  transition: all 0.3s ease;
+}
+.glow-input-focus:focus-within {
+  border-color: rgba(0, 82, 204, 0.6) !important;
+  box-shadow: 0 0 12px rgba(0, 82, 204, 0.25) !important;
+  background: rgba(0, 82, 204, 0.08) !important;
+}
+
+/* Glowing cell buttons */
+.cell-glow-filled {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cell-glow-filled:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 18px rgba(0, 82, 204, 0.4) !important;
+  border-color: rgba(0, 82, 204, 0.8) !important;
+}
+
+.cell-glow-empty {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cell-glow-empty:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3), 0 0 12px rgba(255, 255, 255, 0.05) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
