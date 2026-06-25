@@ -485,8 +485,8 @@ function validateQuizPayloadDraft(name, categories) {
             return 'Unterstütztes Audioformat ist nur MP3.';
           }
           const approximateSizeBytes = q.audio.length * 0.75;
-          if (approximateSizeBytes > 2 * 1024 * 1024) {
-            return 'Die Audiodatei darf 2 MB nicht überschreiten.';
+          if (approximateSizeBytes > 10 * 1024 * 1024) {
+            return 'Die Audiodatei darf 10 MB nicht überschreiten.';
           }
           if (q.audioStart !== undefined && (typeof q.audioStart !== 'number' || q.audioStart < 0)) {
             return 'Ungültiger Audio-Startwert.';

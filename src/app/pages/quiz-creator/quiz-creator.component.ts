@@ -343,10 +343,10 @@ export class QuizCreatorComponent implements OnInit {
         return;
       }
 
-      // Validate size (2 MB limit)
-      const maxSize = 2 * 1024 * 1024;
+      // Validate size (10 MB limit)
+      const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
-        this.audioError.set('Die Audiodatei ist zu groß. Maximale Größe ist 2 MB.');
+        this.audioError.set('Die Audiodatei ist zu groß. Maximale Größe ist 10 MB.');
         return;
       }
 

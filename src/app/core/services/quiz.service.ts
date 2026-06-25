@@ -315,8 +315,8 @@ export class QuizService {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Audioformat bei ${q.value} $. Nur MP3 erlaubt.`);
           }
           const approximateSize = q.audio.length * 0.75;
-          if (approximateSize > 2 * 1024 * 1024) {
-            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat eine zu große Audiodatei bei ${q.value} $ (max. 2 MB).`);
+          if (approximateSize > 10 * 1024 * 1024) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat eine zu große Audiodatei bei ${q.value} $ (max. 10 MB).`);
           }
           if (q.audioPitch !== undefined && (q.audioPitch < -12 || q.audioPitch > 12)) {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat einen ungültigen Tonhöhenwert bei ${q.value} $.`);
