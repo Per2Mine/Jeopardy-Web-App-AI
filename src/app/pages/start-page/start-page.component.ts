@@ -469,6 +469,10 @@ export class StartPageComponent {
       this.joinError.set('Der Name darf nur Buchstaben, Zahlen, Leerzeichen, Unterstriche und Bindestriche enthalten.');
       return;
     }
+    if (this.selectedTemplates().length === 0) {
+      this.joinError.set('Bitte wähle mindestens eine Quiz-Vorlage aus, um einen Spielraum zu erstellen.');
+      return;
+    }
     
     this.joinError.set('');
 
