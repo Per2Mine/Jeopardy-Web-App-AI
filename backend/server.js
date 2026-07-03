@@ -766,6 +766,61 @@ app.post('/api/p2p/send', (req, res) => {
   res.json({ success: true });
 });
 
+// Batch send: send the same message to multiple receivers in a single request
+// Used by the host's broadcast() to avoid N individual HTTP POSTs
+app.post('/api/p2p/send-batch', (req, res) => {
+  const { senderId, receiverIds, message } = req.body;
+  if (!Array.isArray(receiverIds) || !message) {
+    return res.status(400).json({ error: 'Missing receiverIds array or message' });
+  }
+
+  if (receiverIds.length > 50) {
+    return res.status(400).json({ error: 'Too many receivers (max 50)' });
+  }
+
+  const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+  if (messageStr.length > 50 * 1024) {
+    return res.status(400).json({ error: 'Message size exceeds limit of 50KB' });
+  }
+
+  for (const receiverId of receiverIds) {
+    if (typeof receiverId !== 'string') continue;
+
+    lastActivity.set(receiverId, Date.now());
+
+    if (!messageQueues.has(receiverId)) {
+      messageQueues.set(receiverId, []);
+    }
+
+    const queue = messageQueues.get(receiverId);
+    if (queue.length >= 100) {
+      queue.shift();
+    }
+    queue.push({ senderId, message });
+
+    // Resolve pending polls for this receiver
+    if (pendingPolls.has(receiverId)) {
+      const polls = pendingPolls.get(receiverId);
+      pendingPolls.delete(receiverId);
+
+      const currentQueue = messageQueues.get(receiverId) || [];
+      messageQueues.set(receiverId, []);
+
+      for (const pollRes of polls) {
+        if (!pollRes.destroyed && !pollRes.headersSent) {
+          pollRes.json({ messages: currentQueue });
+        }
+      }
+    }
+  }
+
+  if (senderId) {
+    lastActivity.set(senderId, Date.now());
+  }
+
+  res.json({ success: true });
+});
+
 app.get('/api/p2p/poll/:peerId', (req, res) => {
   const { peerId } = req.params;
 

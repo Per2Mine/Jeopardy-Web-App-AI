@@ -244,6 +244,10 @@ export class P2pService {
     });
   }
 
+  // Debounce timer for broadcastPlayerList during rapid joins
+  private broadcastPlayerListTimer: any = null;
+  private readonly BROADCAST_DEBOUNCE_MS = 300;
+
   // HTTP Polling Fallback System
   private isPolling = false;
   private startPolling(myId: string) {
@@ -401,13 +405,9 @@ export class P2pService {
       };
       conn.send(ackMessage);
 
-      // Broadcast updated player list & game state to everyone
-      this.broadcastPlayerList();
-      this.broadcast({
-        type: 'GAME_STATE',
-        senderId: this.myPlayerId()!,
-        payload: this.gameState()
-      });
+      // Broadcast updated player list & game state to everyone (debounced to avoid O(n²) broadcast storm)
+      this.debouncedBroadcastPlayerList();
+      this.debouncedBroadcastGameState();
 
       // Handle messages from this client
       this.setupMessageListener(conn, playerId);
@@ -497,8 +497,8 @@ export class P2pService {
     };
     conn.send(ackMessage);
 
-    // 5. Broadcast updated player list to everyone
-    this.broadcastPlayerList();
+    // 5. Broadcast updated player list to everyone (debounced to avoid O(n²) broadcast storm)
+    this.debouncedBroadcastPlayerList();
 
     // 6. Handle messages from this client
     this.setupMessageListener(conn, playerId);
@@ -866,7 +866,7 @@ export class P2pService {
           this.setupClientListeners(conn, formattedCode, resolve, reject);
         });
 
-        // 3 second WebRTC timeout -> HTTP relay fallback
+        // 1.5 second WebRTC timeout -> HTTP relay fallback (reduced from 3s for faster connection)
         setTimeout(() => {
           if (!webRtcOk && this.connectionState() === 'connecting') {
             console.warn('WebRTC connection to host timed out, falling back to HTTP relay...');
@@ -895,7 +895,7 @@ export class P2pService {
               }
             });
           }
-        }, 3000);
+        }, 1500);
       });
 
       this.peer.on('error', (err: any) => {
@@ -1191,6 +1191,40 @@ export class P2pService {
   }
 
   /**
+   * Host: Debounced broadcast of the player list.
+   * When many players join in rapid succession, this batches all updates
+   * into a single broadcast after a 300ms quiet period, avoiding O(n²) message storms.
+   */
+  private debouncedBroadcastPlayerList() {
+    if (this.broadcastPlayerListTimer) {
+      clearTimeout(this.broadcastPlayerListTimer);
+    }
+    this.broadcastPlayerListTimer = setTimeout(() => {
+      this.broadcastPlayerListTimer = null;
+      this.broadcastPlayerList();
+    }, this.BROADCAST_DEBOUNCE_MS);
+  }
+
+  /**
+   * Host: Debounced broadcast of the game state.
+   * Same debounce logic as player list to batch rapid reconnection state updates.
+   */
+  private broadcastGameStateTimer: any = null;
+  private debouncedBroadcastGameState() {
+    if (this.broadcastGameStateTimer) {
+      clearTimeout(this.broadcastGameStateTimer);
+    }
+    this.broadcastGameStateTimer = setTimeout(() => {
+      this.broadcastGameStateTimer = null;
+      this.broadcast({
+        type: 'GAME_STATE',
+        senderId: this.myPlayerId()!,
+        payload: this.gameState()
+      });
+    }, this.BROADCAST_DEBOUNCE_MS);
+  }
+
+  /**
    * Host: Broadcast player list to all connected clients
    */
   private broadcastPlayerList() {
@@ -1206,11 +1240,32 @@ export class P2pService {
    */
   broadcast(message: P2pMessage) {
     if (!this.isHost()) return;
+
+    // Collect HTTP relay receivers for batch sending
+    const httpRelayReceivers: string[] = [];
+
     this.hostConnectionMap.forEach((conn) => {
       if (conn.open) {
-        conn.send(message);
+        if (conn instanceof HttpRelayConnection) {
+          // Collect for batch send instead of individual HTTP POST per player
+          httpRelayReceivers.push(conn.peer);
+        } else {
+          // WebRTC: fire-and-forget (already fast)
+          conn.send(message);
+        }
       }
     });
+
+    // Batch send to all HTTP relay players in a single request
+    if (httpRelayReceivers.length > 0) {
+      this.http.post('/api/p2p/send-batch', {
+        senderId: this.myPlayerId()!,
+        receiverIds: httpRelayReceivers,
+        message: message
+      }).subscribe({
+        error: (err) => console.error('Failed to send batch HTTP relay message:', err)
+      });
+    }
   }
 
   /**
