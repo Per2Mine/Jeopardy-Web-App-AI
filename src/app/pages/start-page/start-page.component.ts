@@ -8,11 +8,13 @@ import { LogoComponent } from '../../shared/components/logo/logo.component';
 import { P2pService, Player } from '../../core/services/p2p.service';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizService } from '../../core/services/quiz.service';
+import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
+import { AudioSettingsComponent } from '../../shared/components/audio-settings/audio-settings.component';
 
 @Component({
   selector: 'app-start-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, ToggleComponent, LogoComponent],
+  imports: [CommonModule, ButtonComponent, InputComponent, ToggleComponent, LogoComponent, AvatarComponent, AudioSettingsComponent],
   templateUrl: './start-page.component.html',
   styleUrl: './start-page.component.css'
 })
@@ -27,15 +29,53 @@ export class StartPageComponent {
 
   // Player Profile
   playerName = signal(this.authService.currentUser()?.username || '');
-  selectedColor = signal('#f1b814'); // Default gold
+  selectedColor = signal('#0ea5e9'); // Default bright blue
+ 
+  // Avatar Customization Parts
+  avatarBase = signal(2); // Cat / Kitty
+  avatarEyes = signal(1); // Happy Curved (^^) Eyes
+  avatarMouth = signal(1); // Open Smile Mouth
+  avatarAccessory = signal(0);
+  selectedAvatar = computed(() => `b${this.avatarBase()}e${this.avatarEyes()}m${this.avatarMouth()}a${this.avatarAccessory()}`);
+  selectedColorHue = computed(() => this.getHueFromHex(this.selectedColor()));
 
   // Auth form states
   authModalOpen = signal(false);
-  authMode = signal<'login' | 'register'>('login');
+  authMode = signal<'login' | 'register' | 'forgot'>('login');
   authUsername = signal('');
   authEmail = signal('');
   authPassword = signal('');
   authError = signal('');
+
+  // Predefined security questions list
+  securityQuestionsList = [
+    'Name deines ersten Haustiers?',
+    'Geburtsort deiner Mutter?',
+    'Name deiner ersten Schule?',
+    'Lieblings-Videospiel als Kind?',
+    'Marke deines ersten Autos?'
+  ];
+
+  // Added signals for forgot password & registration security questions
+  securityQuestion = signal('Name deines ersten Haustiers?');
+  securityAnswer = signal('');
+  
+  forgotStep = signal<1 | 2>(1);
+  forgotQuestion = signal('');
+  forgotAnswer = signal('');
+  forgotNewPassword = signal('');
+  forgotConfirmPassword = signal('');
+  forgotSuccess = signal(false);
+
+  // Confirmation Modal states (for custom delete warnings)
+  confirmModalOpen = signal(false);
+  confirmModalType = signal<'quiz' | 'account'>('quiz');
+  confirmModalTargetId = signal<string | null>(null);
+  confirmModalTitle = signal('');
+  confirmModalText = signal('');
+
+  // Patch Notes Modal state
+  patchNotesModalOpen = signal(false);
 
   // Settings form states
   settingsModalOpen = signal(false);
@@ -43,7 +83,32 @@ export class StartPageComponent {
   settingsError = signal('');
   settingsSuccess = signal('');
 
+  // Legal modal states
+  legalModalOpen = signal(false);
+  activeLegalTab = signal<'impressum' | 'privacy' | 'terms'>('impressum');
+
   constructor() {
+    // Load from localStorage if present
+    const savedName = localStorage.getItem('jeopardy_player_name');
+    const savedColor = localStorage.getItem('jeopardy_player_color');
+    const savedAvatar = localStorage.getItem('jeopardy_player_avatar');
+
+    if (savedName) {
+      this.playerName.set(savedName);
+    }
+    if (savedColor) {
+      this.selectedColor.set(savedColor);
+    }
+    if (savedAvatar) {
+      const match = savedAvatar.match(/^b(\d+)e(\d+)m(\d+)a(\d+)$/);
+      if (match) {
+        this.avatarBase.set(parseInt(match[1], 10));
+        this.avatarEyes.set(parseInt(match[2], 10));
+        this.avatarMouth.set(parseInt(match[3], 10));
+        this.avatarAccessory.set(parseInt(match[4], 10));
+      }
+    }
+
     effect(() => {
       const user = this.authService.currentUser();
       if (user) {
@@ -52,12 +117,24 @@ export class StartPageComponent {
     });
   }
   avatarColors = [
-    { name: 'Gold', hex: '#f1b814', bgClass: 'bg-[#f1b814]', borderClass: 'border-[#f1b814]' },
-    { name: 'Blue', hex: '#0052cc', bgClass: 'bg-[#0052cc]', borderClass: 'border-[#0052cc]' },
-    { name: 'Red', hex: '#ef4444', bgClass: 'bg-[#ef4444]', borderClass: 'border-[#ef4444]' },
-    { name: 'Green', hex: '#22c55e', bgClass: 'bg-[#22c55e]', borderClass: 'border-[#22c55e]' },
-    { name: 'Purple', hex: '#a855f7', bgClass: 'bg-[#a855f7]', borderClass: 'border-[#a855f7]' },
-    { name: 'Pink', hex: '#ec4899', bgClass: 'bg-[#ec4899]', borderClass: 'border-[#ec4899]' }
+    { name: 'Gelb', hex: '#f1b814' },
+    { name: 'Orange', hex: '#f97316' },
+    { name: 'Rot', hex: '#ef4444' },
+    { name: 'Pink', hex: '#ec4899' },
+    { name: 'Violett', hex: '#a855f7' },
+    { name: 'Indigo', hex: '#6366f1' },
+    { name: 'Blau', hex: '#0052cc' },
+    { name: 'Hellblau', hex: '#0ea5e9' },
+    { name: 'Cyan', hex: '#06b6d4' },
+    { name: 'Teal', hex: '#14b8a6' },
+    { name: 'Smaragd', hex: '#10b981' },
+    { name: 'Grün', hex: '#22c55e' },
+    { name: 'Limette', hex: '#84cc16' },
+    { name: 'Waldgrün', hex: '#15803d' },
+    { name: 'Crimson', hex: '#be123c' },
+    { name: 'Amber', hex: '#f59e0b' },
+    { name: 'Bronze', hex: '#b45309' },
+    { name: 'Silber', hex: '#94a3b8' }
   ];
 
   // Join Game state
@@ -69,9 +146,16 @@ export class StartPageComponent {
   maxPlayers = signal('8');
   teamSize = signal('2');
   teamMode = signal(false);
-  selectedTemplate = signal('general');
+  selectedTemplates = signal<string[]>([]);
+  showTemplateWarning = signal(false);
+  buzzerTimeout = signal('20');
+  deductPointsOnTimeout = signal(false);
+  incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
 
   canStartGame = computed(() => {
+    if (this.selectedTemplates().length === 0) {
+      return false;
+    }
     const guests = this.p2pService.players().filter(p => !p.isHost);
     if (this.p2pService.teamMode()) {
       const maxTeams = this.p2pService.maxTeamsLimit();
@@ -88,6 +172,9 @@ export class StartPageComponent {
   });
 
   getStartGameDisabledReason = computed(() => {
+    if (this.selectedTemplates().length === 0) {
+      return 'Bitte wähle mindestens eine Quiz-Vorlage aus.';
+    }
     const guests = this.p2pService.players().filter(p => !p.isHost);
     if (this.p2pService.teamMode()) {
       const maxTeams = this.p2pService.maxTeamsLimit();
@@ -117,13 +204,37 @@ export class StartPageComponent {
     return this.quizService.getTemplates(email);
   });
 
-  onDeleteQuiz(id: string, event: Event) {
+  triggerQuizDelete(id: string, name: string, event: Event) {
     event.stopPropagation();
-    if (confirm('Möchtest du diese Quiz-Vorlage wirklich löschen?')) {
+    this.confirmModalType.set('quiz');
+    this.confirmModalTargetId.set(id);
+    this.confirmModalTitle.set('Quiz-Vorlage löschen');
+    this.confirmModalText.set(`Möchtest du die Quiz-Vorlage „${name}“ wirklich unwiderruflich löschen?`);
+    this.confirmModalOpen.set(true);
+  }
+
+  triggerAccountDelete() {
+    this.confirmModalType.set('account');
+    this.confirmModalTargetId.set(null);
+    this.confirmModalTitle.set('Konto unwiderruflich löschen');
+    this.confirmModalText.set('Möchtest du dein Benutzerkonto wirklich löschen? Alle deine erstellten Quiz-Vorlagen werden unwiderruflich mitgelöscht.');
+    this.confirmModalOpen.set(true);
+  }
+
+  onCancelDelete() {
+    this.confirmModalOpen.set(false);
+    this.confirmModalTargetId.set(null);
+  }
+
+  onConfirmDelete() {
+    this.confirmModalOpen.set(false);
+    if (this.confirmModalType() === 'quiz') {
+      const id = this.confirmModalTargetId();
+      if (!id) return;
       this.quizService.deleteQuiz(id).subscribe({
         next: () => {
-          if (this.selectedTemplate() === id) {
-            this.selectedTemplate.set('general');
+          if (this.selectedTemplates().includes(id)) {
+            this.selectedTemplates.set(this.selectedTemplates().filter(tid => tid !== id));
           }
           this.refreshTrigger.update(n => n + 1);
         },
@@ -131,6 +242,14 @@ export class StartPageComponent {
           console.error('Failed to delete quiz:', err);
           alert('Fehler beim Löschen des Quizzes.');
         }
+      });
+    } else if (this.confirmModalType() === 'account') {
+      this.settingsModalOpen.set(false);
+      this.authService.deleteAccount().then(() => {
+        this.playerName.set('');
+        this.selectedTemplates.set([]);
+      }).catch(err => {
+        alert(err.message || 'Fehler beim Löschen des Kontos.');
       });
     }
   }
@@ -149,8 +268,88 @@ export class StartPageComponent {
     this.selectedColor.set(color);
   }
 
+  getHueFromHex(hex: string): number {
+    if (!hex || hex.charAt(0) !== '#') return 45; // default to yellow hue
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0;
+
+    if (max !== min) {
+      let d = max - min;
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return Math.round(h * 360);
+  }
+
+  hslToHex(h: number, s: number, l: number): string {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  }
+
+  onSliderChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const hue = parseInt(input.value, 10);
+    const hex = this.hslToHex(hue, 85, 50);
+    this.selectedColor.set(hex);
+  }
+
+  presetColors = [
+    { name: 'Gelb', hex: '#f1b814' },
+    { name: 'Orange', hex: '#f97316' },
+    { name: 'Rot', hex: '#ef4444' },
+    { name: 'Grün', hex: '#10b981' },
+    { name: 'Blau', hex: '#0ea5e9' },
+    { name: 'Violett', hex: '#a855f7' }
+  ];
+
   selectTemplate(templateId: string) {
-    this.selectedTemplate.set(templateId);
+    const template = this.quizService.getTemplateById(
+      templateId,
+      this.authService.currentUser()?.email
+    );
+    if (template && !this.quizService.isQuizComplete(template)) {
+      this.incompleteQuizWarning.set({ name: template.name, id: template.id });
+      return;
+    }
+    this.incompleteQuizWarning.set(null);
+    
+    const current = this.selectedTemplates();
+    if (current.includes(templateId)) {
+      this.selectedTemplates.set(current.filter(id => id !== templateId));
+    } else {
+      if (current.length >= 3) {
+        return;
+      }
+      this.selectedTemplates.set([...current, templateId]);
+    }
+    if (this.selectedTemplates().length > 0) {
+      this.showTemplateWarning.set(false);
+    }
+  }
+
+  dismissIncompleteWarning() {
+    this.incompleteQuizWarning.set(null);
+  }
+
+  onEditIncompleteQuiz() {
+    const warning = this.incompleteQuizWarning();
+    if (warning) {
+      this.router.navigate(['/create-quiz'], { queryParams: { id: warning.id } });
+    }
   }
 
   onMaxPlayersChange(event: Event) {
@@ -161,6 +360,28 @@ export class StartPageComponent {
   onTeamSizeChange(event: Event) {
     const input = event.target as HTMLInputElement;
     this.teamSize.set(input.value);
+  }
+
+  onBuzzerTimeoutChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.buzzerTimeout.set(input.value);
+  }
+
+  formatBuzzerTimeout(valueStr: string): string {
+    const value = parseInt(valueStr, 10);
+    if (value === 0) {
+      return 'Deaktiviert (Kein Countdown)';
+    }
+    if (value >= 60) {
+      const mins = Math.floor(value / 60);
+      const secs = value % 60;
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}s`;
+    }
+    return `${value}s`;
+  }
+
+  onDeductPointsChange(checked: boolean) {
+    this.deductPointsOnTimeout.set(checked);
   }
 
   onTeamModeChange(checked: boolean) {
@@ -179,6 +400,10 @@ export class StartPageComponent {
     return name.slice(0, 2).toUpperCase();
   }
 
+  onAvatarColorClick(hex: string) {
+    this.selectedColor.set(hex);
+  }
+
   getPlayersInTeam(teamId: number): Player[] {
     return this.p2pService.players().filter(p => p.teamId === teamId);
   }
@@ -188,21 +413,44 @@ export class StartPageComponent {
   }
 
   async onJoinSubmit() {
-    if (!this.playerName().trim()) {
+    const name = this.playerName().trim();
+    const nameRegex = /^[a-zA-Z0-9_\-\säöüÄÖÜß]+$/;
+    
+    if (!name) {
       this.joinError.set('Bitte gib einen Namen ein.');
       return;
     }
-    if (this.roomCode().trim().length !== 6) {
+    if (name.length < 2 || name.length > 14) {
+      this.joinError.set('Der Name muss zwischen 2 und 14 Zeichen lang sein.');
+      return;
+    }
+    if (!nameRegex.test(name)) {
+      this.joinError.set('Der Name darf nur Buchstaben, Zahlen, Leerzeichen, Unterstriche und Bindestriche enthalten.');
+      return;
+    }
+
+    const code = this.roomCode().trim();
+    if (!code) {
+      this.joinError.set('Bitte gib einen Raumcode ein.');
+      return;
+    }
+    if (code.length !== 6) {
       this.joinError.set('Der Raumcode muss genau 6 Zeichen lang sein.');
       return;
     }
+    
     this.joinError.set('');
     
     try {
+      localStorage.setItem('jeopardy_player_name', name);
+      localStorage.setItem('jeopardy_player_color', this.selectedColor());
+      localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
+
       await this.p2pService.joinRoom(
-        this.roomCode().trim().toUpperCase(),
-        this.playerName().trim(),
-        this.selectedColor()
+        code.toUpperCase(),
+        name,
+        this.selectedColor(),
+        this.selectedAvatar()
       );
     } catch (err: any) {
       this.joinError.set(this.p2pService.errorMessage() || 'Verbindung fehlgeschlagen.');
@@ -210,10 +458,28 @@ export class StartPageComponent {
   }
 
   async onHostSubmit() {
-    if (!this.playerName().trim()) {
+    const name = this.playerName().trim();
+    const nameRegex = /^[a-zA-Z0-9_\-\säöüÄÖÜß]+$/;
+
+    if (!name) {
       this.joinError.set('Bitte gib einen Namen ein, um ein Spiel zu hosten.');
       return;
     }
+    if (name.length < 2 || name.length > 14) {
+      this.joinError.set('Der Name muss zwischen 2 und 14 Zeichen lang sein.');
+      return;
+    }
+    if (!nameRegex.test(name)) {
+      this.joinError.set('Der Name darf nur Buchstaben, Zahlen, Leerzeichen, Unterstriche und Bindestriche enthalten.');
+      return;
+    }
+    if (this.selectedTemplates().length === 0) {
+      this.showTemplateWarning.set(true);
+      this.joinError.set('Bitte wähle mindestens eine Quiz-Vorlage aus, um einen Spielraum zu erstellen.');
+      return;
+    }
+    
+    this.showTemplateWarning.set(false);
     this.joinError.set('');
 
     // Generate a unique 6-character room code (e.g. JEOP55 or random uppercase alphanumeric)
@@ -224,13 +490,20 @@ export class StartPageComponent {
     }
 
     try {
+      localStorage.setItem('jeopardy_player_name', name);
+      localStorage.setItem('jeopardy_player_color', this.selectedColor());
+      localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
+
       await this.p2pService.hostRoom(
         randomCode,
-        this.playerName().trim(),
+        name,
         this.selectedColor(),
+        this.selectedAvatar(),
         parseInt(this.maxPlayers()),
         this.teamMode(),
-        parseInt(this.teamSize())
+        parseInt(this.teamSize()),
+        parseInt(this.buzzerTimeout()),
+        this.deductPointsOnTimeout()
       );
     } catch (err: any) {
       this.joinError.set(this.p2pService.errorMessage() || 'Raumerstellung fehlgeschlagen.');
@@ -251,20 +524,40 @@ export class StartPageComponent {
   }
 
   onStartGame() {
-    const template = this.quizService.getTemplateById(
-      this.selectedTemplate(),
-      this.authService.currentUser()?.email
-    );
-    if (template) {
-      this.p2pService.startGame(template.categories);
+    const templates = this.selectedTemplates().map(id => 
+      this.quizService.getTemplateById(id, this.authService.currentUser()?.email)
+    ).filter((t): t is Exclude<typeof t, null> => !!t);
+
+    if (templates.length > 0) {
+      const boards = templates.map(t => t.categories);
+      this.p2pService.startGame(boards);
     }
   }
 
-  openAuthModal(mode: 'login' | 'register') {
+  randomizeAvatar() {
+    this.avatarBase.set(Math.floor(Math.random() * 5));
+    this.avatarEyes.set(Math.floor(Math.random() * 8));
+    this.avatarMouth.set(Math.floor(Math.random() * 6));
+    this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
+
+    // Also pick a random color from predefined ones
+    const randomColorObj = this.avatarColors[Math.floor(Math.random() * this.avatarColors.length)];
+    this.selectedColor.set(randomColorObj.hex);
+  }
+
+  openAuthModal(mode: 'login' | 'register' | 'forgot') {
     this.authMode.set(mode);
     this.authUsername.set('');
     this.authEmail.set('');
     this.authPassword.set('');
+    this.securityQuestion.set(this.securityQuestionsList[0]);
+    this.securityAnswer.set('');
+    this.forgotStep.set(1);
+    this.forgotQuestion.set('');
+    this.forgotAnswer.set('');
+    this.forgotNewPassword.set('');
+    this.forgotConfirmPassword.set('');
+    this.forgotSuccess.set(false);
     this.authError.set('');
     this.authModalOpen.set(true);
   }
@@ -276,7 +569,9 @@ export class StartPageComponent {
         await this.authService.register(
           this.authUsername(),
           this.authEmail(),
-          this.authPassword()
+          this.authPassword(),
+          this.securityQuestion(),
+          this.securityAnswer()
         );
       } else {
         await this.authService.login(
@@ -290,10 +585,49 @@ export class StartPageComponent {
     }
   }
 
+  async onFetchForgotPasswordQuestion() {
+    this.authError.set('');
+    try {
+      const question = await this.authService.getSecurityQuestion(this.authEmail());
+      this.forgotQuestion.set(question);
+      this.forgotStep.set(2);
+    } catch (err: any) {
+      this.authError.set(err.message || 'Die Sicherheitsfrage konnte nicht geladen werden.');
+    }
+  }
+
+  async onResetPasswordSubmit() {
+    this.authError.set('');
+    if (this.forgotNewPassword() !== this.forgotConfirmPassword()) {
+      this.authError.set('Die Passwörter stimmen nicht überein.');
+      return;
+    }
+
+    try {
+      await this.authService.resetPassword(
+        this.authEmail(),
+        this.forgotAnswer(),
+        this.forgotNewPassword()
+      );
+      this.forgotSuccess.set(true);
+      setTimeout(() => {
+        this.authMode.set('login');
+        this.forgotStep.set(1);
+        this.forgotQuestion.set('');
+        this.forgotAnswer.set('');
+        this.forgotNewPassword.set('');
+        this.forgotConfirmPassword.set('');
+        this.forgotSuccess.set(false);
+      }, 2000);
+    } catch (err: any) {
+      this.authError.set(err.message || 'Passwort-Zurücksetzen fehlgeschlagen.');
+    }
+  }
+
   onLogout() {
     this.authService.logout();
     this.playerName.set('');
-    this.selectedTemplate.set('general');
+    this.selectedTemplates.set([]);
   }
 
   openSettingsModal() {
@@ -319,5 +653,42 @@ export class StartPageComponent {
 
   onCreateQuizClick() {
     this.router.navigate(['/create-quiz']);
+  }
+
+  cycleBase(direction: number) {
+    const total = 5; // 0, 1, 2, 3, 4
+    let next = this.avatarBase() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarBase.set(next);
+  }
+
+  cycleEyes(direction: number) {
+    const total = 8; // 0 to 7
+    let next = this.avatarEyes() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarEyes.set(next);
+  }
+
+  cycleMouth(direction: number) {
+    const total = 6; // 0 to 5
+    let next = this.avatarMouth() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarMouth.set(next);
+  }
+
+  cycleAccessory(direction: number) {
+    const total = 8; // 0 to 7
+    let next = this.avatarAccessory() + direction;
+    if (next < 0) next = total - 1;
+    if (next >= total) next = 0;
+    this.avatarAccessory.set(next);
+  }
+
+  openLegalModal(tab: 'impressum' | 'privacy' | 'terms') {
+    this.activeLegalTab.set(tab);
+    this.legalModalOpen.set(true);
   }
 }

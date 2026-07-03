@@ -6,11 +6,15 @@ import { InputComponent } from '../../shared/components/input/input.component';
 import { LogoComponent } from '../../shared/components/logo/logo.component';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizService, Category, Question } from '../../core/services/quiz.service';
+import { AudioService } from '../../core/services/audio.service';
+
+import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
+import { CdkDropList, CdkDrag, CdkDragHandle, CdkDragDrop, CdkDragStart, moveItemInArray } from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-quiz-creator',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent],
+  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent, PixelatedImageComponent, CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './quiz-creator.component.html',
   styleUrl: './quiz-creator.component.css'
 })
@@ -19,10 +23,12 @@ export class QuizCreatorComponent implements OnInit {
   private authService = inject(AuthService);
   private quizService = inject(QuizService);
   private route = inject(ActivatedRoute);
+  private audioService = inject(AudioService);
 
   editingId = signal<string | null>(null);
   quizName = signal('');
   errorMessage = signal('');
+  rowValues = signal<number[]>([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
 
   ngOnInit() {
     const id = this.route.snapshot.queryParamMap.get('id');
@@ -37,6 +43,15 @@ export class QuizCreatorComponent implements OnInit {
         const count = template.categories[0]?.questions?.length || 5;
         this.numQuestions.set(count);
         
+        if (template.categories[0]?.questions) {
+          const existingVals = template.categories[0].questions.map(q => q.value);
+          const fullVals = [...existingVals];
+          for (let i = fullVals.length; i < 10; i++) {
+            fullVals.push((i + 1) * 100);
+          }
+          this.rowValues.set(fullVals);
+        }
+
         // Deep copy the categories so edits do not modify original state until saved
         const copiedCategories = JSON.parse(JSON.stringify(template.categories)) as Category[];
         this.categories.set(copiedCategories);
@@ -55,6 +70,22 @@ export class QuizCreatorComponent implements OnInit {
   activeCell = signal<{ cIndex: number; qIndex: number } | null>(null);
   modalQuestionText = signal('');
   modalAnswerText = signal('');
+  modalImage = signal<string | null>(null);
+  imageError = signal<string | null>(null);
+  modalPixelate = signal(false);
+  modalPixelateStrength = signal(80);
+  modalReducePixelation = signal(false);
+  modalReduceAmount = signal(5);
+
+  // Modal Audio State
+  modalAudio = signal<string | null>(null);
+  modalAudioStart = signal<number>(0);
+  modalAudioEnd = signal<number>(10);
+  modalAudioSpeed = signal<number>(1.0);
+  modalAudioPitch = signal<number>(0);
+  modalAudioDuration = signal<number>(0);
+  audioError = signal<string | null>(null);
+  modalAudioPlaying = signal<boolean>(false);
 
   onNumQuestionsChange(count: number) {
     this.numQuestions.set(count);
@@ -68,7 +99,7 @@ export class QuizCreatorComponent implements OnInit {
             newQs.push({
               text: '',
               answer: '',
-              value: (i + 1) * 100
+              value: this.rowValues()[i] || (i + 1) * 100
             });
           }
           return {
@@ -92,7 +123,7 @@ export class QuizCreatorComponent implements OnInit {
     const newQs: Question[] = Array.from({ length: maxQsInMemory }, (_, i) => ({
       text: '',
       answer: '',
-      value: (i + 1) * 100
+      value: this.rowValues()[i] || (i + 1) * 100
     }));
 
     this.categories.update(cats => [
@@ -114,15 +145,39 @@ export class QuizCreatorComponent implements OnInit {
     this.categories.update(cats => cats.filter((_, i) => i !== index));
   }
 
+  updateRowValue(qIndex: number, newValue: number) {
+    if (isNaN(newValue)) return;
+    let clampedValue = newValue;
+    if (clampedValue < 0) clampedValue = 0;
+    if (clampedValue > 10000) clampedValue = 10000;
+
+    this.rowValues.update(vals => {
+      const copy = [...vals];
+      copy[qIndex] = clampedValue;
+      return copy;
+    });
+    this.categories.update(cats => cats.map(cat => {
+      const updatedQs = [...cat.questions];
+      if (updatedQs[qIndex]) {
+        updatedQs[qIndex] = {
+          ...updatedQs[qIndex],
+          value: clampedValue
+        };
+      }
+      return {
+        ...cat,
+        questions: updatedQs
+      };
+    }));
+  }
 
   private initCategories(): Category[] {
-    const values = [100, 200, 300, 400, 500];
     const cats: Category[] = [];
     for (let c = 0; c < 5; c++) {
-      const questions: Question[] = values.map(v => ({
+      const questions: Question[] = Array.from({ length: 10 }, (_, i) => ({
         text: '',
         answer: '',
-        value: v
+        value: this.rowValues()[i]
       }));
       cats.push({
         name: '',
@@ -157,18 +212,78 @@ export class QuizCreatorComponent implements OnInit {
     this.activeCell.set({ cIndex, qIndex });
     this.modalQuestionText.set(q.text);
     this.modalAnswerText.set(q.answer);
+    this.modalImage.set(q.image || null);
+    this.modalPixelate.set(q.pixelate || false);
+    this.modalPixelateStrength.set(q.pixelateStrength || 80);
+    this.modalReducePixelation.set(q.reducePixelationOnWrong || false);
+    this.modalReduceAmount.set(q.reducePixelationAmount || 5);
+    this.imageError.set(null);
+
+    // Audio state
+    this.modalAudio.set(q.audio || null);
+    this.modalAudioStart.set(q.audioStart || 0);
+    this.modalAudioEnd.set(q.audioEnd || 10);
+    this.modalAudioSpeed.set(q.audioSpeed || 1.0);
+    this.modalAudioPitch.set(q.audioPitch || 0);
+    this.modalAudioDuration.set(0);
+    this.audioError.set(null);
+    this.modalAudioPlaying.set(false);
+
+    if (q.audio) {
+      const audio = new Audio(q.audio);
+      audio.addEventListener('loadedmetadata', () => {
+        this.modalAudioDuration.set(audio.duration);
+        if (this.modalAudioEnd() > audio.duration) {
+          this.modalAudioEnd.set(audio.duration);
+        }
+      });
+    }
   }
 
   saveActiveCell() {
     const cell = this.activeCell();
     if (!cell) return;
 
+    const qText = this.modalQuestionText().trim();
+    const aText = this.modalAnswerText().trim();
+
+    if (qText.length > 160) {
+      this.imageError.set('Der Frage-Text darf maximal 160 Zeichen lang sein.');
+      return;
+    }
+    if (aText.length > 100) {
+      this.imageError.set('Der Antwort-Text darf maximal 100 Zeichen lang sein.');
+      return;
+    }
+
+    if (this.modalAudio()) {
+      const duration = this.modalAudioEnd() - this.modalAudioStart();
+      if (duration > 10.1) {
+        this.audioError.set('Der ausgewählte Ausschnitt darf maximal 10 Sekunden lang sein (aktuell: ' + duration.toFixed(1) + 's).');
+        return;
+      }
+    }
+
+    this.stopModalAudioPreview();
+
     this.categories.update(cats => {
       const newCats = [...cats];
       newCats[cell.cIndex].questions[cell.qIndex] = {
         ...newCats[cell.cIndex].questions[cell.qIndex],
-        text: this.modalQuestionText().trim(),
-        answer: this.modalAnswerText().trim()
+        text: qText,
+        answer: aText,
+        image: this.modalImage() || undefined,
+        pixelate: this.modalPixelate(),
+        pixelateStrength: this.modalPixelateStrength(),
+        reducePixelationOnWrong: this.modalReducePixelation(),
+        reducePixelationAmount: this.modalReduceAmount(),
+        
+        // Save Audio state
+        audio: this.modalAudio() || undefined,
+        audioStart: this.modalAudio() ? this.modalAudioStart() : undefined,
+        audioEnd: this.modalAudio() ? this.modalAudioEnd() : undefined,
+        audioSpeed: this.modalAudio() ? this.modalAudioSpeed() : undefined,
+        audioPitch: this.modalAudio() ? this.modalAudioPitch() : undefined
       };
       return newCats;
     });
@@ -176,16 +291,173 @@ export class QuizCreatorComponent implements OnInit {
     this.activeCell.set(null);
   }
 
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+
+      // Validate format
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        this.imageError.set('Ungültiges Dateiformat. Bitte verwende PNG, JPEG, WEBP oder GIF.');
+        return;
+      }
+
+      // Validate size (5 MB limit)
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        this.imageError.set('Die Bilddatei ist zu groß. Maximale Größe ist 5 MB.');
+        return;
+      }
+
+      this.imageError.set(null);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.modalImage.set(reader.result as string);
+      };
+      reader.onerror = () => {
+        this.imageError.set('Fehler beim Lesen der Datei.');
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeModalImage() {
+    this.modalImage.set(null);
+    this.modalPixelate.set(false);
+    this.modalPixelateStrength.set(80);
+    this.modalReducePixelation.set(false);
+    this.modalReduceAmount.set(5);
+    this.imageError.set(null);
+  }
+
+  onAudioFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+
+      // Validate format (MP3 only)
+      if (file.type !== 'audio/mp3' && file.type !== 'audio/mpeg') {
+        this.audioError.set('Ungültiges Audio-Dateiformat. Bitte verwende nur MP3.');
+        return;
+      }
+
+      // Validate size (10 MB limit)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        this.audioError.set('Die Audiodatei ist zu groß. Maximale Größe ist 10 MB.');
+        return;
+      }
+
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(file);
+      audio.addEventListener('loadedmetadata', () => {
+        this.audioError.set(null);
+        const reader = new FileReader();
+        reader.onload = () => {
+          this.modalAudio.set(reader.result as string);
+          this.modalAudioStart.set(0);
+          this.modalAudioEnd.set(Math.min(10, audio.duration));
+          this.modalAudioDuration.set(audio.duration);
+          this.modalAudioSpeed.set(1.0);
+          this.modalAudioPitch.set(0);
+          URL.revokeObjectURL(audio.src);
+        };
+        reader.onerror = () => {
+          this.audioError.set('Fehler beim Lesen der Datei.');
+          URL.revokeObjectURL(audio.src);
+        };
+        reader.readAsDataURL(file);
+      });
+      audio.addEventListener('error', () => {
+        this.audioError.set('Fehler beim Analysieren der Audiodatei. Eventuell ist die Datei beschädigt.');
+        URL.revokeObjectURL(audio.src);
+      });
+    }
+  }
+
+  removeModalAudio() {
+    this.stopModalAudioPreview();
+    this.modalAudio.set(null);
+    this.modalAudioStart.set(0);
+    this.modalAudioEnd.set(10);
+    this.modalAudioSpeed.set(1.0);
+    this.modalAudioPitch.set(0);
+    this.modalAudioDuration.set(0);
+    this.audioError.set(null);
+  }
+
+  toggleModalAudioPreview() {
+    if (this.modalAudioPlaying()) {
+      this.stopModalAudioPreview();
+    } else {
+      this.startModalAudioPreview();
+    }
+  }
+
+  startModalAudioPreview() {
+    if (!this.modalAudio()) return;
+    this.stopModalAudioPreview();
+
+    this.modalAudioPlaying.set(true);
+    this.audioService.playPreview(
+      this.modalAudio()!,
+      this.modalAudioStart(),
+      this.modalAudioEnd(),
+      this.modalAudioSpeed(),
+      this.modalAudioPitch(),
+      () => {
+        this.modalAudioPlaying.set(false);
+      }
+    );
+  }
+
+  stopModalAudioPreview() {
+    this.audioService.stopPreview();
+    this.modalAudioPlaying.set(false);
+  }
+
+  onAudioStartChange(val: number) {
+    this.stopModalAudioPreview();
+    if (val >= this.modalAudioEnd()) {
+      this.modalAudioStart.set(Math.max(0, this.modalAudioEnd() - 0.1));
+    } else {
+      this.modalAudioStart.set(val);
+    }
+  }
+
+  onAudioEndChange(val: number) {
+    this.stopModalAudioPreview();
+    if (val <= this.modalAudioStart()) {
+      this.modalAudioEnd.set(Math.min(this.modalAudioDuration(), this.modalAudioStart() + 0.1));
+    } else {
+      this.modalAudioEnd.set(val);
+    }
+  }
+
+  onAudioSpeedChange(val: number) {
+    this.stopModalAudioPreview();
+    this.modalAudioSpeed.set(val);
+  }
+
+  onAudioPitchChange(val: number) {
+    this.stopModalAudioPreview();
+    this.modalAudioPitch.set(val);
+  }
+
   closeEditModal() {
+    this.stopModalAudioPreview();
     this.activeCell.set(null);
   }
 
   onCategoryNameChange(cIndex: number, value: string) {
+    const truncated = value ? value.substring(0, 30) : '';
     this.categories.update(cats => {
       const newCats = [...cats];
       newCats[cIndex] = {
         ...newCats[cIndex],
-        name: value
+        name: truncated
       };
       return newCats;
     });
@@ -206,8 +478,39 @@ export class QuizCreatorComponent implements OnInit {
       questions: cat.questions.slice(0, activeNum)
     }));
 
+    // Strict validation of all fields before saving
+    const qName = this.quizName() ? this.quizName().trim() : '';
+    if (!qName) {
+      this.errorMessage.set('Bitte gib der Quiz-Vorlage einen Namen.');
+      return;
+    }
+    if (qName.length > 30) {
+      this.errorMessage.set('Der Quiz-Name darf maximal 30 Zeichen lang sein.');
+      return;
+    }
+
+    for (let cIndex = 0; cIndex < finalCategories.length; cIndex++) {
+      const cat = finalCategories[cIndex];
+      const catName = cat.name ? cat.name.trim() : '';
+      if (catName.length > 30) {
+        this.errorMessage.set(`Der Name für Kategorie ${cIndex + 1} darf maximal 30 Zeichen lang sein.`);
+        return;
+      }
+      for (let qIndex = 0; qIndex < cat.questions.length; qIndex++) {
+        const q = cat.questions[qIndex];
+        if (q.text && q.text.trim().length > 160) {
+          this.errorMessage.set(`Der Frage-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 160 Zeichen lang sein.`);
+          return;
+        }
+        if (q.answer && q.answer.trim().length > 100) {
+          this.errorMessage.set(`Der Antwort-Text in Kategorie "${catName || cIndex + 1}" (${(qIndex + 1) * 100} $) darf maximal 100 Zeichen lang sein.`);
+          return;
+        }
+      }
+    }
+
     try {
-      this.quizService.saveQuiz(this.quizName(), finalCategories, email, this.editingId() || undefined).subscribe({
+      this.quizService.saveQuiz(qName, finalCategories, email, this.editingId() || undefined).subscribe({
         next: () => {
           this.router.navigate(['/']);
         },
@@ -218,6 +521,24 @@ export class QuizCreatorComponent implements OnInit {
     } catch (err: any) {
       this.errorMessage.set(err.message || 'Speichern fehlgeschlagen.');
     }
+  }
+
+  onDragHandlePointerDown(event: PointerEvent) {
+    const handle = event.currentTarget as HTMLElement;
+    const card = handle.closest('.cdk-drag') as HTMLElement;
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      document.documentElement.style.setProperty('--dragged-width', `${rect.width}px`);
+      document.documentElement.style.setProperty('--dragged-height', `${rect.height}px`);
+    }
+  }
+
+  onDropCdk(event: CdkDragDrop<Category[]>) {
+    this.categories.update(cats => {
+      const updated = [...cats];
+      moveItemInArray(updated, event.previousIndex, event.currentIndex);
+      return updated;
+    });
   }
 
   onCancel() {

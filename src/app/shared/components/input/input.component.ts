@@ -1,4 +1,4 @@
-import { Component, input, model } from '@angular/core';
+import { Component, input, model, output } from '@angular/core';
 
 @Component({
   selector: 'app-input',
@@ -16,7 +16,9 @@ export class InputComponent {
   rows = input<number>(3);
   disabled = input<boolean>(false);
   maxLength = input<number | null>(null);
+  showCounter = input<boolean>(true);
   id = input<string>(`input-${Math.random().toString(36).substring(2, 9)}`);
+  enterPressed = output<void>();
 
   onInput(event: Event): void {
     const inputEl = event.target as HTMLInputElement | HTMLTextAreaElement;

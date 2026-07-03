@@ -1,6 +1,6 @@
 {
   "name": "jeopardy-app",
-  "version": "0.0.0",
+  "version": "0.9.9",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -13,6 +13,7 @@
   },
   "private": true,
   "dependencies": {
+    "@angular/cdk": "^19.2.19",
     "@angular/common": "^19.2.0",
     "@angular/compiler": "^19.2.0",
     "@angular/core": "^19.2.0",

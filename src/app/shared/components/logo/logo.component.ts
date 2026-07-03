@@ -1,14 +1,16 @@
 import { Component, input, computed } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-logo',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './logo.component.html',
   styleUrl: './logo.component.css'
 })
 export class LogoComponent {
   size = input<'sm' | 'md' | 'lg'>('md');
+  clickable = input<boolean>(true);
 
   logoClass = computed(() => {
     const sizeClasses = {

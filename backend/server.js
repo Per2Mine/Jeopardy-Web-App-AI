@@ -3,11 +3,39 @@ const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const dns = require('dns').promises;
+const rateLimit = require('express-rate-limit');
 const { getDatabase } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'jeopardy_super_secret_key_123_abc_xyz';
+
+// Rate Limiters
+const globalLimiter = rateLimit.rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req, res) => req.originalUrl && req.originalUrl.includes('/api/p2p'),
+  message: { error: 'Zu viele Anfragen von dieser IP, bitte versuche es in 15 Minuten erneut.' }
+});
+
+const authLimiter = rateLimit.rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 registration/login attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anmelde- oder Registrierungsversuche. Bitte warte 15 Minuten.' }
+});
+
+const quizLimiter = rateLimit.rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 quiz creations/updates/deletes per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Quiz-Aktionen. Bitte warte 15 Minuten.' }
+});
 
 // Middlewares
 app.use(cors({
@@ -15,7 +43,107 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10mb' })); // Support larger custom quiz payloads
+app.use(express.json({ limit: '50mb' })); // Support larger custom quiz payloads
+app.use('/api/', globalLimiter); // Apply global rate limiter to all API endpoints
+
+// --- VALIDATION UTILITIES ---
+
+// 1. Email Validator (Regex + disposable list + active DNS check)
+async function validateEmail(email) {
+  if (!email) return { valid: false, error: 'E-Mail-Adresse darf nicht leer sein.' };
+  
+  const formattedEmail = email.toLowerCase().trim();
+
+  // Syntax validation using standard RFC 5322 regex
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  if (!emailRegex.test(formattedEmail)) {
+    return { valid: false, error: 'Bitte gib eine E-Mail-Adresse in einem gültigen Format ein.' };
+  }
+
+  const parts = formattedEmail.split('@');
+  const domain = parts[1];
+
+  // Disposable/temporary email domains blocklist
+  const disposableDomains = new Set([
+    'mailinator.com', '10minutemail.com', 'tempmail.com', 'guerrillamail.com',
+    'sharklasers.com', 'yopmail.com', 'dispostable.com', 'getairmail.com',
+    'burnermail.io', 'trashmail.com', 'temp-mail.org', 'maildrop.cc', 'tempmailaddress.com'
+  ]);
+  if (disposableDomains.has(domain)) {
+    return { valid: false, error: 'Die Verwendung von temporären/Wegwerf-E-Mail-Adressen ist nicht gestattet.' };
+  }
+
+  // Active DNS Verification
+  try {
+    const mxRecords = await dns.resolveMx(domain);
+    if (mxRecords && mxRecords.length > 0) {
+      return { valid: true };
+    }
+  } catch (err) {
+    // If MX lookup fails, check A records as a fallback
+    try {
+      const addresses = await dns.resolve4(domain);
+      if (addresses && addresses.length > 0) {
+        return { valid: true };
+      }
+    } catch (err2) {
+      return { valid: false, error: 'Die E-Mail-Domain existiert nicht oder kann keine E-Mails empfangen.' };
+    }
+  }
+
+  return { valid: false, error: 'Die E-Mail-Domain konnte nicht validiert werden.' };
+}
+
+// 2. Username Validation (Profanity Check)
+function isOffensiveUsername(username) {
+  if (!username) return false;
+
+  const original = username.toLowerCase().trim();
+
+  // Normalize common leetspeak character substitutions
+  let normalized = original
+    .replace(/0/g, 'o')
+    .replace(/1/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/4/g, 'a')
+    .replace(/5/g, 's')
+    .replace(/7/g, 't')
+    .replace(/8/g, 'b')
+    .replace(/@/g, 'a')
+    .replace(/\$/g, 's')
+    .replace(/!/g, 'i');
+
+  const alphanumericOnly = normalized.replace(/[^a-z0-9]/g, '');
+
+  // Substring blacklist (highly specific offensive words)
+  const specificBlacklist = [
+    'arschloch', 'hurensohn', 'huren', 'huso', 'miststueck', 'miststück', 'wichser', 'wixxer', 'wixer',
+    'fotze', 'schlampe', 'niger', 'neger', 'nigger', 'kanacke', 'asshole', 'bitch', 'cunt', 'motherfucker', 
+    'cockhead', 'scheisse', 'scheisser', 'bastard', 'pussy', 'retard', 'faggot', 'wixxen', 'ficken',
+    'ficker', 'idiot', 'depp', 'penis', 'vagina'
+  ];
+
+  for (const word of specificBlacklist) {
+    if (alphanumericOnly.includes(word) || original.includes(word)) {
+      return true;
+    }
+  }
+
+  // Exact/boundary blacklist (shorter words to avoid the Scunthorpe problem, e.g. "Sebastian" or "Marschall")
+  const shortBlacklist = [
+    'arsch', 'fick', 'nazi', 'hitler', 'fuck', 'shit', 'ass', 'cock', 'dick', 'slut', 'whore', 'sex'
+  ];
+
+  for (const word of shortBlacklist) {
+    const regex = new RegExp(`(^|[^a-z])${word}([^a-z]|$)`, 'i');
+    if (regex.test(original) || regex.test(normalized)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 
 // Initialize Database on server startup
 let db;
@@ -51,8 +179,8 @@ function authenticateToken(req, res, next) {
 // --- API ROUTES ---
 
 // 1. Register User
-app.post('/api/auth/register', async (req, res) => {
-  const { username, email, password } = req.body;
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+  const { username, email, password, securityQuestion, securityAnswer } = req.body;
   
   const formattedEmail = email ? email.toLowerCase().trim() : '';
   const formattedUsername = username ? username.trim() : '';
@@ -60,11 +188,38 @@ app.post('/api/auth/register', async (req, res) => {
   if (!formattedUsername) {
     return res.status(400).json({ error: 'Benutzername darf nicht leer sein.' });
   }
-  if (!formattedEmail || !formattedEmail.includes('@')) {
-    return res.status(400).json({ error: 'Bitte gib eine gültige E-Mail-Adresse ein.' });
+
+  // Validate username length and characters
+  if (formattedUsername.length < 3 || formattedUsername.length > 20) {
+    return res.status(400).json({ error: 'Der Benutzername muss zwischen 3 und 20 Zeichen lang sein.' });
   }
+
+  const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+  if (!usernameRegex.test(formattedUsername)) {
+    return res.status(400).json({ error: 'Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten.' });
+  }
+
+  // Check for offensive username
+  if (isOffensiveUsername(formattedUsername)) {
+    return res.status(400).json({ error: 'Dieser Benutzername enthält unangemessene Ausdrücke. Bitte wähle einen anderen.' });
+  }
+
+  // Robust email validation
+  const emailValidation = await validateEmail(formattedEmail);
+  if (!emailValidation.valid) {
+    return res.status(400).json({ error: emailValidation.error });
+  }
+
   if (!password || password.length < 6) {
     return res.status(400).json({ error: 'Das Passwort muss mindestens 6 Zeichen lang sein.' });
+  }
+
+  if (!securityQuestion || !securityQuestion.trim()) {
+    return res.status(400).json({ error: 'Bitte wähle eine Sicherheitsfrage aus.' });
+  }
+
+  if (!securityAnswer || !securityAnswer.trim()) {
+    return res.status(400).json({ error: 'Bitte gib eine Antwort auf deine Sicherheitsfrage ein.' });
   }
 
   try {
@@ -74,9 +229,12 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const formattedAnswer = securityAnswer.trim().toLowerCase();
+    const securityAnswerHash = await bcrypt.hash(formattedAnswer, 10);
+
     await db.run(
-      'INSERT INTO users (email, username, password_hash) VALUES (?, ?, ?)',
-      [formattedEmail, formattedUsername, passwordHash]
+      'INSERT INTO users (email, username, password_hash, security_question, security_answer_hash) VALUES (?, ?, ?, ?, ?)',
+      [formattedEmail, formattedUsername, passwordHash, securityQuestion.trim(), securityAnswerHash]
     );
 
     const tokenPayload = { email: formattedEmail, username: formattedUsername };
@@ -92,8 +250,71 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+// 1.5 Get User's Security Question
+app.post('/api/auth/security-question', authLimiter, async (req, res) => {
+  const { email } = req.body;
+  const formattedEmail = email ? email.toLowerCase().trim() : '';
+
+  if (!formattedEmail) {
+    return res.status(400).json({ error: 'Bitte gib eine E-Mail-Adresse ein.' });
+  }
+
+  try {
+    const user = await db.get('SELECT security_question FROM users WHERE email = ?', [formattedEmail]);
+    if (!user) {
+      return res.status(404).json({ error: 'Es wurde kein Konto mit dieser E-Mail-Adresse gefunden.' });
+    }
+    if (!user.security_question) {
+      return res.status(400).json({ error: 'Für dieses Konto ist keine Sicherheitsfrage eingerichtet.' });
+    }
+    res.json({ securityQuestion: user.security_question });
+  } catch (err) {
+    console.error('Security Question Fetch Error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Sicherheitsfrage.' });
+  }
+});
+
+// 1.6 Reset Password
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  const { email, securityAnswer, newPassword } = req.body;
+  const formattedEmail = email ? email.toLowerCase().trim() : '';
+  const formattedAnswer = securityAnswer ? securityAnswer.trim().toLowerCase() : '';
+
+  if (!formattedEmail || !formattedAnswer || !newPassword) {
+    return res.status(400).json({ error: 'Bitte fülle alle Pflichtfelder aus.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Das neue Passwort muss mindestens 6 Zeichen lang sein.' });
+  }
+
+  try {
+    const user = await db.get('SELECT * FROM users WHERE email = ?', [formattedEmail]);
+    if (!user) {
+      return res.status(404).json({ error: 'Es wurde kein Konto mit dieser E-Mail-Adresse gefunden.' });
+    }
+
+    if (!user.security_answer_hash) {
+      return res.status(400).json({ error: 'Für dieses Konto ist keine Sicherheitsfrage eingerichtet.' });
+    }
+
+    const match = await bcrypt.compare(formattedAnswer, user.security_answer_hash);
+    if (!match) {
+      return res.status(400).json({ error: 'Die Antwort auf die Sicherheitsfrage ist falsch.' });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    await db.run('UPDATE users SET password_hash = ? WHERE email = ?', [newPasswordHash, formattedEmail]);
+
+    res.json({ message: 'Passwort erfolgreich zurückgesetzt.' });
+  } catch (err) {
+    console.error('Password Reset Error:', err);
+    res.status(500).json({ error: 'Fehler beim Zurücksetzen des Passworts.' });
+  }
+});
+
 // 2. Login User
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   const formattedEmail = email ? email.toLowerCase().trim() : '';
 
@@ -110,6 +331,13 @@ app.post('/api/auth/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ error: 'Ungültige E-Mail-Adresse oder Passwort.' });
+    }
+
+    // Update last login timestamp
+    try {
+      await db.run('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE email = ?', [formattedEmail]);
+    } catch (dbErr) {
+      console.warn('Failed to update last_login_at for user:', formattedEmail, dbErr);
     }
 
     const tokenPayload = { email: user.email, username: user.username };
@@ -148,12 +376,38 @@ app.put('/api/auth/username', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Benutzername darf nicht leer sein.' });
   }
 
+  // Validate username length and characters
+  if (formattedUsername.length < 3 || formattedUsername.length > 20) {
+    return res.status(400).json({ error: 'Der Benutzername muss zwischen 3 und 20 Zeichen lang sein.' });
+  }
+
+  const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+  if (!usernameRegex.test(formattedUsername)) {
+    return res.status(400).json({ error: 'Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten.' });
+  }
+
+  // Check for offensive username
+  if (isOffensiveUsername(formattedUsername)) {
+    return res.status(400).json({ error: 'Dieser Benutzername enthält unangemessene Ausdrücke. Bitte wähle einen anderen.' });
+  }
+
   try {
     await db.run('UPDATE users SET username = ? WHERE email = ?', [formattedUsername, req.user.email]);
     res.json({ success: true, username: formattedUsername });
   } catch (err) {
     console.error('Update Username Error:', err);
     res.status(500).json({ error: 'Aktualisierung fehlgeschlagen.' });
+  }
+});
+
+// 4.5 Delete Account
+app.delete('/api/auth/account', authenticateToken, async (req, res) => {
+  try {
+    await db.run('DELETE FROM users WHERE email = ?', [req.user.email]);
+    res.json({ success: true, message: 'Konto erfolgreich gelöscht.' });
+  } catch (err) {
+    console.error('Delete Account Error:', err);
+    res.status(500).json({ error: 'Fehler beim Löschen des Kontos.' });
   }
 });
 
@@ -166,7 +420,8 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
       name: row.name,
       icon: '📝',
       userEmail: row.user_email,
-      categories: JSON.parse(row.categories)
+      categories: JSON.parse(row.categories),
+      isComplete: row.is_complete === 1
     }));
     res.json(quizzes);
   } catch (err) {
@@ -175,25 +430,128 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
   }
 });
 
+// Draft validation: only quiz name is required, images are validated if present
+function validateQuizPayloadDraft(name, categories) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return 'Bitte gib der Quiz-Vorlage einen Namen.';
+  }
+  if (name.trim().length > 30) {
+    return 'Der Quiz-Name darf maximal 30 Zeichen lang sein.';
+  }
+  if (!categories || !Array.isArray(categories)) {
+    return 'Ungültiges Format für Kategorien.';
+  }
+  if (categories.length > 10) {
+    return 'Ein Quiz darf maximal 10 Kategorien besitzen.';
+  }
+
+  // Validate fields and images if present
+  for (let c = 0; c < categories.length; c++) {
+    const cat = categories[c];
+    if (cat.name && (typeof cat.name !== 'string' || cat.name.trim().length > 30)) {
+      return `Der Kategorie-Name von Kategorie ${c + 1} darf maximal 30 Zeichen lang sein.`;
+    }
+    if (cat.questions && Array.isArray(cat.questions)) {
+      for (let qIdx = 0; qIdx < cat.questions.length; qIdx++) {
+        const q = cat.questions[qIdx];
+        if (q.text && (typeof q.text !== 'string' || q.text.trim().length > 160)) {
+          return `Der Frage-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 160 Zeichen lang sein.`;
+        }
+        if (q.answer && (typeof q.answer !== 'string' || q.answer.trim().length > 100)) {
+          return `Der Antwort-Text in Kategorie ${c + 1} bei Frage ${qIdx + 1} darf maximal 100 Zeichen lang sein.`;
+        }
+        if (q.image) {
+          if (typeof q.image !== 'string') {
+            return 'Ungültiges Bild-Format.';
+          }
+          if (!q.image.startsWith('data:image/')) {
+            return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
+          }
+          const allowedTypes = ['data:image/png', 'data:image/jpeg', 'data:image/jpg', 'data:image/webp', 'data:image/gif'];
+          const matchesType = allowedTypes.some(type => q.image.startsWith(type));
+          if (!matchesType) {
+            return 'Unterstützte Bildformate sind nur PNG, JPEG, WEBP und GIF.';
+          }
+          const approximateSizeBytes = q.image.length * 0.75;
+          if (approximateSizeBytes > 6.8 * 1024 * 1024) {
+            return 'Die Bildgröße darf 5 MB nicht überschreiten.';
+          }
+        }
+        if (q.audio) {
+          if (typeof q.audio !== 'string') {
+            return 'Ungültiges Audio-Format.';
+          }
+          if (!q.audio.startsWith('data:audio/mp3') && !q.audio.startsWith('data:audio/mpeg')) {
+            return 'Unterstütztes Audioformat ist nur MP3.';
+          }
+          const approximateSizeBytes = q.audio.length * 0.75;
+          if (approximateSizeBytes > 10 * 1024 * 1024) {
+            return 'Die Audiodatei darf 10 MB nicht überschreiten.';
+          }
+          if (q.audioStart !== undefined && (typeof q.audioStart !== 'number' || q.audioStart < 0)) {
+            return 'Ungültiger Audio-Startwert.';
+          }
+          if (q.audioEnd !== undefined && (typeof q.audioEnd !== 'number' || q.audioEnd < 0)) {
+            return 'Ungültiger Audio-Endwert.';
+          }
+          if (q.audioSpeed !== undefined && (typeof q.audioSpeed !== 'number' || q.audioSpeed < 0.5 || q.audioSpeed > 2.0)) {
+            return 'Ungültiger Audio-Geschwindigkeitswert.';
+          }
+          if (q.audioPitch !== undefined && (typeof q.audioPitch !== 'number' || q.audioPitch < -12 || q.audioPitch > 12)) {
+            return 'Ungültiger Audio-Tonhöhenwert.';
+          }
+          if (q.audioStart !== undefined && q.audioEnd !== undefined && q.audioEnd - q.audioStart > 10.1) {
+            return 'Der ausgewählte Audio-Ausschnitt darf maximal 10 Sekunden lang sein.';
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Completeness check: verifies all fields are filled for a playable quiz
+function isQuizComplete(categories) {
+  if (!categories || !Array.isArray(categories) || categories.length === 0) {
+    return false;
+  }
+  for (const cat of categories) {
+    if (!cat.name || typeof cat.name !== 'string' || !cat.name.trim()) {
+      return false;
+    }
+    if (!cat.questions || !Array.isArray(cat.questions) || cat.questions.length === 0) {
+      return false;
+    }
+    for (const q of cat.questions) {
+      if (!q.text || typeof q.text !== 'string' || !q.text.trim()) {
+        return false;
+      }
+      if (!q.answer || typeof q.answer !== 'string' || !q.answer.trim()) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 // 6. Save Custom Quiz (Create)
-app.post('/api/quizzes', authenticateToken, async (req, res) => {
+app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
   const { name, categories } = req.body;
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Bitte gib der Quiz-Vorlage einen Namen.' });
-  }
-  if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    return res.status(400).json({ error: 'Das Quiz muss mindestens eine Kategorie enthalten.' });
+  const validationError = validateQuizPayloadDraft(name, categories);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   const id = 'custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+  const complete = isQuizComplete(categories) ? 1 : 0;
 
   try {
     await db.run(
-      'INSERT INTO quizzes (id, name, user_email, categories) VALUES (?, ?, ?, ?)',
-      [id, name.trim(), req.user.email, JSON.stringify(categories)]
+      'INSERT INTO quizzes (id, name, user_email, categories, is_complete) VALUES (?, ?, ?, ?, ?)',
+      [id, name.trim(), req.user.email, JSON.stringify(categories), complete]
     );
-    res.status(201).json({ success: true, id });
+    res.status(201).json({ success: true, id, isComplete: complete === 1 });
   } catch (err) {
     console.error('Create Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Erstellen des Quizzes.' });
@@ -201,16 +559,16 @@ app.post('/api/quizzes', authenticateToken, async (req, res) => {
 });
 
 // 7. Update Custom Quiz
-app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
+app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { name, categories } = req.body;
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Bitte gib der Quiz-Vorlage einen Namen.' });
+  const validationError = validateQuizPayloadDraft(name, categories);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
-  if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    return res.status(400).json({ error: 'Das Quiz muss mindestens eine Kategorie enthalten.' });
-  }
+
+  const complete = isQuizComplete(categories) ? 1 : 0;
 
   try {
     const quiz = await db.get('SELECT * FROM quizzes WHERE id = ?', [id]);
@@ -222,10 +580,10 @@ app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
     }
 
     await db.run(
-      'UPDATE quizzes SET name = ?, categories = ? WHERE id = ?',
-      [name.trim(), JSON.stringify(categories), id]
+      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [name.trim(), JSON.stringify(categories), complete, id]
     );
-    res.json({ success: true });
+    res.json({ success: true, isComplete: complete === 1 });
   } catch (err) {
     console.error('Update Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Aktualisieren des Quizzes.' });
@@ -233,7 +591,7 @@ app.put('/api/quizzes/:id', authenticateToken, async (req, res) => {
 });
 
 // 8. Delete Custom Quiz
-app.delete('/api/quizzes/:id', authenticateToken, async (req, res) => {
+app.delete('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -267,14 +625,18 @@ app.post('/api/quizzes/sync', authenticateToken, async (req, res) => {
       const { name, categories, id } = quiz;
       if (!name || !categories) continue;
 
+      const validationError = validateQuizPayloadDraft(name, categories);
+      if (validationError) continue; // Skip invalid quizzes during legacy sync
+
+      const complete = isQuizComplete(categories) ? 1 : 0;
       const quizId = id || ('custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5));
       
       // Check if quiz already exists
       const existing = await db.get('SELECT * FROM quizzes WHERE id = ?', [quizId]);
       if (!existing) {
         await db.run(
-          'INSERT INTO quizzes (id, name, user_email, categories) VALUES (?, ?, ?, ?)',
-          [quizId, name.trim(), req.user.email, JSON.stringify(categories)]
+          'INSERT INTO quizzes (id, name, user_email, categories, is_complete) VALUES (?, ?, ?, ?, ?)',
+          [quizId, name.trim(), req.user.email, JSON.stringify(categories), complete]
         );
       }
     }
@@ -293,7 +655,24 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
 
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // Open Relay Project (Free STUN/TURN servers powered by Metered.ca)
+    { urls: 'stun:openrelay.metered.ca:80' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ];
 
   if (turnUrl && turnUsername && turnPassword) {
@@ -310,6 +689,118 @@ app.get('/api/webrtc/ice-servers', (req, res) => {
 
   res.json({ iceServers });
 });
+
+// Debug log endpoint to capture client logs on server
+app.post('/api/debug/log', (req, res) => {
+  console.log('[Client Log]', req.body.message);
+  res.json({ success: true });
+});
+
+// 11. P2P HTTP Long-Polling Relay
+const messageQueues = new Map(); // peerId -> queue of messages
+const pendingPolls = new Map();  // peerId -> array of pending response objects
+const lastActivity = new Map();  // peerId -> timestamp of last poll/send
+
+// Periodic cleanup of idle queues to prevent memory leaks/DoS
+setInterval(() => {
+  const now = Date.now();
+  const maxIdleTime = 5 * 60 * 1000; // 5 minutes of inactivity
+  for (const [peerId, timestamp] of lastActivity.entries()) {
+    if (now - timestamp > maxIdleTime) {
+      messageQueues.delete(peerId);
+      pendingPolls.delete(peerId);
+      lastActivity.delete(peerId);
+    }
+  }
+}, 60 * 1000); // Run cleanup every minute
+
+app.post('/api/p2p/send', (req, res) => {
+  const { senderId, receiverId, message } = req.body;
+  if (!receiverId || !message) {
+    return res.status(400).json({ error: 'Missing receiverId or message' });
+  }
+
+  // Safety checks to prevent spam / memory exhaustion
+  if (typeof message !== 'string' && typeof message !== 'object') {
+    return res.status(400).json({ error: 'Invalid message type' });
+  }
+
+  const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+  if (messageStr.length > 50 * 1024) { // 50 KB limit
+    return res.status(400).json({ error: 'Message size exceeds limit of 50KB' });
+  }
+
+  // Update activity timestamp
+  lastActivity.set(receiverId, Date.now());
+  if (senderId) {
+    lastActivity.set(senderId, Date.now());
+  }
+
+  // Queue message for receiver
+  if (!messageQueues.has(receiverId)) {
+    messageQueues.set(receiverId, []);
+  }
+
+  const queue = messageQueues.get(receiverId);
+  if (queue.length >= 100) {
+    // Drop the oldest message if the queue exceeds 100 messages to prevent memory abuse
+    queue.shift();
+  }
+  queue.push({ senderId, message });
+
+  // Resolve pending polls for receiver
+  if (pendingPolls.has(receiverId)) {
+    const polls = pendingPolls.get(receiverId);
+    pendingPolls.delete(receiverId);
+    
+    const currentQueue = messageQueues.get(receiverId) || [];
+    messageQueues.set(receiverId, []);
+
+    for (const pollRes of polls) {
+      if (!pollRes.destroyed && !pollRes.headersSent) {
+        pollRes.json({ messages: currentQueue });
+      }
+    }
+  }
+
+  res.json({ success: true });
+});
+
+app.get('/api/p2p/poll/:peerId', (req, res) => {
+  const { peerId } = req.params;
+
+  // Update activity timestamp
+  lastActivity.set(peerId, Date.now());
+
+  // If messages are queued, return them immediately
+  const queue = messageQueues.get(peerId) || [];
+  if (queue.length > 0) {
+    messageQueues.set(peerId, []);
+    return res.json({ messages: queue });
+  }
+
+  // Otherwise, hold connection (long poll)
+  if (!pendingPolls.has(peerId)) {
+    pendingPolls.set(peerId, []);
+  }
+  pendingPolls.get(peerId).push(res);
+
+  // Timeout after 15 seconds
+  setTimeout(() => {
+    const polls = pendingPolls.get(peerId) || [];
+    const index = polls.indexOf(res);
+    if (index !== -1) {
+      polls.splice(index, 1);
+      if (polls.length === 0) {
+        pendingPolls.delete(peerId);
+      }
+      if (!res.destroyed && !res.headersSent) {
+        res.json({ messages: [] });
+      }
+    }
+  }, 15000);
+});
+
 
 
 

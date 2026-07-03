@@ -6,6 +6,9 @@ import { ButtonComponent } from '../../shared/components/button/button.component
 import { LogoComponent } from '../../shared/components/logo/logo.component';
 
 import { Category, Question } from '../../core/services/quiz.service';
+import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
+import { AudioSettingsComponent } from '../../shared/components/audio-settings/audio-settings.component';
+import { AudioService } from '../../core/services/audio.service';
 
 interface TeamScoreInfo {
   id: number;
@@ -14,15 +17,18 @@ interface TeamScoreInfo {
   players: Player[];
 }
 
+import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
+
 @Component({
   selector: 'app-game-page',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, LogoComponent],
+  imports: [CommonModule, ButtonComponent, LogoComponent, AvatarComponent, AudioSettingsComponent, PixelatedImageComponent],
   templateUrl: './game-page.component.html',
   styleUrl: './game-page.component.css'
 })
 export class GamePageComponent implements OnInit {
   p2pService = inject(P2pService);
+  audioService = inject(AudioService);
   private router = inject(Router);
 
   constructor() {
@@ -47,7 +53,7 @@ export class GamePageComponent implements OnInit {
 
   // Leaderboard sorted by score descending
   sortedPlayers = computed(() => {
-    return [...this.p2pService.players()].sort((a, b) => b.score - a.score);
+    return this.p2pService.players().filter(p => !p.isHost).sort((a, b) => b.score - a.score);
   });
 
   // Team-grouped leaderboard sorted by score descending
@@ -110,6 +116,13 @@ export class GamePageComponent implements OnInit {
     return player ? player.color : '#f1b814';
   }
 
+  getBuzzedPlayerAvatar(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.buzzedPlayerId) return '';
+    const player = this.p2pService.players().find(p => p.id === state.buzzedPlayerId);
+    return player ? (player.avatar || '') : '';
+  }
+
   isBuzzerDisabled(): boolean {
     const state = this.p2pService.gameState();
     const me = this.p2pService.me();
@@ -145,6 +158,9 @@ export class GamePageComponent implements OnInit {
     }
 
     if (state.buzzerLocked) {
+      if (state.buzzedPlayerId === null) {
+        return 'Buzzer für diese Frage noch gesperrt...';
+      }
       return 'Jemand anderes war schneller!';
     }
 
@@ -157,6 +173,193 @@ export class GamePageComponent implements OnInit {
     if (state === 'disconnected' || state === 'error') {
       this.p2pService.disconnect();
       this.router.navigate(['/']);
+    }
+  }
+
+  getTeamColor(teamId: number): string {
+    switch (teamId) {
+      case 1: return '#3b82f6'; // blue-500
+      case 2: return '#ef4444'; // red-500
+      case 3: return '#22c55e'; // green-500
+      case 4: return '#a855f7'; // purple-500
+      case 5: return '#ec4899'; // pink-500
+      default: return '#eab308'; // yellow-500
+    }
+  }
+
+  canISelectOrVote(): boolean {
+    const state = this.p2pService.gameState();
+    const me = this.p2pService.me();
+    if (!state || !state.activeSelectorId || !me) return false;
+    if (me.isHost) return false; // Host moderates, doesn't vote
+
+    if (this.p2pService.teamMode()) {
+      return me.teamId !== undefined && state.activeSelectorId === `team-${me.teamId}`;
+    } else {
+      return state.activeSelectorId === me.id;
+    }
+  }
+
+  canIConfirmSelection(): boolean {
+    const state = this.p2pService.gameState();
+    if (!state || !state.votes) return false;
+
+    // Check if there are any votes cast
+    const votedKeys = Object.keys(state.votes).filter(k => state.votes[k] && state.votes[k].length > 0);
+    if (votedKeys.length === 0) return false;
+
+    // Only Host is allowed to confirm/open the question
+    return this.p2pService.isHost();
+  }
+
+  getQuestionVoters(categoryIndex: number, questionIndex: number): Player[] {
+    const state = this.p2pService.gameState();
+    if (!state || !state.votes) return [];
+    const key = `${categoryIndex}-${questionIndex}`;
+    const voterIds = state.votes[key];
+    if (!voterIds || voterIds.length === 0) return [];
+    return this.p2pService.players().filter(p => voterIds.includes(p.id));
+  }
+
+  doesQuestionHaveMyVote(categoryIndex: number, questionIndex: number): boolean {
+    const state = this.p2pService.gameState();
+    const me = this.p2pService.me();
+    if (!state || !state.votes || !me) return false;
+    const key = `${categoryIndex}-${questionIndex}`;
+    const voterIds = state.votes[key];
+    return voterIds ? voterIds.includes(me.id) : false;
+  }
+
+  getCardBorderColor(categoryIndex: number, questionIndex: number): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.votes) return '';
+    const key = `${categoryIndex}-${questionIndex}`;
+    const voterIds = state.votes[key];
+    if (!voterIds || voterIds.length === 0) return '';
+
+    if (!this.p2pService.teamMode()) {
+      const player = this.p2pService.players().find(p => p.id === voterIds[0]);
+      return player ? player.color : '';
+    } else {
+      const activeTeamStr = state.activeSelectorId;
+      if (activeTeamStr) {
+        const teamId = parseInt(activeTeamStr.replace('team-', ''), 10);
+        return this.getTeamColor(teamId);
+      }
+      return '';
+    }
+  }
+
+  getActiveSelectorColor(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.activeSelectorId) return '#f1b814';
+    if (this.p2pService.teamMode()) {
+      const teamId = parseInt(state.activeSelectorId.replace('team-', ''), 10);
+      return this.getTeamColor(teamId);
+    } else {
+      const player = this.p2pService.players().find(p => p.id === state.activeSelectorId);
+      return player ? player.color : '#f1b814';
+    }
+  }
+
+  getActiveSelectorAvatar(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.activeSelectorId || this.p2pService.teamMode()) return '';
+    const player = this.p2pService.players().find(p => p.id === state.activeSelectorId);
+    return player ? (player.avatar || '') : '';
+  }
+
+  getActiveSelectorInitials(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.activeSelectorId) return '?';
+    if (this.p2pService.teamMode()) {
+      return 'T' + state.activeSelectorId.replace('team-', '');
+    } else {
+      const player = this.p2pService.players().find(p => p.id === state.activeSelectorId);
+      return player ? player.name.slice(0, 2).toUpperCase() : 'H';
+    }
+  }
+
+  getActiveSelectorName(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.activeSelectorId) return 'Niemand';
+    if (this.p2pService.teamMode()) {
+      const teamIdStr = state.activeSelectorId.replace('team-', '');
+      return `Team ${teamIdStr}`;
+    } else {
+      const player = this.p2pService.players().find(p => p.id === state.activeSelectorId);
+      return player ? player.name : 'Host';
+    }
+  }
+
+  getSelectionStatusText(): string {
+    const state = this.p2pService.gameState();
+    if (!state || !state.votes) return 'Warte auf Auswahl...';
+
+    const votedKeys = Object.keys(state.votes).filter(k => state.votes[k] && state.votes[k].length > 0);
+    if (votedKeys.length === 0) {
+      if (this.canISelectOrVote()) {
+        return 'Wähle eine Frage auf dem Feld aus, um abzustimmen.';
+      }
+      return `${this.getActiveSelectorName()} wählt eine Frage...`;
+    }
+
+    if (!this.p2pService.teamMode()) {
+      const key = votedKeys[0];
+      const parts = key.split('-');
+      const catIdx = parseInt(parts[0], 10);
+      const rowIdx = parseInt(parts[1], 10);
+      const cat = this.categories[catIdx];
+      const q = cat?.questions[rowIdx];
+      if (!cat || !q) return 'Frage wird ausgewählt...';
+      return `Ausgewählt: ${cat.name} für ${q.value} $`;
+    }
+
+    let bestKey = '';
+    let maxVotes = 0;
+    votedKeys.forEach(k => {
+      const count = state.votes[k].length;
+      if (count > maxVotes) {
+        maxVotes = count;
+        bestKey = k;
+      }
+    });
+
+    if (!bestKey) return 'Warte auf Stimmen...';
+
+    const parts = bestKey.split('-');
+    const catIdx = parseInt(parts[0], 10);
+    const rowIdx = parseInt(parts[1], 10);
+    const cat = this.categories[catIdx];
+    const q = cat?.questions[rowIdx];
+    if (!cat || !q) return 'Stimmen werden gezählt...';
+
+    const activeTeamStr = state.activeSelectorId;
+    if (!activeTeamStr) return 'Stimmen werden gezählt...';
+    const activeTeamId = parseInt(activeTeamStr.replace('team-', ''), 10);
+
+    const totalTeamPlayers = this.p2pService.players().filter(p => {
+      return !p.isHost && !p.isOffline && p.teamId === activeTeamId;
+    }).length;
+
+    return `Favorit: ${cat.name} (${q.value} $) mit ${maxVotes} von ${totalTeamPlayers} Stimmen.`;
+  }
+
+  getBoardInstructionText(): string {
+    if (this.canISelectOrVote()) {
+      return 'Du bist an der Reihe! Wähle eine Frage auf dem Spielfeld aus.';
+    }
+    if (this.p2pService.isHost()) {
+      return `Warte auf Auswahl durch ${this.getActiveSelectorName()} oder wähle eine Frage direkt aus.`;
+    }
+    return `${this.getActiveSelectorName()} wählt als Nächstes eine Frage aus.`;
+  }
+
+  onCardClick(categoryIndex: number, questionIndex: number) {
+    if (this.p2pService.isHost()) {
+      this.onSelectQuestion(categoryIndex, questionIndex);
+    } else if (this.canISelectOrVote()) {
+      this.p2pService.voteQuestion(categoryIndex, questionIndex);
     }
   }
 
@@ -186,6 +389,45 @@ export class GamePageComponent implements OnInit {
     this.p2pService.skipQuestion();
   }
 
+  onConfirmSelectedQuestion() {
+    if (!this.p2pService.isHost()) return;
+    const state = this.p2pService.gameState();
+    if (!state || !state.votes) return;
+
+    const votedKeys = Object.keys(state.votes).filter(k => state.votes[k] && state.votes[k].length > 0);
+    if (votedKeys.length === 0) return;
+
+    // Find the question key with the most votes
+    let bestKey = votedKeys[0];
+    let maxVotes = 0;
+    votedKeys.forEach(k => {
+      const count = state.votes[k].length;
+      if (count > maxVotes) {
+        maxVotes = count;
+        bestKey = k;
+      }
+    });
+
+    const parts = bestKey.split('-');
+    const catIdx = parseInt(parts[0], 10);
+    const rowIdx = parseInt(parts[1], 10);
+
+    const question = this.categories[catIdx].questions[rowIdx];
+    this.p2pService.selectQuestion(catIdx, rowIdx, question.value, question.text, question.answer);
+  }
+
+  onBackToBoard() {
+    this.p2pService.backToBoard();
+  }
+
+  onUnlockBuzzer() {
+    this.p2pService.unlockBuzzer();
+  }
+
+  onToggleAudio() {
+    this.p2pService.toggleQuestionAudio();
+  }
+
   onEndGame() {
     this.p2pService.endGame();
   }
@@ -193,5 +435,22 @@ export class GamePageComponent implements OnInit {
   onLeaveLobby() {
     this.p2pService.disconnect();
     this.router.navigate(['/']);
+  }
+
+  isBoardComplete(): boolean {
+    const state = this.p2pService.gameState();
+    if (!state || !state.categories) return false;
+    const totalQuestions = state.categories.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0);
+    return state.answeredQuestions.length === totalQuestions;
+  }
+
+  hasNextBoard(): boolean {
+    const state = this.p2pService.gameState();
+    if (!state || !state.boards || state.currentBoardIndex === undefined) return false;
+    return this.isBoardComplete() && (state.currentBoardIndex + 1 < state.boards.length);
+  }
+
+  onNextBoard() {
+    this.p2pService.nextBoard();
   }
 }
