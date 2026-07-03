@@ -132,6 +132,7 @@ export class P2pService {
   private peer: Peer | null = null;
   private hostConnectionMap = new Map<string, any>(); // Host only: playerId -> DataConnection or HttpRelayConnection
   private clientConnection: any = null; // Client only: connection to host
+  private hostFullBoards: Category[][] = []; // Host only: complete local copy of quiz templates/boards
   private maxPlayersLimit = 8;
   
   private iceServers: any[] = [
@@ -242,6 +243,21 @@ export class P2pService {
         console.warn('Could not fetch custom ICE servers from backend, using default STUN', err);
       }
     });
+  }
+
+  private stripCategories(categories: Category[]): Category[] {
+    return categories.map(cat => ({
+      name: cat.name,
+      questions: (cat.questions || []).map(q => ({
+        value: q.value,
+        text: '',
+        answer: '',
+      }))
+    }));
+  }
+
+  private stripBoards(boards: Category[][]): Category[][] {
+    return boards.map(board => this.stripCategories(board));
   }
 
   // Debounce timer for broadcastPlayerList during rapid joins
@@ -588,6 +604,17 @@ export class P2pService {
   private restoreHostRoom(session: any): Promise<boolean> {
     return new Promise((resolve) => {
       this.cleanupForReconnection(); // Clear any existing instance state first
+      
+      // Restore hostFullBoards
+      const fullBoardsStr = sessionStorage.getItem('jeopardy_host_full_boards');
+      if (fullBoardsStr) {
+        try {
+          this.hostFullBoards = JSON.parse(fullBoardsStr);
+        } catch (e) {
+          console.warn('Failed to parse hostFullBoards from sessionStorage', e);
+        }
+      }
+
       this.maxPlayersLimit = session.maxPlayers;
       this.teamMode.set(session.teamMode);
       this.maxTeamsLimit.set(session.maxTeamsLimit);
@@ -951,6 +978,8 @@ export class P2pService {
     this.maxTeamsLimit.set(4);
     this.maxPlayersPerTeam.set(2);
     this.chatMessages.set([]);
+    this.hostFullBoards = [];
+    sessionStorage.removeItem('jeopardy_host_full_boards');
   }
 
   cleanupForReconnection() {
@@ -1698,6 +1727,10 @@ export class P2pService {
   startGame(boards: Category[][]) {
     if (!this.isHost()) return;
     
+    // Save host full boards
+    this.hostFullBoards = boards;
+    sessionStorage.setItem('jeopardy_host_full_boards', JSON.stringify(boards));
+
     // Reset all player scores to 0
     const resetPlayers = this.players().map(p => ({ ...p, score: 0 }));
     this.players.set(resetPlayers);
@@ -1705,6 +1738,10 @@ export class P2pService {
 
     const current = this.gameState();
     const categories = boards[0] || [];
+
+    // Strip categories and boards to keep the network payload tiny
+    const strippedCategories = this.stripCategories(categories);
+    const strippedBoards = this.stripBoards(boards);
 
     const tempStateForSelector: GameState = {
       phase: 'BOARD',
@@ -1714,7 +1751,7 @@ export class P2pService {
       answeredQuestions: [],
       lockedOutPlayerIds: [],
       lockedOutTeamIds: [],
-      categories,
+      categories: strippedCategories,
       activeSelectorId: null,
       votes: {},
       showAnswer: false,
@@ -1723,30 +1760,14 @@ export class P2pService {
       deductPointsOnTimeout: current.deductPointsOnTimeout,
       timerSeconds: null,
       isInitialTurn: false,
-      boards,
+      boards: strippedBoards,
       currentBoardIndex: 0
     };
     const firstSelector = this.getNextSelectorId(tempStateForSelector);
 
     const initialState: GameState = {
-      phase: 'BOARD',
-      activeQuestion: null,
-      buzzedPlayerId: null,
-      buzzerLocked: false,
-      answeredQuestions: [],
-      lockedOutPlayerIds: [],
-      lockedOutTeamIds: [],
-      categories,
-      activeSelectorId: firstSelector,
-      votes: {},
-      showAnswer: false,
-      lastAnswerResult: null,
-      buzzerTimeout: current.buzzerTimeout,
-      deductPointsOnTimeout: current.deductPointsOnTimeout,
-      timerSeconds: null,
-      isInitialTurn: false,
-      boards,
-      currentBoardIndex: 0
+      ...tempStateForSelector,
+      activeSelectorId: firstSelector
     };
     this.gameState.set(initialState);
     
@@ -1808,7 +1829,7 @@ export class P2pService {
     });
   }
 
-  selectQuestion(categoryIndex: number, questionIndex: number, value: number, text: string, answer: string) {
+  selectQuestion(categoryIndex: number, questionIndex: number) {
     if (!this.isHost()) return;
     const current = this.gameState();
 
@@ -1825,17 +1846,29 @@ export class P2pService {
       initialBuzzedPlayerId = current.activeSelectorId;
     }
 
-    const question = current.categories[categoryIndex]?.questions[questionIndex];
-    const image = question?.image || undefined;
-    const pixelate = question?.pixelate || false;
-    const pixelateStrength = question?.pixelateStrength || 80;
-    const reducePixelationOnWrong = question?.reducePixelationOnWrong || false;
-    const reducePixelationAmount = question?.reducePixelationAmount || 5;
-    const audio = question?.audio || undefined;
-    const audioStart = question?.audioStart;
-    const audioEnd = question?.audioEnd;
-    const audioSpeed = question?.audioSpeed;
-    const audioPitch = question?.audioPitch;
+    // Lookup full question from our local complete copy
+    const currentBoardIndex = current.currentBoardIndex || 0;
+    const fullCategory = this.hostFullBoards[currentBoardIndex]?.[categoryIndex];
+    const question = fullCategory?.questions?.[questionIndex];
+    
+    if (!question) {
+      console.error('Question not found in hostFullBoards:', { currentBoardIndex, categoryIndex, questionIndex });
+      return;
+    }
+
+    const value = question.value;
+    const text = question.text;
+    const answer = question.answer;
+    const image = question.image || undefined;
+    const pixelate = question.pixelate || false;
+    const pixelateStrength = question.pixelateStrength || 80;
+    const reducePixelationOnWrong = question.reducePixelationOnWrong || false;
+    const reducePixelationAmount = question.reducePixelationAmount || 5;
+    const audio = question.audio || undefined;
+    const audioStart = question.audioStart;
+    const audioEnd = question.audioEnd;
+    const audioSpeed = question.audioSpeed;
+    const audioPitch = question.audioPitch;
 
     const nextState: GameState = {
       ...current,

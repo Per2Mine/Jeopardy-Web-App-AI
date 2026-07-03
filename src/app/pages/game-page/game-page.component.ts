@@ -369,14 +369,7 @@ export class GamePageComponent implements OnInit {
     // Check if already answered
     if (this.isQuestionAnswered(categoryIndex, questionIndex)) return;
 
-    const question = this.categories[categoryIndex].questions[questionIndex];
-    this.p2pService.selectQuestion(
-      categoryIndex,
-      questionIndex,
-      question.value,
-      question.text,
-      question.answer
-    );
+    this.p2pService.selectQuestion(categoryIndex, questionIndex);
   }
 
   onAwardPoints(correct: boolean) {
@@ -412,8 +405,7 @@ export class GamePageComponent implements OnInit {
     const catIdx = parseInt(parts[0], 10);
     const rowIdx = parseInt(parts[1], 10);
 
-    const question = this.categories[catIdx].questions[rowIdx];
-    this.p2pService.selectQuestion(catIdx, rowIdx, question.value, question.text, question.answer);
+    this.p2pService.selectQuestion(catIdx, rowIdx);
   }
 
   onBackToBoard() {
