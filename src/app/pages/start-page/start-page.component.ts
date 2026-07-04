@@ -153,6 +153,15 @@ export class StartPageComponent {
   autoStartTimer = signal(true);
   incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
 
+  // Community Pool state
+  isCommunityPoolOpen = signal(false);
+  communityQuizzes = signal<any[]>([]);
+  communityPage = signal(1);
+  communityTotalPages = signal(1);
+  communitySearch = signal('');
+  communityLoading = signal(false);
+  communityFavoritesOnly = signal(false);
+
   canStartGame = computed(() => {
     if (this.selectedTemplates().length === 0) {
       return false;
@@ -659,6 +668,119 @@ export class StartPageComponent {
 
   onCreateQuizClick() {
     this.router.navigate(['/create-quiz']);
+  }
+
+  openCommunityPool() {
+    this.isCommunityPoolOpen.set(true);
+    this.communityPage.set(1);
+    this.communitySearch.set('');
+    this.communityFavoritesOnly.set(false);
+    this.loadCommunityQuizzes();
+  }
+
+  closeCommunityPool() {
+    this.isCommunityPoolOpen.set(false);
+  }
+
+  loadCommunityQuizzes() {
+    this.communityLoading.set(true);
+    this.quizService.getCommunityQuizzes(this.communityPage(), 6, this.communitySearch(), this.communityFavoritesOnly()).subscribe({
+      next: (res) => {
+        this.communityQuizzes.set(res.quizzes);
+        this.communityTotalPages.set(res.totalPages || 1);
+        this.communityLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load community quizzes:', err);
+        this.communityLoading.set(false);
+      }
+    });
+  }
+
+  toggleFavorite(quiz: any) {
+    if (!this.authService.currentUser()) return;
+    
+    const newFavStatus = !quiz.isFavorited;
+    this.quizService.toggleFavorite(quiz.id, newFavStatus).subscribe({
+      next: () => {
+        this.communityQuizzes.update(list => 
+          list.map(q => q.id === quiz.id ? { ...q, isFavorited: newFavStatus } : q)
+        );
+        if (this.communityFavoritesOnly() && !newFavStatus) {
+          this.loadCommunityQuizzes();
+        }
+      },
+      error: (err) => {
+        console.error('Failed to toggle favorite:', err);
+        alert('Fehler beim Aktualisieren des Favoritenstatus.');
+      }
+    });
+  }
+
+  toggleFavoritesFilter() {
+    this.communityFavoritesOnly.set(!this.communityFavoritesOnly());
+    this.communityPage.set(1);
+    this.loadCommunityQuizzes();
+  }
+
+  private searchTimeout: any;
+
+  onSearchInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.communitySearch.set(input.value);
+    this.communityPage.set(1);
+
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
+
+    this.searchTimeout = setTimeout(() => {
+      this.loadCommunityQuizzes();
+    }, 300);
+  }
+
+  onCommunityPageChange(page: number) {
+    if (page < 1 || page > this.communityTotalPages()) return;
+    this.communityPage.set(page);
+    this.loadCommunityQuizzes();
+  }
+
+  onSelectCommunityQuiz(id: string) {
+    this.communityLoading.set(true);
+    this.quizService.loadFullCommunityQuiz(id).subscribe({
+      next: (quiz) => {
+        this.communityLoading.set(false);
+        this.closeCommunityPool();
+        // Select it
+        const current = this.selectedTemplates();
+        if (!current.includes(quiz.id)) {
+          this.selectedTemplates.set([...current, quiz.id]);
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load full community quiz:', err);
+        this.communityLoading.set(false);
+        alert('Fehler beim Laden des Quizzes aus dem Community-Pool.');
+      }
+    });
+  }
+
+  toggleMyQuizPublic(tmpl: any, event: Event) {
+    event.stopPropagation(); // Prevent selection when clicking the toggle badge
+    const newStatus = !tmpl.isPublic;
+    if (newStatus && !this.quizService.isQuizComplete(tmpl)) {
+      alert('Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.');
+      return;
+    }
+    this.quizService.toggleQuizPublic(tmpl.id, newStatus).subscribe({
+      next: () => {
+        // Success: the quiz list will be automatically reloaded by the service
+      },
+      error: (err) => {
+        console.error('Failed to toggle quiz visibility:', err);
+        alert(err.error?.error || 'Fehler beim Ändern der Sichtbarkeit.');
+      }
+    });
   }
 
   cycleBase(direction: number) {

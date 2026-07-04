@@ -33,6 +33,9 @@ export interface QuizTemplate {
   icon: string;
   userEmail?: string; // Owned by user if set
   isComplete?: boolean; // Whether all fields are filled
+  isPublic?: boolean; // Public visibility
+  isFavorited?: boolean; // Favorited by user
+  creatorName?: string; // Creator username reference
   categories: Category[];
 }
 
@@ -47,6 +50,7 @@ export class QuizService {
 
   // Custom quizzes fetched from backend
   customQuizzes = signal<QuizTemplate[]>([]);
+  temporaryCommunityQuizzes = signal<QuizTemplate[]>([]);
 
   // Default system templates
   private defaultTemplates: QuizTemplate[] = [
@@ -275,10 +279,10 @@ export class QuizService {
    * Get all templates available to a user (defaults + their custom ones)
    */
   getTemplates(userEmail?: string): QuizTemplate[] {
-    if (!userEmail) {
-      return this.defaultTemplates;
-    }
-    return [...this.defaultTemplates, ...this.customQuizzes()];
+    const base = userEmail 
+      ? [...this.defaultTemplates, ...this.customQuizzes()]
+      : this.defaultTemplates;
+    return [...base, ...this.temporaryCommunityQuizzes()];
   }
 
   /**
@@ -292,7 +296,7 @@ export class QuizService {
   /**
    * Save a new custom quiz via Express API. Returns Observable.
    */
-  saveQuiz(name: string, categories: Category[], userEmail: string, id?: string): Observable<any> {
+  saveQuiz(name: string, categories: Category[], userEmail: string, id?: string, isPublic: boolean = false): Observable<any> {
     if (!name.trim()) {
       throw new Error('Bitte gib der Quiz-Vorlage einen Namen.');
     }
@@ -330,7 +334,7 @@ export class QuizService {
       });
     });
 
-    const body = { name: name.trim(), categories };
+    const body = { name: name.trim(), categories, isPublic };
     const request$ = id 
       ? this.http.put<any>(`/api/quizzes/${id}`, body)
       : this.http.post<any>('/api/quizzes', body);
@@ -340,6 +344,53 @@ export class QuizService {
         this.loadQuizzes();
       })
     );
+  }
+
+  getCommunityQuizzes(page: number, limit: number, search: string = '', favoritesOnly: boolean = false): Observable<{ quizzes: any[], total: number, page: number, limit: number, totalPages: number }> {
+    const params = {
+      page: page.toString(),
+      limit: limit.toString(),
+      search,
+      favoritesOnly: favoritesOnly.toString()
+    };
+    return this.http.get<any>('/api/community-quizzes', { params });
+  }
+
+  /**
+   * Fetch the full details of a community quiz and save it temporarily
+   */
+  loadFullCommunityQuiz(id: string): Observable<QuizTemplate> {
+    return this.http.get<QuizTemplate>(`/api/community-quizzes/${id}`).pipe(
+      tap((quiz) => {
+        this.temporaryCommunityQuizzes.update((quizzes) => {
+          if (quizzes.some((q) => q.id === quiz.id)) {
+            return quizzes.map((q) => q.id === quiz.id ? quiz : q);
+          }
+          return [...quizzes, quiz];
+        });
+      })
+    );
+  }
+
+  /**
+   * Toggle public visibility of a quiz
+   */
+  toggleQuizPublic(id: string, isPublic: boolean): Observable<any> {
+    return this.http.patch<any>(`/api/quizzes/${id}/public`, { isPublic }).pipe(
+      tap(() => {
+        this.loadQuizzes();
+      })
+    );
+  }
+
+  /**
+   * Toggle favorite status of a quiz for the current user
+   */
+  toggleFavorite(id: string, isFavorite: boolean): Observable<any> {
+    const request$ = isFavorite 
+      ? this.http.post<any>(`/api/quizzes/${id}/favorite`, {})
+      : this.http.delete<any>(`/api/quizzes/${id}/favorite`);
+    return request$;
   }
 
   /**

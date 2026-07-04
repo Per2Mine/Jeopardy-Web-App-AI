@@ -40,7 +40,7 @@ const quizLimiter = rateLimit.rateLimit({
 // Middlewares
 app.use(cors({
   origin: '*', // Allow all origins for dev simplicity, or specify localhost:4200
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '50mb' })); // Support larger custom quiz payloads
@@ -170,6 +170,24 @@ function authenticateToken(req, res, next) {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Sitzung abgelaufen oder ungültiges Token. Bitte melde dich erneut an.' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// Optional Authentication Middleware (does not block if unauthorized)
+function optionalAuthenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return next();
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return next();
     }
     req.user = user;
     next();
@@ -421,7 +439,8 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
       icon: '📝',
       userEmail: row.user_email,
       categories: JSON.parse(row.categories),
-      isComplete: row.is_complete === 1
+      isComplete: row.is_complete === 1,
+      isPublic: row.is_public === 1
     }));
     res.json(quizzes);
   } catch (err) {
@@ -536,7 +555,7 @@ function isQuizComplete(categories) {
 
 // 6. Save Custom Quiz (Create)
 app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
-  const { name, categories } = req.body;
+  const { name, categories, isPublic } = req.body;
 
   const validationError = validateQuizPayloadDraft(name, categories);
   if (validationError) {
@@ -545,13 +564,23 @@ app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
 
   const id = 'custom_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
   const complete = isQuizComplete(categories) ? 1 : 0;
+  const isPublicVal = isPublic ? 1 : 0;
 
   try {
+    const existingQuiz = await db.get('SELECT * FROM quizzes WHERE name = ? AND user_email = ?', [name.trim(), req.user.email]);
+    if (existingQuiz) {
+      return res.status(400).json({ error: `Du hast bereits ein Quiz mit dem Namen „${name.trim()}“.` });
+    }
+
+    if (isPublicVal === 1 && complete === 0) {
+      return res.status(400).json({ error: 'Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.' });
+    }
+
     await db.run(
-      'INSERT INTO quizzes (id, name, user_email, categories, is_complete) VALUES (?, ?, ?, ?, ?)',
-      [id, name.trim(), req.user.email, JSON.stringify(categories), complete]
+      'INSERT INTO quizzes (id, name, user_email, categories, is_complete, is_public) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, name.trim(), req.user.email, JSON.stringify(categories), complete, isPublicVal]
     );
-    res.status(201).json({ success: true, id, isComplete: complete === 1 });
+    res.status(201).json({ success: true, id, isComplete: complete === 1, isPublic: isPublicVal === 1 });
   } catch (err) {
     console.error('Create Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Erstellen des Quizzes.' });
@@ -561,7 +590,7 @@ app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
 // 7. Update Custom Quiz
 app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { name, categories } = req.body;
+  const { name, categories, isPublic } = req.body;
 
   const validationError = validateQuizPayloadDraft(name, categories);
   if (validationError) {
@@ -569,6 +598,7 @@ app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => 
   }
 
   const complete = isQuizComplete(categories) ? 1 : 0;
+  const isPublicVal = isPublic ? 1 : 0;
 
   try {
     const quiz = await db.get('SELECT * FROM quizzes WHERE id = ?', [id]);
@@ -579,11 +609,20 @@ app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => 
       return res.status(403).json({ error: 'Keine Berechtigung, dieses Quiz zu bearbeiten.' });
     }
 
+    const existingQuiz = await db.get('SELECT * FROM quizzes WHERE name = ? AND user_email = ? AND id != ?', [name.trim(), req.user.email, id]);
+    if (existingQuiz) {
+      return res.status(400).json({ error: `Du hast bereits ein Quiz mit dem Namen „${name.trim()}“.` });
+    }
+
+    if (isPublicVal === 1 && complete === 0) {
+      return res.status(400).json({ error: 'Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.' });
+    }
+
     await db.run(
-      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [name.trim(), JSON.stringify(categories), complete, id]
+      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ?, is_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [name.trim(), JSON.stringify(categories), complete, isPublicVal, id]
     );
-    res.json({ success: true, isComplete: complete === 1 });
+    res.json({ success: true, isComplete: complete === 1, isPublic: isPublicVal === 1 });
   } catch (err) {
     console.error('Update Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Aktualisieren des Quizzes.' });
@@ -608,6 +647,208 @@ app.delete('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) 
   } catch (err) {
     console.error('Delete Quiz Error:', err);
     res.status(500).json({ error: 'Fehler beim Löschen des Quizzes.' });
+  }
+});
+
+// 8b. Toggle Custom Quiz Public Status
+app.patch('/api/quizzes/:id/public', quizLimiter, authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { isPublic } = req.body;
+
+  if (isPublic === undefined) {
+    return res.status(400).json({ error: 'Fehlender Parameter isPublic.' });
+  }
+
+  const isPublicVal = isPublic ? 1 : 0;
+
+  try {
+    const quiz = await db.get('SELECT * FROM quizzes WHERE id = ?', [id]);
+    if (!quiz) {
+      return res.status(404).json({ error: 'Quiz nicht gefunden.' });
+    }
+    if (quiz.user_email !== req.user.email) {
+      return res.status(403).json({ error: 'Keine Berechtigung, dieses Quiz zu ändern.' });
+    }
+
+    if (isPublicVal === 1 && quiz.is_complete !== 1) {
+      return res.status(400).json({ error: 'Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.' });
+    }
+
+    await db.run('UPDATE quizzes SET is_public = ? WHERE id = ?', [isPublicVal, id]);
+    res.json({ success: true, isPublic: isPublicVal === 1 });
+  } catch (err) {
+    console.error('Toggle Public Status Error:', err);
+    res.status(500).json({ error: 'Fehler beim Ändern der Sichtbarkeit.' });
+  }
+});
+
+// 8c. Get Community Quizzes (Public, paginated, lightweight)
+app.get('/api/community-quizzes', optionalAuthenticateToken, async (req, res) => {
+  try {
+    let page = parseInt(req.query.page, 10) || 1;
+    let limit = parseInt(req.query.limit, 10) || 6;
+    const search = req.query.search ? req.query.search.trim() : '';
+    const favoritesOnly = req.query.favoritesOnly === 'true';
+
+    if (page < 1) page = 1;
+    if (limit < 1 || limit > 50) limit = 6;
+
+    const offset = (page - 1) * limit;
+
+    if (favoritesOnly && !req.user) {
+      return res.status(401).json({ error: 'Anmeldung erforderlich, um Favoriten zu filtern.' });
+    }
+
+    const params = [];
+    let whereClauses = 'q.is_public = 1 AND q.is_complete = 1';
+
+    if (favoritesOnly) {
+      whereClauses += ' AND f.user_email = ?';
+      params.push(req.user.email);
+    }
+
+    if (search) {
+      whereClauses += ' AND q.name LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    let countSql = '';
+    let selectSql = '';
+
+    if (favoritesOnly) {
+      countSql = `SELECT COUNT(*) as count FROM quizzes q JOIN users u ON q.user_email = u.email JOIN user_favorites f ON q.id = f.quiz_id WHERE ${whereClauses}`;
+      selectSql = `SELECT q.id, q.name, q.categories, q.created_at, u.username as creator_name, 1 as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email JOIN user_favorites f ON q.id = f.quiz_id WHERE ${whereClauses}`;
+    } else if (req.user) {
+      countSql = `SELECT COUNT(*) as count FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
+      selectSql = `SELECT q.id, q.name, q.categories, q.created_at, u.username as creator_name, (CASE WHEN f.quiz_id IS NOT NULL THEN 1 ELSE 0 END) as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email LEFT JOIN user_favorites f ON q.id = f.quiz_id AND f.user_email = ? WHERE ${whereClauses}`;
+    } else {
+      countSql = `SELECT COUNT(*) as count FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
+      selectSql = `SELECT q.id, q.name, q.categories, q.created_at, u.username as creator_name, 0 as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
+    }
+
+    selectSql += ' ORDER BY q.created_at DESC LIMIT ? OFFSET ?';
+
+    const totalRow = await db.get(countSql, params);
+    const total = totalRow ? totalRow.count : 0;
+
+    const selectParams = [];
+    if (!favoritesOnly && req.user) {
+      selectParams.push(req.user.email);
+    }
+    selectParams.push(...params);
+    selectParams.push(limit, offset);
+
+    const rows = await db.all(selectSql, selectParams);
+
+    const quizzes = rows.map(row => {
+      let categoriesCount = 0;
+      let questionsCount = 0;
+      try {
+        const categories = JSON.parse(row.categories);
+        categoriesCount = categories.length;
+        categories.forEach(c => {
+          if (c.questions) questionsCount += c.questions.length;
+        });
+      } catch (e) {
+        // Ignore parsing errors
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        icon: '🌐',
+        creatorName: row.creator_name,
+        categoriesCount,
+        questionsCount,
+        createdAt: row.created_at,
+        isFavorited: row.is_favorited === 1
+      };
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      quizzes,
+      total,
+      page,
+      limit,
+      totalPages
+    });
+  } catch (err) {
+    console.error('Get Community Quizzes Error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden des Community Pools.' });
+  }
+});
+
+// 8e. Favorite a Quiz
+app.post('/api/quizzes/:id/favorite', quizLimiter, authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const quiz = await db.get('SELECT * FROM quizzes WHERE id = ?', [id]);
+    if (!quiz) {
+      return res.status(404).json({ error: 'Quiz nicht gefunden.' });
+    }
+    if (quiz.is_public !== 1 && quiz.user_email !== req.user.email) {
+      return res.status(403).json({ error: 'Keine Berechtigung, dieses Quiz zu favorisieren.' });
+    }
+
+    await db.run(
+      'INSERT OR IGNORE INTO user_favorites (user_email, quiz_id) VALUES (?, ?)',
+      [req.user.email, id]
+    );
+    res.json({ success: true, isFavorited: true });
+  } catch (err) {
+    console.error('Favorite Quiz Error:', err);
+    res.status(500).json({ error: 'Fehler beim Favorisieren des Quizzes.' });
+  }
+});
+
+// 8f. Unfavorite a Quiz
+app.delete('/api/quizzes/:id/favorite', quizLimiter, authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await db.run(
+      'DELETE FROM user_favorites WHERE user_email = ? AND quiz_id = ?',
+      [req.user.email, id]
+    );
+    res.json({ success: true, isFavorited: false });
+  } catch (err) {
+    console.error('Unfavorite Quiz Error:', err);
+    res.status(500).json({ error: 'Fehler beim Entfernen des Favoriten.' });
+  }
+});
+
+// 8d. Get Full Community Quiz Details (Public)
+app.get('/api/community-quizzes/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const quiz = await db.get(
+      'SELECT q.*, u.username as creator_name FROM quizzes q JOIN users u ON q.user_email = u.email WHERE q.id = ? AND q.is_public = 1 AND q.is_complete = 1',
+      [id]
+    );
+
+    if (!quiz) {
+      return res.status(404).json({ error: 'Quiz nicht gefunden oder nicht öffentlich.' });
+    }
+
+    const response = {
+      id: quiz.id,
+      name: quiz.name,
+      icon: '🌐',
+      userEmail: quiz.user_email,
+      creatorName: quiz.creator_name,
+      categories: JSON.parse(quiz.categories),
+      isComplete: quiz.is_complete === 1,
+      isPublic: quiz.is_public === 1
+    };
+
+    res.json(response);
+  } catch (err) {
+    console.error('Get Full Community Quiz Error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden des Quizzes.' });
   }
 });
 

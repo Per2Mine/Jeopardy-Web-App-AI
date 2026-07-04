@@ -372,14 +372,26 @@
                 <span class="block text-xs font-bold text-white/50 uppercase tracking-widest">
                   3. Quiz-Vorlage auswählen
                 </span>
-                @if (authService.currentUser()) {
+                <div class="flex items-center gap-3">
                   <button 
                     type="button"
-                    (click)="onCreateQuizClick()"
-                    class="text-xs text-jeopardy-accent hover:text-jeopardy-accent-hover font-bold flex items-center gap-1 cursor-pointer transition-all">
-                    <span>+ Quiz erstellen</span>
+                    (click)="openCommunityPool()"
+                    class="text-xs text-jeopardy-accent hover:text-jeopardy-accent-hover font-bold flex items-center gap-1.5 cursor-pointer transition-all">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-.778.099-1.533.284-2.253"></path>
+                    </svg>
+                    <span>Community-Pool</span>
                   </button>
-                }
+                  @if (authService.currentUser()) {
+                    <div class="w-[1px] h-3 bg-white/20"></div>
+                    <button 
+                      type="button"
+                      (click)="onCreateQuizClick()"
+                      class="text-xs text-jeopardy-accent hover:text-jeopardy-accent-hover font-bold flex items-center gap-1 cursor-pointer transition-all">
+                      <span>+ Quiz erstellen</span>
+                    </button>
+                  }
+                </div>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 @for (tmpl of quizTemplates(); track tmpl.id) {
@@ -426,6 +438,15 @@
                         <span class="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 rounded-md">
                           🚧 Entwurf
                         </span>
+                      } @else if (tmpl.userEmail) {
+                        <button
+                          type="button"
+                          (click)="toggleMyQuizPublic(tmpl, $event)"
+                          [class]="'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1.5 transition-all duration-300 ' + 
+                                   (tmpl.isPublic ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20 hover:bg-emerald-500/25' : 'text-zinc-400 bg-zinc-500/15 border-zinc-500/20 hover:bg-zinc-500/25')"
+                          [title]="tmpl.isPublic ? 'Klicke, um dieses Quiz privat zu schalten' : 'Klicke, um dieses Quiz im Community-Pool zu veröffentlichen'">
+                          <span>{{ tmpl.isPublic ? '🌐 Öffentlich' : '🔒 Privat' }}</span>
+                        </button>
                       }
                     </div>
                     <div class="flex flex-col">
@@ -1399,11 +1420,26 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
-          <!-- Version 1.1 -->
+          <!-- Version 1.2 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-jeopardy-accent/10 border border-jeopardy-accent/20 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.1 — Gameplay & Kommunikation 🚀</span>
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.2 — Community-Pool & Favoriten 🌐</span>
               <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Community-Pool:</strong> Veröffentliche deine fertigen Quiz-Vorlagen im globalen Pool. Entdecke, durchsuche und spiele Quizzes von anderen Spielern (auch ohne Anmeldung direkt nutzbar).</li>
+              <li><strong class="text-white">Favoriten-System:</strong> Markiere deine Lieblingsquizzes aus der Community mit einem Klick auf den Stern ⭐ und filtere die Auswahlliste, um sie blitzschnell wiederzufinden.</li>
+              <li><strong class="text-white">Sicherheitsprüfung & Entwurfs-Schutz:</strong> Vorlagen können nur noch veröffentlicht werden, wenn sie komplett ausgefüllt sind. Unvollständige Entwürfe bleiben privat.</li>
+              <li><strong class="text-white">Namens-Eindeutigkeit:</strong> Doppelte Quiz-Namen pro Account sind blockiert, was Ordnung in deine eigene Vorlagensammlung bringt.</li>
+              <li><strong class="text-white">Wackelfreie Suche & Debouncing:</strong> Die Suchfunktion im Community-Pool reagiert mit einer intelligenten Verzögerung (Debounce) und stabiler Höhe, wodurch Flackern und Hüpfen des Fensters eliminiert wurden.</li>
+            </ul>
+          </div>
+
+          <!-- Version 1.1 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-white uppercase tracking-wider">v1.1 — Gameplay & Kommunikation 🚀</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Juli 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Team-Chat im Team-Modus:</strong> Eigener, privater Team-Chat-Tab neben dem globalen Chat. Nachrichten dort sind exklusiv für Teammitglieder sichtbar und farblich in Teamfarben gestaltet. Neue Nachrichten auf inaktiven Tabs werden durch rote Benachrichtigungspunkte signalisiert.</li>
@@ -1544,6 +1580,181 @@
             variant="primary" 
             size="md"
             (click)="patchNotesModalOpen.set(false)">
+            Schließen
+          </app-button>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <!-- 10. COMMUNITY POOL MODAL OVERLAY -->
+  @if (isCommunityPoolOpen()) {
+    <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-6">
+      <!-- Backdrop -->
+      <div 
+        (click)="closeCommunityPool()"
+        class="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity z-40">
+      </div>
+      
+      <!-- Modal Box -->
+      <div class="relative max-w-6xl 2xl:max-w-7xl w-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-jeopardy-blue/20 via-jeopardy-dark/95 to-jeopardy-dark border border-white/15 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-50 animate-scale-in max-h-[90vh]">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center pb-4 border-b border-white/10 shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="p-3 bg-jeopardy-accent/10 text-jeopardy-accent rounded-2xl">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-.778.099-1.533.284-2.253"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-black text-white leading-tight bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
+                🌐 Community-Pool
+              </h3>
+              <p class="text-xs text-white/50 mt-0.5">Entdecke und nutze Quizzes, die von anderen Spielern geteilt wurden</p>
+            </div>
+          </div>
+          <button 
+            (click)="closeCommunityPool()"
+            class="p-2 text-white/40 hover:text-white rounded-xl hover:bg-white/5 transition-all cursor-pointer">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Search Bar & Filters -->
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="relative flex-1">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/40">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </span>
+            <input 
+              type="text"
+              [value]="communitySearch()"
+              (input)="onSearchInput($event)"
+              placeholder="Nach Quiz-Name suchen..."
+              class="w-full bg-black/30 border border-white/10 hover:border-white/20 focus:border-jeopardy-accent text-sm text-white placeholder-white/35 rounded-2xl pl-10 pr-4 py-3 outline-none transition-all duration-300">
+          </div>
+
+          <!-- Favorites Filter Button -->
+          @if (authService.currentUser()) {
+            <button 
+              type="button"
+              (click)="toggleFavoritesFilter()"
+              [class]="'px-4 py-3 border text-xs font-black rounded-2xl transition-all duration-300 cursor-pointer flex items-center gap-1.5 shadow-md shrink-0 ' + 
+                       (communityFavoritesOnly() 
+                         ? 'bg-jeopardy-gold text-neutral-900 border-jeopardy-gold shadow-jeopardy-gold/25' 
+                         : 'bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10')">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+              </svg>
+              <span>Favoriten</span>
+            </button>
+          }
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-y-auto pr-1 min-h-[500px] flex flex-col">
+          @if (communityLoading()) {
+            <div class="flex-1 flex flex-col items-center justify-center gap-3 py-8">
+              <div class="w-10 h-10 border-4 border-jeopardy-accent border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-white/50 uppercase tracking-widest animate-pulse">Lade Community Quizzes...</span>
+            </div>
+          } @else {
+            @if (communityQuizzes().length === 0) {
+              <div class="flex-1 flex flex-col items-center justify-center text-center gap-3 py-8">
+                <span class="text-4xl">🔍</span>
+                <h4 class="text-sm font-black text-white">Keine öffentlichen Quizzes gefunden</h4>
+                <p class="text-xs text-white/50 max-w-xs">Es wurden keine Quizzes mit diesem Namen gefunden oder es wurden noch keine Quizzes geteilt.</p>
+              </div>
+            } @else {
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                @for (quiz of communityQuizzes(); track quiz.id) {
+                  <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-white/20 hover:bg-white/[0.04] transition-all duration-300 flex flex-col justify-between gap-4 group">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <span class="text-3xl shrink-0 p-2 bg-white/5 rounded-xl">{{ quiz.icon }}</span>
+                        <div class="min-w-0 flex-1">
+                          <h4 class="text-base font-black text-white truncate group-hover:text-jeopardy-gold transition-colors">{{ quiz.name }}</h4>
+                          <p class="text-xs text-white/40 mt-0.5 truncate">Erstellt von <span class="text-jeopardy-accent font-bold">{{ quiz.creatorName }}</span></p>
+                        </div>
+                      </div>
+
+                      <!-- Favorite Star Button -->
+                      @if (authService.currentUser()) {
+                        <button
+                          type="button"
+                          (click)="toggleFavorite(quiz)"
+                          [class]="'p-2.5 rounded-xl border transition-all duration-300 cursor-pointer shrink-0 ' + 
+                                   (quiz.isFavorited 
+                                     ? 'bg-jeopardy-gold/15 border-jeopardy-gold/30 text-jeopardy-gold shadow-md shadow-jeopardy-gold/10' 
+                                     : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/20')"
+                          [title]="quiz.isFavorited ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'">
+                          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                          </svg>
+                        </button>
+                      }
+                    </div>
+                    
+                    <div class="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-white/60 bg-white/5 px-2 py-1 rounded-md border border-white/5">
+                          {{ quiz.categoriesCount }} Kat.
+                        </span>
+                        <span class="text-[10px] font-bold text-white/60 bg-white/5 px-2 py-1 rounded-md border border-white/5">
+                          {{ quiz.questionsCount }} Fragen
+                        </span>
+                      </div>
+                      
+                      <button 
+                        (click)="onSelectCommunityQuiz(quiz.id)"
+                        class="px-4 py-2 bg-jeopardy-accent hover:bg-jeopardy-accent-hover text-neutral-900 text-xs font-black rounded-xl cursor-pointer transition-all duration-300 flex items-center gap-1.5 shadow-md shadow-jeopardy-accent/10 hover:shadow-jeopardy-accent/20">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Auswählen
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+
+        <!-- Footer / Pagination -->
+        <div class="flex justify-between items-center pt-4 border-t border-white/10 shrink-0">
+          <div class="flex items-center gap-2">
+            <button 
+              [disabled]="communityPage() === 1 || communityLoading()"
+              (click)="onCommunityPageChange(communityPage() - 1)"
+              class="p-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl cursor-pointer disabled:opacity-30 disabled:pointer-events-none transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+              </svg>
+            </button>
+            <span class="text-xs font-bold text-white/70 px-2">
+              Seite <span class="text-white font-extrabold">{{ communityPage() }}</span> von <span class="text-white font-extrabold">{{ communityTotalPages() }}</span>
+            </span>
+            <button 
+              [disabled]="communityPage() === communityTotalPages() || communityLoading()"
+              (click)="onCommunityPageChange(communityPage() + 1)"
+              class="p-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl cursor-pointer disabled:opacity-30 disabled:pointer-events-none transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <app-button 
+            variant="ghost" 
+            size="md"
+            (click)="closeCommunityPool()">
             Schließen
           </app-button>
         </div>

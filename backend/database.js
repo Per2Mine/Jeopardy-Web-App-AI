@@ -35,9 +35,19 @@ async function getDatabase() {
       user_email TEXT NOT NULL,
       categories TEXT NOT NULL,
       is_complete INTEGER DEFAULT 0,
+      is_public INTEGER DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS user_favorites (
+      user_email TEXT NOT NULL,
+      quiz_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_email, quiz_id),
+      FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE,
+      FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
     );
   `);
 
@@ -68,6 +78,12 @@ async function getDatabase() {
 
   try {
     await db.run('ALTER TABLE quizzes ADD COLUMN updated_at DATETIME');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.run('ALTER TABLE quizzes ADD COLUMN is_public INTEGER DEFAULT 0');
   } catch (e) {
     // Column already exists, ignore
   }

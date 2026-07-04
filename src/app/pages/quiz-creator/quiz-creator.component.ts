@@ -9,12 +9,13 @@ import { QuizService, Category, Question } from '../../core/services/quiz.servic
 import { AudioService } from '../../core/services/audio.service';
 
 import { PixelatedImageComponent } from '../../shared/components/pixelated-image/pixelated-image.component';
+import { ToggleComponent } from '../../shared/components/toggle/toggle.component';
 import { CdkDropList, CdkDrag, CdkDragHandle, CdkDragDrop, CdkDragStart, moveItemInArray } from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-quiz-creator',
   standalone: true,
-  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent, PixelatedImageComponent, CdkDropList, CdkDrag, CdkDragHandle],
+  imports: [CommonModule, ButtonComponent, InputComponent, LogoComponent, PixelatedImageComponent, ToggleComponent, CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './quiz-creator.component.html',
   styleUrl: './quiz-creator.component.css'
 })
@@ -27,6 +28,7 @@ export class QuizCreatorComponent implements OnInit {
 
   editingId = signal<string | null>(null);
   quizName = signal('');
+  isPublic = signal(false);
   errorMessage = signal('');
   rowValues = signal<number[]>([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
 
@@ -39,6 +41,7 @@ export class QuizCreatorComponent implements OnInit {
       if (template && template.userEmail === email) {
         this.editingId.set(id);
         this.quizName.set(template.name);
+        this.isPublic.set(template.isPublic || false);
         
         const count = template.categories[0]?.questions?.length || 5;
         this.numQuestions.set(count);
@@ -480,6 +483,11 @@ export class QuizCreatorComponent implements OnInit {
       return;
     }
 
+    if (this.isPublic() && !this.isQuizCompleteLocal()) {
+      this.errorMessage.set('Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.');
+      return;
+    }
+
     const activeNum = this.numQuestions();
     const finalCategories = this.categories().map(cat => ({
       ...cat,
@@ -518,7 +526,7 @@ export class QuizCreatorComponent implements OnInit {
     }
 
     try {
-      this.quizService.saveQuiz(qName, finalCategories, email, this.editingId() || undefined).subscribe({
+      this.quizService.saveQuiz(qName, finalCategories, email, this.editingId() || undefined, this.isPublic()).subscribe({
         next: () => {
           this.router.navigate(['/']);
         },
@@ -529,6 +537,21 @@ export class QuizCreatorComponent implements OnInit {
     } catch (err: any) {
       this.errorMessage.set(err.message || 'Speichern fehlgeschlagen.');
     }
+  }
+
+  isQuizCompleteLocal(): boolean {
+    const activeNum = this.numQuestions();
+    const cats = this.categories();
+    if (!cats || cats.length === 0) return false;
+    for (const cat of cats) {
+      if (!cat.name?.trim()) return false;
+      if (!cat.questions || cat.questions.length < activeNum) return false;
+      for (let i = 0; i < activeNum; i++) {
+        const q = cat.questions[i];
+        if (!q || !q.text?.trim() || !q.answer?.trim()) return false;
+      }
+    }
+    return true;
   }
 
   onDragHandlePointerDown(event: PointerEvent) {

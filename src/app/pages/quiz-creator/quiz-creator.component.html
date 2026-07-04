@@ -34,7 +34,7 @@
   <div class="w-full max-w-7xl 2xl:max-w-[90%] 3xl:max-w-[85%] mx-auto flex flex-col gap-6">
     
     <!-- Meta Configuration Card -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white/[0.04] border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-[0_15px_30px_rgba(0,0,0,0.55)] quiz-card quiz-card-hover">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 bg-white/[0.04] border border-white/10 p-6 rounded-3xl backdrop-blur-md shadow-[0_15px_30px_rgba(0,0,0,0.55)] quiz-card quiz-card-hover">
       
       <!-- Quiz Name -->
       <div class="md:col-span-1">
@@ -44,6 +44,23 @@
           [(value)]="quizName"
           [maxLength]="30">
         </app-input>
+      </div>
+
+      <!-- Sichtbarkeit Toggle -->
+      <div class="flex flex-col gap-1.5 justify-center">
+        <span class="block text-xs font-bold text-white/50 uppercase tracking-widest mb-1.5">Sichtbarkeit</span>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center h-12 bg-black/30 border border-white/5 rounded-xl px-4">
+            <app-toggle 
+              label="Öffentlich teilen" 
+              [(checked)]="isPublic"
+              [disabled]="!isQuizCompleteLocal()">
+            </app-toggle>
+          </div>
+          @if (!isQuizCompleteLocal()) {
+            <span class="text-[9px] text-amber-500/80 font-bold ml-1">Nur für vollständige Quizzes</span>
+          }
+        </div>
       </div>
 
       <!-- Fragen pro Kategorie (Zeilenanzahl) -->
