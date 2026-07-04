@@ -150,6 +150,7 @@ export class StartPageComponent {
   showTemplateWarning = signal(false);
   buzzerTimeout = signal('20');
   deductPointsOnTimeout = signal(false);
+  autoStartTimer = signal(true);
   incompleteQuizWarning = signal<{ name: string; id: string } | null>(null);
 
   canStartGame = computed(() => {
@@ -384,6 +385,10 @@ export class StartPageComponent {
     this.deductPointsOnTimeout.set(checked);
   }
 
+  onAutoStartTimerChange(checked: boolean) {
+    this.autoStartTimer.set(checked);
+  }
+
   onTeamModeChange(checked: boolean) {
     this.teamMode.set(checked);
     if (checked) {
@@ -503,7 +508,8 @@ export class StartPageComponent {
         this.teamMode(),
         parseInt(this.teamSize()),
         parseInt(this.buzzerTimeout()),
-        this.deductPointsOnTimeout()
+        this.deductPointsOnTimeout(),
+        this.autoStartTimer()
       );
     } catch (err: any) {
       this.joinError.set(this.p2pService.errorMessage() || 'Raumerstellung fehlgeschlagen.');
@@ -536,8 +542,8 @@ export class StartPageComponent {
 
   randomizeAvatar() {
     this.avatarBase.set(Math.floor(Math.random() * 5));
-    this.avatarEyes.set(Math.floor(Math.random() * 8));
-    this.avatarMouth.set(Math.floor(Math.random() * 6));
+    this.avatarEyes.set(Math.floor(Math.random() * 9));
+    this.avatarMouth.set(Math.floor(Math.random() * 7));
     this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
 
     // Also pick a random color from predefined ones
@@ -664,7 +670,7 @@ export class StartPageComponent {
   }
 
   cycleEyes(direction: number) {
-    const total = 8; // 0 to 7
+    const total = 9; // 0 to 8
     let next = this.avatarEyes() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
@@ -672,7 +678,7 @@ export class StartPageComponent {
   }
 
   cycleMouth(direction: number) {
-    const total = 6; // 0 to 5
+    const total = 7; // 0 to 6
     let next = this.avatarMouth() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;

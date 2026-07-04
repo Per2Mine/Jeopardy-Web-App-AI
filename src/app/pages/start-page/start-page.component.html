@@ -303,34 +303,48 @@
             </div>
 
             <!-- Countdown & Buzzer Settings -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl">
-              <!-- Buzzer Timeout Range Slider -->
-              <div class="flex flex-col gap-1.5 justify-center">
-                <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1 select-none">
-                  Antwortzeit: 
-                  <span class="text-jeopardy-gold font-extrabold text-sm ml-1">{{ formatBuzzerTimeout(buzzerTimeout()) }}</span>
-                </label>
-                <div class="relative flex items-center h-10">
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="90" 
-                    step="5"
-                    [value]="buzzerTimeout()" 
-                    (input)="onBuzzerTimeoutChange($event)"
-                    class="custom-range-slider w-full cursor-pointer">
+            <div class="flex flex-col gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Buzzer Timeout Range Slider -->
+                <div class="flex flex-col gap-1.5 justify-center">
+                  <label class="block text-xs font-bold text-white/70 uppercase tracking-widest mb-1 select-none">
+                    Antwortzeit: 
+                    <span class="text-jeopardy-gold font-extrabold text-sm ml-1">{{ formatBuzzerTimeout(buzzerTimeout()) }}</span>
+                  </label>
+                  <div class="relative flex items-center h-10">
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="90" 
+                      step="5"
+                      [value]="buzzerTimeout()" 
+                      (input)="onBuzzerTimeoutChange($event)"
+                      class="custom-range-slider w-full cursor-pointer">
+                  </div>
+                </div>
+
+                <!-- Deduct Points on Timeout Toggle -->
+                <div class="flex items-center justify-center p-3 bg-jeopardy-blue/10 border border-white/5 rounded-lg h-full">
+                  <app-toggle 
+                    label="Punkte abziehen bei Zeitablauf (Erstversuch)" 
+                    [checked]="deductPointsOnTimeout()" 
+                    (checkedChange)="onDeductPointsChange($event)"
+                    class="w-full">
+                  </app-toggle>
                 </div>
               </div>
 
-              <!-- Deduct Points on Timeout Toggle -->
-              <div class="flex items-center justify-center p-3 bg-jeopardy-blue/10 border border-white/5 rounded-lg h-full">
-                <app-toggle 
-                  label="Punkte abziehen bei Zeitablauf (Erstversuch)" 
-                  [checked]="deductPointsOnTimeout()" 
-                  (checkedChange)="onDeductPointsChange($event)"
-                  class="w-full">
-                </app-toggle>
-              </div>
+              <!-- Auto Start Timer Toggle -->
+              @if (buzzerTimeout() !== '0') {
+                <div class="flex items-center justify-center p-3 bg-jeopardy-blue/10 border border-white/5 rounded-lg animate-fade-in">
+                  <app-toggle 
+                    label="Timer automatisch starten (sobald Frage erscheint)" 
+                    [checked]="autoStartTimer()" 
+                    (checkedChange)="onAutoStartTimerChange($event)"
+                    class="w-full">
+                  </app-toggle>
+                </div>
+              }
             </div>
 
             <!-- Team Size Slider (only shown in team mode) -->
@@ -1385,11 +1399,26 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
-          <!-- Version 1.0 -->
+          <!-- Version 1.1 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-jeopardy-accent/10 border border-jeopardy-accent/20 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.0 — Der große Release 🎉</span>
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.1 — Gameplay & Kommunikation 🚀</span>
               <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Team-Chat im Team-Modus:</strong> Eigener, privater Team-Chat-Tab neben dem globalen Chat. Nachrichten dort sind exklusiv für Teammitglieder sichtbar und farblich in Teamfarben gestaltet. Neue Nachrichten auf inaktiven Tabs werden durch rote Benachrichtigungspunkte signalisiert.</li>
+              <li><strong class="text-white">Bild-Transformationen (Rotation & Zoom):</strong> Verändere die Ausrichtung (0° bis 360°) und Skalierung (1.0x bis 5.0x) von Bildern im Quiz-Creator mit flüssiger Live-Vorschau. Im Spiel setzen sich die Transformationen bei Antwortenthüllung automatisch zurück.</li>
+              <li><strong class="text-white">Manueller Timer-Start:</strong> Neue Lobby-Einstellung „Timer automatisch starten“. Ist diese deaktiviert, kann der Host den Frage-Timer jederzeit manuell per Button starten.</li>
+              <li><strong class="text-white">UwU-Gesicht im Avatar-Creator:</strong> Süßer w-förmiger Mund mit weichem Wangenrot sowie U-förmige geschlossene Augen erweitern die Anpassungsmöglichkeiten für Avatare.</li>
+              <li><strong class="text-white">Lockerung des Rate Limiting:</strong> Anheben des API-Limits auf bis zu 10.000 Anfragen pro Minute im Backend, um reibungsloses Gameplay und Testen ohne Sperren zu garantieren.</li>
+            </ul>
+          </div>
+
+          <!-- Version 1.0 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-white uppercase tracking-wider">v1.0 — Der große Release 🎉</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Juli 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Spielstart- & Spielende-Fanfare:</strong> Angenehme, warme Synthesizer-Melodien beim Start und Ende eines Spiels für ein immersiveres Spielerlebnis.</li>

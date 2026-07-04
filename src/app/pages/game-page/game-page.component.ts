@@ -416,6 +416,10 @@ export class GamePageComponent implements OnInit {
     this.p2pService.unlockBuzzer();
   }
 
+  onStartTimer() {
+    this.p2pService.startTimerManually();
+  }
+
   onToggleAudio() {
     this.p2pService.toggleQuestionAudio();
   }

@@ -13,28 +13,28 @@ const JWT_SECRET = process.env.JWT_SECRET || 'jeopardy_super_secret_key_123_abc_
 
 // Rate Limiters
 const globalLimiter = rateLimit.rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per 15 minutes
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10000, // Limit each IP to 10000 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req, res) => req.originalUrl && req.originalUrl.includes('/api/p2p'),
-  message: { error: 'Zu viele Anfragen von dieser IP, bitte versuche es in 15 Minuten erneut.' }
+  message: { error: 'Zu viele Anfragen von dieser IP, bitte versuche es in einer Minute erneut.' }
 });
 
 const authLimiter = rateLimit.rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 registration/login attempts per 15 minutes
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // Limit each IP to 1000 registration/login attempts per minute
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Zu viele Anmelde- oder Registrierungsversuche. Bitte warte 15 Minuten.' }
+  message: { error: 'Zu viele Anmelde- oder Registrierungsversuche. Bitte warte eine Minute.' }
 });
 
 const quizLimiter = rateLimit.rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 quiz creations/updates/deletes per 15 minutes
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 5000, // Limit each IP to 5000 quiz creations/updates/deletes per minute
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Zu viele Quiz-Aktionen. Bitte warte 15 Minuten.' }
+  message: { error: 'Zu viele Quiz-Aktionen. Bitte warte eine Minute.' }
 });
 
 // Middlewares

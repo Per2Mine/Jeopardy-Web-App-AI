@@ -30,6 +30,8 @@ export interface GameState {
     pixelateStrength?: number;
     reducePixelationOnWrong?: boolean;
     reducePixelationAmount?: number;
+    zoom?: number;
+    rotation?: number;
     audio?: string;
     audioStart?: number;
     audioEnd?: number;
@@ -53,6 +55,8 @@ export interface GameState {
   buzzerTimeout: number;
   deductPointsOnTimeout: boolean;
   timerSeconds: number | null;
+  autoStartTimer?: boolean;
+  timerActive?: boolean;
   isInitialTurn: boolean;
   audioPlaying?: boolean;
   boards?: Category[][];
@@ -67,6 +71,7 @@ export interface ChatMessage {
   senderAvatar?: string;
   text: string;
   timestamp: number;
+  teamId?: number;
 }
 
 export interface P2pMessage {
@@ -184,6 +189,8 @@ export class P2pService {
     buzzerTimeout: 20,
     deductPointsOnTimeout: false,
     timerSeconds: null,
+    autoStartTimer: true,
+    timerActive: false,
     isInitialTurn: false,
     audioPlaying: false
   });
@@ -791,7 +798,8 @@ export class P2pService {
     teamMode: boolean, 
     maxPlayersPerTeam: number,
     buzzerTimeout: number,
-    deductPointsOnTimeout: boolean
+    deductPointsOnTimeout: boolean,
+    autoStartTimer: boolean
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.disconnect();
@@ -804,7 +812,9 @@ export class P2pService {
       this.gameState.set({
         ...current,
         buzzerTimeout,
-        deductPointsOnTimeout
+        deductPointsOnTimeout,
+        autoStartTimer,
+        timerActive: false
       });
 
       this.wasKicked.set(false);
@@ -1297,6 +1307,41 @@ export class P2pService {
     }
   }
 
+  broadcastToTeam(message: P2pMessage, teamId: number) {
+    if (!this.isHost()) return;
+
+    // Collect HTTP relay receivers for batch sending
+    const httpRelayReceivers: string[] = [];
+
+    // Filter players by teamId
+    const teamPlayerIds = this.players()
+      .filter(p => !p.isHost && p.teamId === teamId)
+      .map(p => p.id);
+
+    this.hostConnectionMap.forEach((conn) => {
+      if (conn.open && teamPlayerIds.includes(conn.peer)) {
+        if (conn instanceof HttpRelayConnection) {
+          // Collect for batch send instead of individual HTTP POST per player
+          httpRelayReceivers.push(conn.peer);
+        } else {
+          // WebRTC: fire-and-forget
+          conn.send(message);
+        }
+      }
+    });
+
+    // Batch send to all HTTP relay players in this team
+    if (httpRelayReceivers.length > 0) {
+      this.http.post('/api/p2p/send-batch', {
+        senderId: this.myPlayerId()!,
+        receiverIds: httpRelayReceivers,
+        message: message
+      }).subscribe({
+        error: (err) => console.error('Failed to send team batch HTTP relay message:', err)
+      });
+    }
+  }
+
   /**
    * Client: Send a message to the Host
    */
@@ -1383,7 +1428,8 @@ export class P2pService {
     if (current.buzzerTimeout === 0) {
       const nextState = {
         ...current,
-        timerSeconds: null
+        timerSeconds: null,
+        timerActive: false
       };
       this.gameState.set(nextState);
       this.broadcast({
@@ -1397,7 +1443,8 @@ export class P2pService {
     // Set initial timer seconds
     const nextState = {
       ...current,
-      timerSeconds: current.buzzerTimeout
+      timerSeconds: current.buzzerTimeout,
+      timerActive: true
     };
     this.gameState.set(nextState);
 
@@ -1406,7 +1453,8 @@ export class P2pService {
       if (state.timerSeconds !== null && state.timerSeconds > 0) {
         const updatedState = {
           ...state,
-          timerSeconds: state.timerSeconds - 1
+          timerSeconds: state.timerSeconds - 1,
+          timerActive: true
         };
         this.gameState.set(updatedState);
 
@@ -1438,13 +1486,19 @@ export class P2pService {
       this.timerId = null;
     }
     const current = this.gameState();
-    if (current.timerSeconds !== null) {
+    if (current.timerSeconds !== null || current.timerActive) {
       const nextState = {
         ...current,
-        timerSeconds: null
+        timerSeconds: null,
+        timerActive: false
       };
       this.gameState.set(nextState);
     }
+  }
+
+  startTimerManually() {
+    if (!this.isHost()) return;
+    this.startHostTimer();
   }
 
   private handleHostTimerTimeout() {
@@ -1758,6 +1812,8 @@ export class P2pService {
       lastAnswerResult: null,
       buzzerTimeout: current.buzzerTimeout,
       deductPointsOnTimeout: current.deductPointsOnTimeout,
+      autoStartTimer: current.autoStartTimer,
+      timerActive: false,
       timerSeconds: null,
       isInitialTurn: false,
       boards: strippedBoards,
@@ -1809,6 +1865,7 @@ export class P2pService {
       buzzedPlayerId: null,
       buzzerLocked: false,
       timerSeconds: null,
+      timerActive: false,
       isInitialTurn: false,
       answeredQuestions: [],
       lockedOutPlayerIds: [],
@@ -1864,6 +1921,8 @@ export class P2pService {
     const pixelateStrength = question.pixelateStrength || 80;
     const reducePixelationOnWrong = question.reducePixelationOnWrong || false;
     const reducePixelationAmount = question.reducePixelationAmount || 5;
+    const zoom = question.zoom || 1.0;
+    const rotation = question.rotation || 0;
     const audio = question.audio || undefined;
     const audioStart = question.audioStart;
     const audioEnd = question.audioEnd;
@@ -1884,6 +1943,8 @@ export class P2pService {
         pixelateStrength, 
         reducePixelationOnWrong, 
         reducePixelationAmount,
+        zoom,
+        rotation,
         audio,
         audioStart,
         audioEnd,
@@ -1898,18 +1959,21 @@ export class P2pService {
       lastAnswerResult: null,
       isInitialTurn: true, // Initial turn is active
       timerSeconds: current.buzzerTimeout === 0 ? null : current.buzzerTimeout,
+      timerActive: current.buzzerTimeout > 0 ? (current.autoStartTimer !== false) : false,
       audioPlaying: true
     };
     this.gameState.set(nextState);
 
-    // Start timer for the initial selector player
-    this.startHostTimer();
-
-    this.broadcast({
-      type: 'GAME_STATE',
-      senderId: this.myPlayerId()!,
-      payload: nextState
-    });
+    // Start timer for the initial selector player if auto start is enabled
+    if (current.buzzerTimeout > 0 && current.autoStartTimer !== false) {
+      this.startHostTimer();
+    } else {
+      this.broadcast({
+        type: 'GAME_STATE',
+        senderId: this.myPlayerId()!,
+        payload: nextState
+      });
+    }
   }
 
   awardPoints(playerId: string, correct: boolean) {
@@ -2078,6 +2142,7 @@ export class P2pService {
       buzzedPlayerId: null,
       buzzerLocked: false,
       timerSeconds: null,
+      timerActive: false,
       isInitialTurn: false,
       lockedOutPlayerIds: [],
       lockedOutTeamIds: [],
@@ -2106,6 +2171,7 @@ export class P2pService {
       buzzedPlayerId: null,
       buzzerLocked: false,
       timerSeconds: null,
+      timerActive: false,
       isInitialTurn: false
     };
     this.gameState.set(nextState);
@@ -2142,7 +2208,7 @@ export class P2pService {
     });
   }
 
-  sendChatMessage(text: string) {
+  sendChatMessage(text: string, isTeam: boolean = false) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -2150,6 +2216,7 @@ export class P2pService {
     const senderName = me ? me.name : (this.isHost() ? 'Host' : 'Spieler');
     const senderColor = me ? me.color : '#f1b814';
     const senderAvatar = me ? (me.avatar || '') : '';
+    const teamId = (isTeam && me && me.teamId !== undefined) ? me.teamId : undefined;
 
     const chatMsg: ChatMessage = {
       id: Math.random().toString(36).substring(2, 9),
@@ -2158,7 +2225,8 @@ export class P2pService {
       senderColor,
       senderAvatar,
       text: trimmed,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      teamId
     };
 
     if (this.isHost()) {
@@ -2178,7 +2246,8 @@ export class P2pService {
           senderName,
           senderColor,
           senderAvatar,
-          text: trimmed
+          text: trimmed,
+          teamId
         }
       });
     }
@@ -2193,6 +2262,7 @@ export class P2pService {
     }
 
     const senderName = msg.payload?.senderName ? String(msg.payload.senderName).substring(0, 14) : 'Spieler';
+    const teamId = typeof msg.payload?.teamId === 'number' ? msg.payload.teamId : undefined;
 
     const chatMsg: ChatMessage = {
       id: Math.random().toString(36).substring(2, 9),
@@ -2201,18 +2271,29 @@ export class P2pService {
       senderColor: msg.payload.senderColor || '#f1b814',
       senderAvatar: msg.payload.senderAvatar || '',
       text: rawText.trim(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      teamId
     };
 
     // Add to Host's list
     this.chatMessages.update(msgs => [...msgs, chatMsg]);
 
-    // Broadcast to everyone else (including the client who sent it)
-    this.broadcast({
-      type: 'CHAT_MSG',
-      senderId: this.myPlayerId()!,
-      payload: chatMsg
-    });
+    // Broadcast
+    if (teamId !== undefined) {
+      // Team message: Broadcast only to the teammates
+      this.broadcastToTeam({
+        type: 'CHAT_MSG',
+        senderId: this.myPlayerId()!,
+        payload: chatMsg
+      }, teamId);
+    } else {
+      // Global message: Broadcast to everyone
+      this.broadcast({
+        type: 'CHAT_MSG',
+        senderId: this.myPlayerId()!,
+        payload: chatMsg
+      });
+    }
   }
 
   private heartbeatIntervalId: any = null;

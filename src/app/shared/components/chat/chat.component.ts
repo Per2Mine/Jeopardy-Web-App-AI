@@ -63,23 +63,52 @@ import { AvatarComponent } from '../avatar/avatar.component';
               </button>
             </div>
 
+            <!-- Tab Switcher (only shown if Team Mode is active and player is in a team) -->
+            @if (p2pService.teamMode() && myTeamId() !== undefined) {
+              <div class="flex border-b border-white/10 bg-black/10 p-1.5 gap-1.5">
+                <button 
+                  type="button"
+                  (click)="setActiveTab('global')"
+                  [class]="'flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer relative ' + 
+                           (activeTab() === 'global' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5')">
+                  Globaler Chat
+                  @if (unreadGlobalCount() > 0) {
+                    <span class="absolute top-1.5 right-2.5 w-2 h-2 rounded-full bg-red-500"></span>
+                  }
+                </button>
+                <button 
+                  type="button"
+                  (click)="setActiveTab('team')"
+                  [class]="'flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer relative ' + 
+                           (activeTab() === 'team' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5')">
+                  <span [style.color]="activeTab() === 'team' ? getTeamColor(myTeamId()!) : ''">Team {{ myTeamId() }} Chat</span>
+                  @if (unreadTeamCount() > 0) {
+                    <span class="absolute top-1.5 right-2.5 w-2 h-2 rounded-full bg-red-500"></span>
+                  }
+                </button>
+              </div>
+            }
+
             <!-- Messages List -->
             <div 
               #messagesContainer
               class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 min-h-0 bg-white/[0.01]">
               
-              @if (p2pService.chatMessages().length === 0) {
+              @if (filteredMessages().length === 0) {
                 <div class="flex-1 flex flex-col items-center justify-center text-center p-6 gap-2 text-white/20">
                   <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025 10.314 10.314 0 01-2.286-2.257C2.188 15.611 1.5 13.882 1.5 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"></path>
                   </svg>
-                  <span class="text-xs font-semibold uppercase tracking-wider">Noch keine Nachrichten</span>
+                  <span class="text-xs font-semibold uppercase tracking-wider">
+                    {{ activeTab() === 'team' ? 'Keine Team-Nachrichten' : 'Keine Nachrichten' }}
+                  </span>
                   <p class="text-[10px] max-w-[180px]">Schreibe eine Nachricht, um das Gespräch zu beginnen!</p>
                 </div>
               } @else {
-                @for (msg of p2pService.chatMessages(); track msg.id) {
+                @for (msg of filteredMessages(); track msg.id) {
                   @let isSelf = msg.senderId === p2pService.myPlayerId();
                   @let isHostMsg = msg.senderId === p2pService.roomCode();
+                  @let isTeamMsg = msg.teamId !== undefined;
 
                   <div 
                     [class]="'flex flex-col max-w-[85%] ' + (isSelf ? 'self-end' : 'self-start')">
@@ -109,6 +138,12 @@ import { AvatarComponent } from '../avatar/avatar.component';
                               <span class="text-[8px] bg-jeopardy-gold/20 text-jeopardy-gold border border-jeopardy-gold/30 px-1 py-0.2 rounded uppercase font-bold tracking-wider">
                                 Host
                               </span>
+                            } @else if (isTeamMsg) {
+                              <span 
+                                [style.color]="getTeamColor(msg.teamId!)"
+                                class="text-[8px] bg-white/5 border border-white/10 px-1 py-0.2 rounded uppercase font-bold tracking-wider">
+                                Team {{ msg.teamId }}
+                              </span>
                             }
                           </div>
                         }
@@ -118,7 +153,9 @@ import { AvatarComponent } from '../avatar/avatar.component';
                           [class]="'px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words border ' + 
                                    (isSelf ? 
                                      'bg-jeopardy-accent/15 border-jeopardy-accent/30 text-white rounded-tr-none' : 
-                                     'bg-white/[0.04] border-white/5 text-white/90 rounded-tl-none')">
+                                     'bg-white/[0.04] border-white/5 text-white/90 rounded-tl-none')"
+                          [style.border-color]="isTeamMsg ? getTeamColor(msg.teamId!) + '40' : ''"
+                          [style.background-color]="isTeamMsg ? (isSelf ? getTeamColor(msg.teamId!) + '20' : getTeamColor(msg.teamId!) + '0c') : ''">
                           {{ msg.text }}
                         </div>
 
@@ -143,7 +180,7 @@ import { AvatarComponent } from '../avatar/avatar.component';
                 type="text"
                 [(ngModel)]="messageText"
                 name="messageText"
-                placeholder="Nachricht eingeben..."
+                [placeholder]="activeTab() === 'team' ? 'Team-Nachricht eingeben...' : 'Nachricht eingeben...'"
                 class="flex-1 bg-white/[0.03] border border-white/10 focus:border-jeopardy-accent rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none transition-colors"
                 autocomplete="off"
                 maxlength="200"
@@ -189,20 +226,71 @@ export class ChatComponent {
   @ViewChild('chatInput') private chatInput!: ElementRef<HTMLInputElement>;
 
   isOpen = signal(false);
-  seenMessagesCount = signal(0);
   messageText = '';
+
+  // Tab state
+  activeTab = signal<'global' | 'team'>('global');
+
+  // Seen counts
+  seenGlobalCount = signal(0);
+  seenTeamCount = signal(0);
+
+  // Computeds
+  myTeamId = computed(() => this.p2pService.me()?.teamId);
+
+  globalMessages = computed(() => {
+    return this.p2pService.chatMessages().filter(m => m.teamId === undefined || m.teamId === null);
+  });
+
+  teamMessages = computed(() => {
+    const myTeam = this.myTeamId();
+    if (myTeam === undefined) return [];
+    return this.p2pService.chatMessages().filter(m => m.teamId === myTeam);
+  });
+
+  filteredMessages = computed(() => {
+    const tab = this.activeTab();
+    const myTeam = this.myTeamId();
+
+    if (this.p2pService.teamMode() && myTeam !== undefined) {
+      if (tab === 'team') {
+        return this.teamMessages();
+      } else {
+        return this.globalMessages();
+      }
+    }
+    return this.p2pService.chatMessages();
+  });
+
+  unreadGlobalCount = computed(() => {
+    if (this.isOpen() && this.activeTab() === 'global') return 0;
+    return Math.max(0, this.globalMessages().length - this.seenGlobalCount());
+  });
+
+  unreadTeamCount = computed(() => {
+    if (this.isOpen() && this.activeTab() === 'team') return 0;
+    return Math.max(0, this.teamMessages().length - this.seenTeamCount());
+  });
 
   unreadCount = computed(() => {
     if (this.isOpen()) return 0;
-    return Math.max(0, this.p2pService.chatMessages().length - this.seenMessagesCount());
+    return this.unreadGlobalCount() + this.unreadTeamCount();
   });
 
   constructor() {
-    // Automatically mark read & scroll when chat is open and a new message arrives
+    // Automatically mark read & scroll when chat is open and a new message arrives or activeTab changes
     effect(() => {
+      // Register signals dependencies
       const msgs = this.p2pService.chatMessages();
-      if (this.isOpen()) {
-        this.seenMessagesCount.set(msgs.length);
+      const tab = this.activeTab();
+      const open = this.isOpen();
+
+      if (open) {
+        if (tab === 'global') {
+          this.seenGlobalCount.set(this.globalMessages().length);
+        } else {
+          this.seenTeamCount.set(this.teamMessages().length);
+        }
         setTimeout(() => this.scrollToBottom(), 30);
       }
     });
@@ -212,7 +300,8 @@ export class ChatComponent {
     const nextOpen = !this.isOpen();
     this.isOpen.set(nextOpen);
     if (nextOpen) {
-      this.seenMessagesCount.set(this.p2pService.chatMessages().length);
+      this.seenGlobalCount.set(this.globalMessages().length);
+      this.seenTeamCount.set(this.teamMessages().length);
       setTimeout(() => {
         this.scrollToBottom();
         this.focusInput();
@@ -220,17 +309,42 @@ export class ChatComponent {
     }
   }
 
+  setActiveTab(tab: 'global' | 'team') {
+    this.activeTab.set(tab);
+    if (tab === 'global') {
+      this.seenGlobalCount.set(this.globalMessages().length);
+    } else {
+      this.seenTeamCount.set(this.teamMessages().length);
+    }
+    setTimeout(() => {
+      this.scrollToBottom();
+      this.focusInput();
+    }, 30);
+  }
+
   sendMessage() {
     const text = this.messageText.trim();
     if (!text) return;
 
-    this.p2pService.sendChatMessage(text);
+    const isTeam = this.activeTab() === 'team';
+    this.p2pService.sendChatMessage(text, isTeam);
     this.messageText = '';
     
     setTimeout(() => {
       this.scrollToBottom();
       this.focusInput();
     }, 10);
+  }
+
+  getTeamColor(teamId: number): string {
+    switch (teamId) {
+      case 1: return '#3b82f6'; // blue-500
+      case 2: return '#ef4444'; // red-500
+      case 3: return '#22c55e'; // green-500
+      case 4: return '#a855f7'; // purple-500
+      case 5: return '#ec4899'; // pink-500
+      default: return '#eab308'; // yellow-500
+    }
   }
 
   private scrollToBottom() {

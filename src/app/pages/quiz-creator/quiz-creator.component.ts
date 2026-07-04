@@ -76,6 +76,8 @@ export class QuizCreatorComponent implements OnInit {
   modalPixelateStrength = signal(80);
   modalReducePixelation = signal(false);
   modalReduceAmount = signal(5);
+  modalZoom = signal(1.0);
+  modalRotation = signal(0);
 
   // Modal Audio State
   modalAudio = signal<string | null>(null);
@@ -217,6 +219,8 @@ export class QuizCreatorComponent implements OnInit {
     this.modalPixelateStrength.set(q.pixelateStrength || 80);
     this.modalReducePixelation.set(q.reducePixelationOnWrong || false);
     this.modalReduceAmount.set(q.reducePixelationAmount || 5);
+    this.modalZoom.set(q.zoom || 1.0);
+    this.modalRotation.set(q.rotation || 0);
     this.imageError.set(null);
 
     // Audio state
@@ -277,6 +281,8 @@ export class QuizCreatorComponent implements OnInit {
         pixelateStrength: this.modalPixelateStrength(),
         reducePixelationOnWrong: this.modalReducePixelation(),
         reducePixelationAmount: this.modalReduceAmount(),
+        zoom: this.modalZoom(),
+        rotation: this.modalRotation(),
         
         // Save Audio state
         audio: this.modalAudio() || undefined,
@@ -329,6 +335,8 @@ export class QuizCreatorComponent implements OnInit {
     this.modalPixelateStrength.set(80);
     this.modalReducePixelation.set(false);
     this.modalReduceAmount.set(5);
+    this.modalZoom.set(1.0);
+    this.modalRotation.set(0);
     this.imageError.set(null);
   }
 

@@ -13,6 +13,8 @@ export interface Question {
   pixelateStrength?: number;
   reducePixelationOnWrong?: boolean;
   reducePixelationAmount?: number;
+  zoom?: number;
+  rotation?: number;
   audio?: string;
   audioStart?: number;
   audioEnd?: number;

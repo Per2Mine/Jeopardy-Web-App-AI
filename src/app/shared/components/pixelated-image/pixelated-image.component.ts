@@ -6,19 +6,25 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    @if (pixelate && src) {
-      <canvas #canvas [class]="customClass"></canvas>
-    } @else if (src) {
-      <img [src]="src" [class]="customClass" alt="Bild" />
-    }
+    <div class="overflow-hidden flex items-center justify-center relative" [class]="customClass" style="display: inline-flex;">
+      @if (pixelate && src) {
+        <canvas #canvas [style.transform]="transformStyle"></canvas>
+      } @else if (src) {
+        <img [src]="src" [style.transform]="transformStyle" alt="Bild" />
+      }
+    </div>
   `,
   styles: [`
-    canvas {
+    canvas, img {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
-      max-width: 100%;
+      max-width: inherit;
+      max-height: inherit;
+      width: auto;
       height: auto;
+      object-fit: contain;
       display: block;
+      transition: transform 0.3s ease-out;
     }
   `]
 })
@@ -26,9 +32,15 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
   @Input() src?: string | null;
   @Input() pixelate = false;
   @Input() strength = 80; // strength slider value (1 to 100)
+  @Input() zoom = 1.0;
+  @Input() rotation = 0; // rotation angle in degrees
   @Input() customClass = '';
 
   @ViewChild('canvas') canvasRef?: ElementRef<HTMLCanvasElement>;
+
+  get transformStyle(): string {
+    return `rotate(${this.rotation}deg) scale(${this.zoom})`;
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['src'] || changes['pixelate'] || changes['strength']) {

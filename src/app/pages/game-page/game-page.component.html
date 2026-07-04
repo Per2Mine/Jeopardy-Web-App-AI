@@ -237,6 +237,9 @@
                 [class]="'px-4 py-2 rounded-full text-xs font-black tracking-wider border transition-all duration-300 flex items-center gap-1.5 shadow-md ' + 
                          (p2pService.gameState().timerSeconds! <= 3 ? 'timer-critical bg-red-500/20 shadow-red-500/20' : 'bg-black/40 border-white/10 text-white')">
                 ⏱️ {{ p2pService.gameState().timerSeconds }}s
+                @if (!p2pService.gameState().timerActive) {
+                  <span class="text-[9px] text-white/50 font-normal uppercase tracking-wider ml-1">(Pausiert)</span>
+                }
               </div>
             }
           </div>
@@ -264,6 +267,8 @@
                   [src]="activeQ?.image" 
                   [pixelate]="!!(activeQ?.pixelate && !p2pService.gameState().showAnswer)"
                   [strength]="activeQ?.pixelateStrength || 15"
+                  [zoom]="p2pService.gameState().showAnswer ? 1.0 : (activeQ?.zoom || 1.0)"
+                  [rotation]="p2pService.gameState().showAnswer ? 0 : (activeQ?.rotation || 0)"
                   customClass="max-h-64 md:max-h-80 lg:max-h-[450px] xl:max-h-[550px] 2xl:max-h-[650px] w-auto max-w-full object-contain rounded-2xl border border-white/15 shadow-2xl transition-all duration-300 hover:scale-[1.02]"
                 ></app-pixelated-image>
               </div>
@@ -388,6 +393,17 @@
                       <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Antwort-Schlüssel (Lösung)</span>
                       <span class="text-base font-extrabold text-jeopardy-gold">{{ activeQ?.answer }}</span>
                     </div>
+
+                    @if (p2pService.gameState().timerSeconds !== null && !p2pService.gameState().timerActive) {
+                      <div class="w-full mt-2">
+                        <app-button 
+                          variant="accent" 
+                          [fullWidth]="true" 
+                          (click)="onStartTimer()">
+                          ⚡ Timer starten
+                        </app-button>
+                      </div>
+                    }
 
                     <div class="flex gap-4 w-full mt-2">
                       <app-button 
