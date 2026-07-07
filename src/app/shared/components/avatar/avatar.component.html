@@ -82,6 +82,55 @@
 
         <!-- Highlight shimmer on upper-left star arm -->
         <ellipse cx="40" cy="28" rx="7" ry="5" fill="rgba(255,255,255,0.3)" transform="rotate(-35,40,28)"/>
+      } @else if (av.base === 5) {
+        <!-- Cute Ghost -->
+        <!-- Ground shadow -->
+        <ellipse cx="50" cy="92" rx="22" ry="5" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- Ghost body with wavy bottom -->
+        <path d="M 28 50 C 28 26, 72 26, 72 50 L 72 78 Q 65 85, 61 76 Q 57 85, 50 78 Q 43 85, 39 76 Q 35 85, 28 78 Z" [attr.fill]="color()"/>
+
+        <!-- Ghost highlight (glossy shine) -->
+        <ellipse cx="38" cy="38" rx="8" ry="6" fill="rgba(255,255,255,0.25)" transform="rotate(-15,38,38)"/>
+      } @else if (av.base === 6) {
+        <!-- Cute Mushroom -->
+        <!-- Ground shadow -->
+        <ellipse cx="50" cy="92" rx="20" ry="5" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- Mushroom stem -->
+        <rect x="39" y="55" width="22" height="30" rx="8" fill="#f5f0e1"/>
+        <!-- Mushroom stem shadow -->
+        <rect x="39" y="55" width="8" height="30" rx="4" fill="rgba(0,0,0,0.06)"/>
+
+        <!-- Mushroom cap -->
+        <ellipse cx="50" cy="45" rx="28" ry="22" [attr.fill]="color()"/>
+
+        <!-- Cap spots -->
+        <circle cx="36" cy="38" r="5" fill="rgba(255,255,255,0.35)"/>
+        <circle cx="58" cy="34" r="6" fill="rgba(255,255,255,0.3)"/>
+        <circle cx="46" cy="28" r="3.5" fill="rgba(255,255,255,0.25)"/>
+        <circle cx="66" cy="44" r="3" fill="rgba(255,255,255,0.2)"/>
+
+        <!-- Cap highlight -->
+        <ellipse cx="40" cy="32" rx="10" ry="6" fill="rgba(255,255,255,0.15)" transform="rotate(-20,40,32)"/>
+      } @else if (av.base === 7) {
+        <!-- Cute Penguin -->
+        <!-- Ground shadow -->
+        <ellipse cx="50" cy="92" rx="22" ry="5" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- Penguin body (dark outer) -->
+        <path d="M 28 48 C 28 26, 72 26, 72 48 L 72 80 C 72 88, 64 92, 56 92 L 44 92 C 36 92, 28 88, 28 80 Z" [attr.fill]="color()"/>
+
+        <!-- White belly -->
+        <ellipse cx="50" cy="68" rx="16" ry="20" fill="#f0f0f0"/>
+
+        <!-- Penguin wings/flippers -->
+        <path d="M 28 55 Q 20 65, 24 78" fill="none" [attr.stroke]="color()" stroke-width="7" stroke-linecap="round"/>
+        <path d="M 72 55 Q 80 65, 76 78" fill="none" [attr.stroke]="color()" stroke-width="7" stroke-linecap="round"/>
+
+        <!-- Penguin feet -->
+        <ellipse cx="40" cy="91" rx="7" ry="3.5" fill="#f59e0b"/>
+        <ellipse cx="60" cy="91" rx="7" ry="3.5" fill="#f59e0b"/>
       }
 
       <!-- Eyes Selection -->
@@ -135,6 +184,20 @@
         <!-- UwU Eyes (U-shaped cute closed eyes) -->
         <path d="M 37 45 Q 37 53 42 53 Q 47 53 47 45" stroke="#1e293b" stroke-width="3" stroke-linecap="round" fill="none"/>
         <path d="M 53 45 Q 53 53 58 53 Q 63 53 63 45" stroke="#1e293b" stroke-width="3" stroke-linecap="round" fill="none"/>
+      } @else if (av.eyes === 9) {
+        <!-- Heart Eyes -->
+        <path d="M 38 46 C 38 43, 42 42, 42 45 C 42 42, 46 43, 46 46 C 46 49, 42 52, 42 52 C 42 52, 38 49, 38 46 Z" fill="#ef4444" stroke="#b91c1c" stroke-width="1"/>
+        <path d="M 54 46 C 54 43, 58 42, 58 45 C 58 42, 62 43, 62 46 C 62 49, 58 52, 58 52 C 58 52, 54 49, 54 46 Z" fill="#ef4444" stroke="#b91c1c" stroke-width="1"/>
+      } @else if (av.eyes === 10) {
+        <!-- X / Cross Eyes (Dizzy/KO) -->
+        <line x1="37" y1="44" x2="47" y2="52" stroke="#1e293b" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="47" y1="44" x2="37" y2="52" stroke="#1e293b" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="53" y1="44" x2="63" y2="52" stroke="#1e293b" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="63" y1="44" x2="53" y2="52" stroke="#1e293b" stroke-width="3.5" stroke-linecap="round"/>
+      } @else if (av.eyes === 11) {
+        <!-- Spiral / Dizzy Eyes -->
+        <path d="M 42 48 C 42 44, 46 44, 46 48 C 46 51, 40 51, 40 47 C 40 43, 48 43, 48 48" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M 58 48 C 58 44, 62 44, 62 48 C 62 51, 56 51, 56 47 C 56 43, 64 43, 64 48" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" fill="none"/>
       }
 
       <!-- Mouth Selection -->
@@ -165,6 +228,28 @@
         <!-- Blush -->
         <circle cx="35" cy="58" r="4" fill="#f9a8d4" opacity="0.5"/>
         <circle cx="65" cy="58" r="4" fill="#f9a8d4" opacity="0.5"/>
+      } @else if (av.mouth === 7) {
+        <!-- Vampire Fangs -->
+        <path d="M 43 59 Q 50 65 57 59" stroke="#1e293b" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <!-- Left fang -->
+        <polygon points="45,59 47,59 46,65" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8"/>
+        <!-- Right fang -->
+        <polygon points="53,59 55,59 54,65" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8"/>
+      } @else if (av.mouth === 8) {
+        <!-- Drool / Excited -->
+        <path d="M 43 59 Q 50 67 57 59 Z" fill="#1e293b"/>
+        <!-- Drool drop -->
+        <path d="M 53 64 Q 54 70, 52 72 Q 50 74, 51 70 Q 52 67, 53 64 Z" fill="#60a5fa" opacity="0.7"/>
+      } @else if (av.mouth === 9) {
+        <!-- Cat :3 mouth -->
+        <circle cx="50" cy="60" r="2" fill="#f9a8d4"/>
+        <path d="M 44 63 Q 47 67 50 63" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M 50 63 Q 53 67 56 63" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <!-- Whiskers -->
+        <line x1="30" y1="55" x2="39" y2="58" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+        <line x1="30" y1="62" x2="39" y2="61" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+        <line x1="70" y1="55" x2="61" y2="58" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+        <line x1="70" y1="62" x2="61" y2="61" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
       }
 
       <!-- Accessories / Headwear Selection -->

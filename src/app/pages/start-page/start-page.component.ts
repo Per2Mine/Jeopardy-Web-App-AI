@@ -598,9 +598,9 @@ export class StartPageComponent {
   }
 
   randomizeAvatar() {
-    this.avatarBase.set(Math.floor(Math.random() * 5));
-    this.avatarEyes.set(Math.floor(Math.random() * 9));
-    this.avatarMouth.set(Math.floor(Math.random() * 7));
+    this.avatarBase.set(Math.floor(Math.random() * 8));
+    this.avatarEyes.set(Math.floor(Math.random() * 12));
+    this.avatarMouth.set(Math.floor(Math.random() * 10));
     this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
 
     // Also pick a random color from predefined ones
@@ -853,7 +853,7 @@ export class StartPageComponent {
   }
 
   cycleBase(direction: number) {
-    const total = 5; // 0, 1, 2, 3, 4
+    const total = 8; // 0-7: Blob, Robot, Cat, Octopus, Star, Ghost, Mushroom, Penguin
     let next = this.avatarBase() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
@@ -861,7 +861,7 @@ export class StartPageComponent {
   }
 
   cycleEyes(direction: number) {
-    const total = 9; // 0 to 8
+    const total = 12; // 0-11: Dots, Happy, Glasses, Wink, Sleepy, Stars, Anime, Angry, UwU, Hearts, X-Eyes, Spiral
     let next = this.avatarEyes() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
@@ -869,7 +869,7 @@ export class StartPageComponent {
   }
 
   cycleMouth(direction: number) {
-    const total = 7; // 0 to 6
+    const total = 10; // 0-9: Smile, Open, Sad, Straight, Tongue, Surprise, UwU, Fangs, Drool, Cat :3
     let next = this.avatarMouth() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
