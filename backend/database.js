@@ -117,6 +117,63 @@ async function seedDefaultQuizzes(db) {
 
   const quizzes = [
     {
+      id: 'ai-quiz-mcu',
+      name: 'Marvel Cinematic Universe 🦸‍♂️',
+      icon: '🛡️',
+      categories: [
+        {
+          name: 'Superhelden 🦸‍♂️',
+          questions: [
+            { text: 'Wie lautet der bürgerliche Name des genialen Erfinders und Milliardärs Iron Man?', answer: 'Tony Stark', value: 100 },
+            { text: 'Welcher mächtige Gott des Donners trägt den magischen Hammer Mjölnir?', answer: 'Thor (Odinson)', value: 200 },
+            { text: 'Welcher Teenager erhält durch den Biss einer radioaktiven Spinne Superkräfte?', answer: 'Peter Parker (Spider-Man)', value: 300 },
+            { text: 'Wie heißt die hochintelligente Cousine von Bruce Banner, die ebenfalls Hulk-Kräfte besitzt?', answer: 'Jennifer Walters (She-Hulk)', value: 400 },
+            { text: 'Wie lautet der echte Name des Königs von Wakanda und ersten Black Panther im MCU?', answer: 'T\'Challa', value: 500 }
+          ]
+        },
+        {
+          name: 'Infinity-Steine 💎',
+          questions: [
+            { text: 'Welcher violette Titan will alle sechs Steine sammeln, um die Hälfte des Lebens auszulöschen?', answer: 'Thanos', value: 100 },
+            { text: 'Welcher Stein befindet sich zunächst in Lokis Zepter und später in Visions Stirn?', answer: 'Gedankenstein (Mind Stone)', value: 200 },
+            { text: 'In welchem blauen, würfelförmigen Artefakt ist der Raumstein versteckt?', answer: 'Tesserakt (Tesseract)', value: 300 },
+            { text: 'Auf welchem düsteren Planeten bewacht Red Skull den Seelenstein?', answer: 'Vormir', value: 400 },
+            { text: 'Welcher Stein wird von Doctor Strange im Auge von Agamotto beschützt?', answer: 'Zeitstein (Time Stone)', value: 500 }
+          ]
+        },
+        {
+          name: 'Zitate & Momente 💬',
+          questions: [
+            { text: 'Welchen emotionalen Satz sagt Tony Stark zu seiner Tochter Morgan, den sie später erwidert?', answer: 'Ich liebe dich mal 3000 / Ich liebe dich 3000', value: 100 },
+            { text: 'Welchen Kampfruf nutzt Captain America, um das gesamte Team zum Gefecht aufzurufen?', answer: 'Avengers sammeln! / Avengers Assemble!', value: 200 },
+            { text: '„Ich bin ___“ ist der einzige Satz, den dieses baumartige Guardians-Mitglied sprechen kann.', answer: 'Groot', value: 300 },
+            { text: 'Welcher Held opfert sich am Ende von Avengers: Endgame, um Thanos\' Armee wegzuschnippen?', answer: 'Iron Man / Tony Stark', value: 400 },
+            { text: 'Welcher Heimatplanet von Thor wird im Film „Tag der Entscheidung“ durch Surtur vernichtet?', answer: 'Asgard', value: 500 }
+          ]
+        },
+        {
+          name: 'Schurken & Feinde 😈',
+          questions: [
+            { text: 'Thors Adoptivbruder und Gott des Schabernacks führt die Chitauri-Invasion in New York an.', answer: 'Loki', value: 100 },
+            { text: 'Welche mörderische künstliche Intelligenz will die Menschheit durch einen Meteoriteneinschlag ausrotten?', answer: 'Ultron', value: 200 },
+            { text: 'Welcher Spezialeffekt-Künstler und Trickbetrüger kämpft in London gegen Spider-Man?', answer: 'Mysterio (Quentin Beck)', value: 300 },
+            { text: 'Wie heißt die skrupellose Göttin des Todes und ältere Schwester von Thor?', answer: 'Hela', value: 400 },
+            { text: 'Wie heißt der unsterbliche Vater von Shang-Chi, der die legendären Zehn Ringe besitzt?', answer: 'Wenwu (Der Mandarin)', value: 500 }
+          ]
+        },
+        {
+          name: 'Technik & Orte 🚀',
+          questions: [
+            { text: 'Aus welchem technologisch hochentwickelten afrikanischen Land stammt das Metall Vibranium?', answer: 'Wakanda', value: 100 },
+            { text: 'Wie heißt das imposante S.H.I.E.L.D.-Hauptquartier in Washington D.C., das von Hydra unterwandert wurde?', answer: 'Triskelion', value: 200 },
+            { text: 'In welchem winzigen Reich herrschen eigene Gesetze der Zeit, was Zeitreisen ermöglicht?', answer: 'Quantenreich (Quantum Realm)', value: 300 },
+            { text: 'Welches Sprachassistenten-System steuerte Starks Rüstungen, bevor es in Vision hochgeladen wurde?', answer: 'J.A.R.V.I.S.', value: 400 },
+            { text: 'In welchem Küstenort in Norwegen gründen die asgardischen Flüchtlinge ihre neue Heimat?', answer: 'New Asgard (Tønsberg)', value: 500 }
+          ]
+        }
+      ]
+    },
+    {
       id: 'ai-quiz-hdr',
       name: 'Der Herr der Ringe 💍',
       icon: '🧙‍♂️',
