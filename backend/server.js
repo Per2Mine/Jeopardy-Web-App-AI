@@ -708,8 +708,14 @@ app.get('/api/community-quizzes', optionalAuthenticateToken, async (req, res) =>
     }
 
     if (search) {
-      whereClauses += ' AND q.name LIKE ?';
-      params.push(`%${search}%`);
+      if (search.startsWith('@')) {
+        const creatorSearch = search.slice(1).trim();
+        whereClauses += ' AND u.username LIKE ?';
+        params.push(`%${creatorSearch}%`);
+      } else {
+        whereClauses += ' AND q.name LIKE ?';
+        params.push(`%${search}%`);
+      }
     }
 
     let countSql = '';
