@@ -6,7 +6,11 @@
     <!-- Top Header bar -->
     <header class="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-black/10 shrink-0">
       <div class="flex items-center gap-4">
-        <app-logo size="sm"></app-logo>
+        @if (p2pService.isHost()) {
+          <app-logo size="sm" [clickable]="false" (click)="onLogoClick()" class="cursor-pointer" title="Spiel abbrechen und zur Lobby zurückkehren"></app-logo>
+        } @else {
+          <app-logo size="sm" [clickable]="false"></app-logo>
+        }
         <div class="h-4 w-[1px] bg-white/20"></div>
         <span class="text-xs text-white/50 tracking-wider font-semibold">
           Code: <span class="text-jeopardy-gold font-mono font-bold">{{ p2pService.roomCode() }}</span>

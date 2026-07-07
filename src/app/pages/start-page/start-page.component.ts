@@ -27,6 +27,9 @@ export class StartPageComponent {
   // Tab control: 'join' or 'host'
   activeTab = signal<'join' | 'host'>('join');
 
+  // Lobby Quiz Change Control
+  showChangeQuizSection = signal(false);
+
   // Player Profile
   playerName = signal(this.authService.currentUser()?.username || '');
   selectedColor = signal('#0ea5e9'); // Default bright blue
@@ -113,6 +116,24 @@ export class StartPageComponent {
       const user = this.authService.currentUser();
       if (user) {
         this.playerName.set(user.username);
+      }
+    });
+
+    effect(() => {
+      const state = this.p2pService.gameState();
+      if (this.p2pService.isHost() && state.selectedQuizzes && state.phase === 'LOBBY') {
+        const ids = state.selectedQuizzes.map(q => q.id);
+        if (JSON.stringify(this.selectedTemplates()) !== JSON.stringify(ids)) {
+          this.selectedTemplates.set(ids);
+        }
+      }
+    });
+
+    effect(() => {
+      const state = this.p2pService.gameState();
+      const conn = this.p2pService.connectionState();
+      if (conn === 'connected' && state.phase !== 'LOBBY') {
+        this.router.navigate(['/game']);
       }
     });
   }
@@ -349,6 +370,21 @@ export class StartPageComponent {
     if (this.selectedTemplates().length > 0) {
       this.showTemplateWarning.set(false);
     }
+
+    // Sync changes with P2P game state if connected as host
+    if (this.p2pService.isHost() && this.p2pService.connectionState() === 'connected') {
+      const updatedQuizzes = this.selectedTemplates().map(id => {
+        const tmpl = this.quizTemplates().find(t => t.id === id);
+        return {
+          id: id,
+          name: tmpl?.name || 'Unbekanntes Quiz',
+          icon: tmpl?.icon || '❓',
+          categoriesCount: tmpl?.categories.length || 0,
+          questionsCount: tmpl ? tmpl.categories.reduce((acc, cat) => acc + cat.questions.length, 0) : 0
+        };
+      });
+      this.p2pService.updateSelectedQuizzes(updatedQuizzes);
+    }
   }
 
   dismissIncompleteWarning() {
@@ -508,6 +544,17 @@ export class StartPageComponent {
       localStorage.setItem('jeopardy_player_color', this.selectedColor());
       localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
 
+      const initialQuizzes = this.selectedTemplates().map(id => {
+        const tmpl = this.quizTemplates().find(t => t.id === id);
+        return {
+          id: id,
+          name: tmpl?.name || 'Unbekanntes Quiz',
+          icon: tmpl?.icon || '❓',
+          categoriesCount: tmpl?.categories.length || 0,
+          questionsCount: tmpl ? tmpl.categories.reduce((acc, cat) => acc + cat.questions.length, 0) : 0
+        };
+      });
+
       await this.p2pService.hostRoom(
         randomCode,
         name,
@@ -518,7 +565,8 @@ export class StartPageComponent {
         parseInt(this.teamSize()),
         parseInt(this.buzzerTimeout()),
         this.deductPointsOnTimeout(),
-        this.autoStartTimer()
+        this.autoStartTimer(),
+        initialQuizzes
       );
     } catch (err: any) {
       this.joinError.set(this.p2pService.errorMessage() || 'Raumerstellung fehlgeschlagen.');

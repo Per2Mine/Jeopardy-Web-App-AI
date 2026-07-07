@@ -38,6 +38,13 @@ export class GamePageComponent implements OnInit {
         this.router.navigate(['/']);
       }
     });
+
+    effect(() => {
+      const phase = this.p2pService.gameState().phase;
+      if (phase === 'LOBBY') {
+        this.router.navigate(['/']);
+      }
+    });
   }
 
   // Jeopardy Categories loaded dynamically from game state
@@ -426,6 +433,14 @@ export class GamePageComponent implements OnInit {
 
   onEndGame() {
     this.p2pService.endGame();
+  }
+
+  onLogoClick() {
+    if (this.p2pService.isHost()) {
+      if (confirm('Möchtest du das aktuelle Spiel wirklich abbrechen und alle Spieler zurück in die Lobby bringen?')) {
+        this.p2pService.cancelGame();
+      }
+    }
   }
 
   onLeaveLobby() {

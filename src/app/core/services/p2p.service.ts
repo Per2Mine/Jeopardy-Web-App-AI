@@ -61,6 +61,13 @@ export interface GameState {
   audioPlaying?: boolean;
   boards?: Category[][];
   currentBoardIndex?: number;
+  selectedQuizzes?: {
+    id: string;
+    name: string;
+    icon: string;
+    categoriesCount: number;
+    questionsCount: number;
+  }[];
 }
 
 export interface ChatMessage {
@@ -799,7 +806,8 @@ export class P2pService {
     maxPlayersPerTeam: number,
     buzzerTimeout: number,
     deductPointsOnTimeout: boolean,
-    autoStartTimer: boolean
+    autoStartTimer: boolean,
+    selectedQuizzes: { id: string; name: string; icon: string; categoriesCount: number; questionsCount: number; }[]
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.disconnect();
@@ -814,7 +822,8 @@ export class P2pService {
         buzzerTimeout,
         deductPointsOnTimeout,
         autoStartTimer,
-        timerActive: false
+        timerActive: false,
+        selectedQuizzes
       });
 
       this.wasKicked.set(false);
@@ -1836,6 +1845,21 @@ export class P2pService {
     this.router.navigate(['/game']);
   }
 
+  updateSelectedQuizzes(quizzes: { id: string; name: string; icon: string; categoriesCount: number; questionsCount: number; }[]) {
+    if (!this.isHost()) return;
+    const current = this.gameState();
+    const nextState = {
+      ...current,
+      selectedQuizzes: quizzes
+    };
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
   nextBoard() {
     if (!this.isHost()) return;
     
@@ -2173,6 +2197,29 @@ export class P2pService {
       timerSeconds: null,
       timerActive: false,
       isInitialTurn: false
+    };
+    this.gameState.set(nextState);
+    this.broadcast({
+      type: 'GAME_STATE',
+      senderId: this.myPlayerId()!,
+      payload: nextState
+    });
+  }
+
+  cancelGame() {
+    if (!this.isHost()) return;
+    this.stopHostTimer();
+
+    const current = this.gameState();
+    const nextState: GameState = {
+      ...current,
+      phase: 'LOBBY',
+      activeQuestion: null,
+      buzzedPlayerId: null,
+      buzzerLocked: false,
+      timerSeconds: null,
+      isInitialTurn: false,
+      votes: {}
     };
     this.gameState.set(nextState);
     this.broadcast({
