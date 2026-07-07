@@ -802,7 +802,28 @@ export class StartPageComponent {
         // Select it
         const current = this.selectedTemplates();
         if (!current.includes(quiz.id)) {
+          if (current.length >= 3) {
+            return;
+          }
           this.selectedTemplates.set([...current, quiz.id]);
+          if (this.selectedTemplates().length > 0) {
+            this.showTemplateWarning.set(false);
+          }
+
+          // Sync changes with P2P game state if connected as host
+          if (this.p2pService.isHost() && this.p2pService.connectionState() === 'connected') {
+            const updatedQuizzes = this.selectedTemplates().map(tid => {
+              const tmpl = this.quizTemplates().find(t => t.id === tid) || (tid === quiz.id ? quiz : null);
+              return {
+                id: tid,
+                name: tmpl?.name || 'Unbekanntes Quiz',
+                icon: tmpl?.icon || '❓',
+                categoriesCount: tmpl?.categories.length || 0,
+                questionsCount: tmpl ? tmpl.categories.reduce((acc, cat) => acc + cat.questions.length, 0) : 0
+              };
+            });
+            this.p2pService.updateSelectedQuizzes(updatedQuizzes);
+          }
         }
       },
       error: (err) => {
