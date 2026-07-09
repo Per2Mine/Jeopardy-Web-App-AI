@@ -400,6 +400,177 @@ async function seedDefaultQuizzes(db) {
           ]
         }
       ]
+    },
+    {
+      id: 'ai-quiz-cars',
+      name: 'Autos & Motoren 🚗',
+      icon: '🚗',
+      categories: [
+        {
+          name: 'Automarken & Logos 🏷️',
+          questions: [
+            { text: 'Welcher deutsche Autohersteller hat vier ineinandergreifende Ringe als Logo?', answer: 'Audi', value: 100 },
+            { text: 'Welcher weltberühmte italienische Sportwagenhersteller hat ein aufbäumendes schwarzes Pferd als Wappen?', answer: 'Ferrari', value: 200 },
+            { text: 'Zu welchem großen deutschen Automobilkonzern gehören die britischen Luxusmarken Bentley und Bugatti?', answer: 'Volkswagen / VW (Konzern)', value: 300 },
+            { text: 'Welche schwedische Premiummarke trennte sich von Volvo und stellt ausschließlich Hochleistungs-Elektroautos her?', answer: 'Polestar', value: 400 },
+            { text: 'Aus welchem Land stammt der Automobilhersteller Subaru, dessen Name das Sternbild der Plejaden bezeichnet?', answer: 'Japan', value: 500 }
+          ]
+        },
+        {
+          name: 'Supersportwagen ⚡',
+          questions: [
+            { text: 'Welcher Elektroauto-Hersteller brachte den extrem beschleunigungsstarken „Model S Plaid“ auf den Markt?', answer: 'Tesla', value: 100 },
+            { text: 'Welcher französisch-deutsche Supersportwagen knackte als Chiron als einer der ersten die 490 km/h-Marke?', answer: 'Bugatti (Chiron)', value: 200 },
+            { text: 'Welcher legendäre britische Supersportwagen der 90er besaß drei Sitze (Fahrer mittig) und einen BMW-V12?', answer: 'McLaren F1', value: 300 },
+            { text: 'Welcher US-amerikanische Tuner und Supersportwagenhersteller baute die Modelle Venom GT und F5?', answer: 'Hennessey (Special Performance)', value: 400 },
+            { text: 'Welcher schwedische Hersteller ist bekannt für innovative Rekord-Megacars wie den Jesko und Regera?', answer: 'Koenigsegg', value: 500 }
+          ]
+        },
+        {
+          name: 'Technik & Motoren ⚙️',
+          questions: [
+            { text: 'Für welche Motorbauart steht die Abkürzung „TDI“ bei vielen Dieselfahrzeugen?', answer: 'Turbocharged Direct Injection (Turbo-Dieseldirekteinspritzer)', value: 100 },
+            { text: 'Welche besondere Motorbauart, bei der sich Kolben horizontal gegenüberliegen, nutzt Porsche traditionell im 911er?', answer: 'Boxermotor', value: 200 },
+            { text: 'Wie nennt man das Bauteil, das die Abgase nutzt, um frische Luft mit hohem Druck in den Brennraum zu pressen?', answer: 'Turbolader (Abgasturbolader)', value: 300 },
+            { text: 'Welcher rotierende Kolbenmotor, benannt nach seinem deutschen Erfinder, trieb legendäre Mazda-Sportwagen wie den RX-7 an?', answer: 'Wankelmotor', value: 400 },
+            { text: 'Wie nennt man das Differenzialgetriebe, das bei Kurvenfahrten die Drehzahlen der angetriebenen Räder ausgleicht?', answer: 'Ausgleichsgetriebe / Differenzial', value: 500 }
+          ]
+        },
+        {
+          name: 'Film- & Kultautos 🎬',
+          questions: [
+            { text: 'Welches Auto dient in der Filmreihe „Zurück in die Zukunft“ als Zeitmaschine?', answer: 'DeLorean DMC-12', value: 100 },
+            { text: 'Wie heißt der sprechende, schwarzglänzende Pontiac Firebird mit künstlicher Intelligenz aus der Serie Knight Rider?', answer: 'K.I.T.T.', value: 200 },
+            { text: 'Welches britische Agentenauto (Modell DB5) ist untrennbar mit James Bond verbunden?', answer: 'Aston Martin DB5', value: 300 },
+            { text: 'Unter welchem Kosenamen ist der legendäre VW Käfer aus der Disney-Filmreihe (Startnummer 53) bekannt?', answer: 'Herbie', value: 400 },
+            { text: 'Welches modifizierte weiße Filmauto („Ecto-1“) fahren die Ghostbusters bei ihren Einsätzen?', answer: 'Cadillac Miller-Meteor (Kombiwagen)', value: 500 }
+          ]
+        },
+        {
+          name: 'Geschichte 📜',
+          questions: [
+            { text: 'Welcher US-Industrielle revolutionierte die Automobilproduktion durch die Einführung der Fließbandarbeit beim Model T?', answer: 'Henry Ford', value: 100 },
+            { text: 'Welcher berühmte Kleinstwagen von Rover wurde in den 1960er Jahren zum Kultobjekt und britischen Wahrzeichen?', answer: 'Mini (Classic Mini)', value: 200 },
+            { text: 'Welcher legendäre deutsche Sportwagen trägt seit 1963 die Typschlüsselnummer 911?', answer: 'Porsche 911', value: 300 },
+            { text: 'Welcher Mercedes-Klassiker der 1950er Jahre ist weltberühmt für seine spektakulären Flügeltüren?', answer: 'Mercedes-Benz 300 SL (Flügeltürer)', value: 400 },
+            { text: 'Welcher deutsche Ingenieur reichte im Jahr 1886 das Patent für das erste praxistaugliche Automobil mit Gasmotor ein?', answer: 'Carl Benz', value: 500 }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'ai-quiz-general-hard',
+      name: 'Allgemeinwissen (Schwer) 🧠',
+      icon: '🏛️',
+      categories: [
+        {
+          name: 'Geschichte & Antike 🏛️',
+          questions: [
+            { text: 'Welcher römische Feldherr und Diktator wurde an den Iden des März im Jahr 44 v. Chr. ermordet?', answer: 'Gaius Julius Caesar', value: 100 },
+            { text: 'Welche uralte mesopotamische Keilschrift-Gesetzessammlung gilt als eines der ältesten geschriebenen Gesetzbücher der Erde?', answer: 'Codex Hammurapi', value: 200 },
+            { text: 'In welchem Jahrhundert begann die Französische Revolution mit dem Sturm auf die Bastille?', answer: '18. Jahrhundert (1789)', value: 300 },
+            { text: 'Welche antike Zivilisation besiegte die persischen Invasoren in den berühmten Schlachten von Marathon und Salamis?', answer: 'Griechen (Athener / Stadtstaaten)', value: 400 },
+            { text: 'Wie hieß das oströmische Reich mit der Hauptstadt Konstantinopel, das bis ins Jahr 1453 bestand?', answer: 'Byzantinisches Reich (Byzanz)', value: 500 }
+          ]
+        },
+        {
+          name: 'Geografie 🗺️',
+          questions: [
+            { text: 'Welches wüstenreiche afrikanische Land beheimatet das legendäre Tal der Könige und die Pyramiden von Gizeh?', answer: 'Ägypten', value: 100 },
+            { text: 'Welcher Fluss ist gemessen an seiner gewaltigen Wassermenge (nicht an der Länge) der größte Fluss der Erde?', answer: 'Amazonas', value: 200 },
+            { text: 'Welcher europäische Staat besitzt die meisten aktiven Vulkansysteme und ist bekannt für seine Geysire und Gletscher?', answer: 'Island', value: 300 },
+            { text: 'Welcher Binnensee ist flächenmäßig der größte See der Erde, obwohl sein Wasser salzig ist?', answer: 'Kaspisches Meer', value: 400 },
+            { text: 'Welche eisige Meerenge trennt den asiatischen Kontinent (Sibirien) vom amerikanischen Kontinent (Alaska)?', answer: 'Beringstraße', value: 500 }
+          ]
+        },
+        {
+          name: 'Naturwissenschaften 🔬',
+          questions: [
+            { text: 'Welcher physikalische Begriff beschreibt den Widerstand, den ein Körper einer Änderung seiner Bewegung entgegensetzt?', answer: 'Trägheit (Inertia)', value: 100 },
+            { text: 'Welches chemische Element hat die Ordnungszahl 1 und ist das häufigste Element im Universum?', answer: 'Wasserstoff (H)', value: 200 },
+            { text: 'Welcher dänische Physiker entwickelte 1913 das bahnbrechende Atommodell mit diskreten Elektronenbahnen?', answer: 'Niels Bohr', value: 300 },
+            { text: 'Wie nennt man den biologischen Prozess, bei dem Zellen Glukose unter Sauerstoffverbrauch in Energie umwandeln?', answer: 'Zellatmung (aerobe Atmung)', value: 400 },
+            { text: 'Welches physikalische Prinzip besagt, dass man Ort und Impuls eines Teilchens nicht gleichzeitig exakt bestimmen kann?', answer: 'Heisenbergsche Unschärferelation', value: 500 }
+          ]
+        },
+        {
+          name: 'Kunst & Literatur 🎨',
+          questions: [
+            { text: 'Welcher spanische Maler gilt als Mitbegründer des Kubismus und malte das Antikriegsbild „Guernica“?', answer: 'Pablo Picasso', value: 100 },
+            { text: 'Welcher Dichter schrieb das weltberühmte deutsche Drama „Faust. Eine Tragödie“?', answer: 'Johann Wolfgang von Goethe', value: 200 },
+            { text: 'Welche weltberühmte italienische Skulptur aus weißem Marmor schuf Michelangelo zwischen 1501 und 1504?', answer: 'David', value: 300 },
+            { text: 'Welcher russische Schriftsteller verfasste die monumentalen literarischen Meisterwerke „Krieg und Frieden“ sowie „Anna Karenina“?', answer: 'Leo Tolstoi', value: 400 },
+            { text: 'Welcher Epoche der europäischen Kunstgeschichte (ca. 1600-1720) lassen sich Maler wie Caravaggio und Rembrandt zuordnen?', answer: 'Barock', value: 500 }
+          ]
+        },
+        {
+          name: 'Philosophie 💭',
+          questions: [
+            { text: 'Welcher antike griechische Philosoph war der Lehrer von Alexander dem Großen und Schüler von Platon?', answer: 'Aristoteles', value: 100 },
+            { text: 'Welcher Aufklärungsphilosoph formulierte den berühmten lateinischen Satz „Cogito ergo sum“?', answer: 'René Descartes', value: 200 },
+            { text: 'Welcher deutsche Philosoph forderte den Menschen auf, nach dem „kategorischen Imperativ“ zu handeln?', answer: 'Immanuel Kant', value: 300 },
+            { text: 'Welcher griechische Denker begründete die Lehre der Skepsis und lebte der Legende nach bescheiden in einer Tonne?', answer: 'Diogenes (von Sinope)', value: 400 },
+            { text: 'Wie nennt man das von Platon formulierte philosophische Gleichnis, das den Erkenntnisweg des Menschen beschreibt?', answer: 'Höhlengleichnis', value: 500 }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'ai-quiz-animals',
+      name: 'Wunderwelt der Tiere 🦁',
+      icon: '🦁',
+      categories: [
+        {
+          name: 'Raubtiere & Jäger 🦁',
+          questions: [
+            { text: 'Welches afrikanische Raubtier wird als „König der Tiere“ bezeichnet und lebt in Rudeln?', answer: 'Löwe', value: 100 },
+            { text: 'Welches ist das schnellste Landsäugetier der Erde, das bei der Jagd über 100 km/h erreichen kann?', answer: 'Gepard', value: 200 },
+            { text: 'Welche größte aller Katzenarten lebt in den Wäldern Asiens und besitzt ein markantes Streifenmuster?', answer: 'Tiger', value: 300 },
+            { text: 'Welches arktische Raubtier ist das größte Landsäugetier der Erde und jagt vor allem Robben auf dem Packeis?', answer: 'Eisbär', value: 400 },
+            { text: 'Welcher schlaue Meeresjäger gehört zur Familie der Delphine und wird auch als „Schwertwal“ bezeichnet?', answer: 'Orca (Killerwal)', value: 500 }
+          ]
+        },
+        {
+          name: 'Ozeane & Gewässer 🌊',
+          questions: [
+            { text: 'Welches größte lebende Tier der Erde filtert tonnenweise Krill durch seine Barten im Ozean?', answer: 'Blauwal', value: 100 },
+            { text: 'Welcher wirbellose Meeresbewohner besitzt drei Herzen, blaues Blut und acht Tentakel?', answer: 'Krake (Oktopus)', value: 200 },
+            { text: 'Welcher Fisch ist bekannt für seine giftigen Stacheln und kann sich bei Gefahr kugelförmig aufblasen?', answer: 'Kugelfisch', value: 300 },
+            { text: 'Welches kleine, ungewöhnlich geformte Meerestier schwimmt aufrecht und wird von den Männchen ausgetragen?', answer: 'Seepferdchen', value: 400 },
+            { text: 'Welches uralte, gepanzerte Reptil legt seine Eier an den Stränden ab, an denen es selbst geschlüpft ist?', answer: 'Meeresschildkröte', value: 500 }
+          ]
+        },
+        {
+          name: 'Vögel & Himmel 🦅',
+          questions: [
+            { text: 'Welcher majestätische Greifvogel gilt als „König der Lüfte“ und ist das Wappentier vieler Staaten?', answer: 'Adler (Steinadler)', value: 100 },
+            { text: 'Welcher flugunfähige Vogel lebt in den eisigen Regionen der Antarktis und watschelt in Kolonien?', answer: 'Pinguin', value: 200 },
+            { text: 'Welcher winzige Vogel kann als einziger rückwärts fliegen und schlägt seine Flügel extrem schnell?', answer: 'Kolibri', value: 300 },
+            { text: 'Welcher große Laufvogel aus Afrika legt die größten Eier aller lebenden Vögel?', answer: 'Strauß', value: 400 },
+            { text: 'Welcher nachtaktive Raubvogel kann seinen Kopf um bis zu 270 Grad drehen, um Beute zu erspähen?', answer: 'Eule (Uhu)', value: 500 }
+          ]
+        },
+        {
+          name: 'Insekten 🐜',
+          questions: [
+            { text: 'Welches fleißige Insekt produziert Honig und kommuniziert durch den sogenannten Schwänzeltanz?', answer: 'Biene (Honigbiene)', value: 100 },
+            { text: 'Welches achtbeinige Tier spinnt Netze, um Beute zu fangen, und besitzt Kieferklauen?', answer: 'Spinne', value: 200 },
+            { text: 'Welches Insekt verwandelt sich nach einem Puppenstadium von einer Raupe in ein wunderschönes, geflügeltes Wesen?', answer: 'Schmetterling', value: 300 },
+            { text: 'Welches staatenbildende Insekt kann das Vielfache seines eigenen Körpergewichts tragen und baut Hügel im Wald?', answer: 'Ameise', value: 400 },
+            { text: 'Welches winzige Insekt leuchtet in lauen Sommernächten durch Biolumineszenz im Hinterleib?', answer: 'Glühwürmchen (Leuchtkäfer)', value: 500 }
+          ]
+        },
+        {
+          name: 'Rekorde & Kurioses 🏆',
+          questions: [
+            { text: 'Welches Landsäugetier besitzt den längsten Hals der Erde, um Blätter von hohen Akazien zu fressen?', answer: 'Giraffe', value: 100 },
+            { text: 'Welches australische Beuteltier ernährt sich fast ausschließlich von Eukalyptusblättern und schläft bis zu 20 Stunden am Tag?', answer: 'Koala', value: 200 },
+            { text: 'Welches eierlegende Säugetier aus Australien besitzt einen Entenschnabel und einen Biberschwanz?', answer: 'Schnabeltier (Platypus)', value: 300 },
+            { text: 'Welches extrem langsame Säugetier aus Südamerika verbringt fast sein ganzes Leben kopfüber in den Bäumen?', answer: 'Faultier', value: 400 },
+            { text: 'Welches afrikanische Säugetier verbringt den Tag im Wasser, um seine Haut zu kühlen, und ist extrem territorial und gefährlich?', answer: 'Flusspferd (Nilpferd)', value: 500 }
+          ]
+        }
+      ]
     }
   ];
 
