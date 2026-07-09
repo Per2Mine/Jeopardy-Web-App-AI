@@ -2155,6 +2155,16 @@ export class P2pService {
     
     const current = this.gameState();
     
+    // Check if the game is completely over (no more questions and no more boards left)
+    const totalQuestions = current.categories ? current.categories.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0) : 0;
+    const isBoardComplete = current.answeredQuestions.length === totalQuestions;
+    const hasNextBoard = current.boards && current.currentBoardIndex !== undefined && (current.currentBoardIndex + 1 < current.boards.length);
+
+    if (isBoardComplete && !hasNextBoard) {
+      this.endGame();
+      return;
+    }
+    
     // Advance active selector
     const nextSelector = this.getNextSelectorId(current);
 

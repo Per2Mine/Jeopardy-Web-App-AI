@@ -436,7 +436,7 @@ app.get('/api/quizzes', authenticateToken, async (req, res) => {
     const quizzes = rows.map(row => ({
       id: row.id,
       name: row.name,
-      icon: '📝',
+      icon: row.icon || '📝',
       userEmail: row.user_email,
       categories: JSON.parse(row.categories),
       isComplete: row.is_complete === 1,
@@ -555,7 +555,7 @@ function isQuizComplete(categories) {
 
 // 6. Save Custom Quiz (Create)
 app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
-  const { name, categories, isPublic } = req.body;
+  const { name, categories, isPublic, icon } = req.body;
 
   const validationError = validateQuizPayloadDraft(name, categories);
   if (validationError) {
@@ -577,8 +577,8 @@ app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
     }
 
     await db.run(
-      'INSERT INTO quizzes (id, name, user_email, categories, is_complete, is_public) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, name.trim(), req.user.email, JSON.stringify(categories), complete, isPublicVal]
+      'INSERT INTO quizzes (id, name, user_email, categories, icon, is_complete, is_public) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, name.trim(), req.user.email, JSON.stringify(categories), icon || '📝', complete, isPublicVal]
     );
     res.status(201).json({ success: true, id, isComplete: complete === 1, isPublic: isPublicVal === 1 });
   } catch (err) {
@@ -590,7 +590,7 @@ app.post('/api/quizzes', quizLimiter, authenticateToken, async (req, res) => {
 // 7. Update Custom Quiz
 app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { name, categories, isPublic } = req.body;
+  const { name, categories, isPublic, icon } = req.body;
 
   const validationError = validateQuizPayloadDraft(name, categories);
   if (validationError) {
@@ -619,8 +619,8 @@ app.put('/api/quizzes/:id', quizLimiter, authenticateToken, async (req, res) => 
     }
 
     await db.run(
-      'UPDATE quizzes SET name = ?, categories = ?, is_complete = ?, is_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [name.trim(), JSON.stringify(categories), complete, isPublicVal, id]
+      'UPDATE quizzes SET name = ?, categories = ?, icon = ?, is_complete = ?, is_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [name.trim(), JSON.stringify(categories), icon || '📝', complete, isPublicVal, id]
     );
     res.json({ success: true, isComplete: complete === 1, isPublic: isPublicVal === 1 });
   } catch (err) {
@@ -723,13 +723,13 @@ app.get('/api/community-quizzes', optionalAuthenticateToken, async (req, res) =>
 
     if (favoritesOnly) {
       countSql = `SELECT COUNT(*) as count FROM quizzes q JOIN users u ON q.user_email = u.email JOIN user_favorites f ON q.id = f.quiz_id WHERE ${whereClauses}`;
-      selectSql = `SELECT q.id, q.name, q.categories, q.created_at, u.username as creator_name, 1 as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email JOIN user_favorites f ON q.id = f.quiz_id WHERE ${whereClauses}`;
+      selectSql = `SELECT q.id, q.name, q.categories, q.icon, q.created_at, u.username as creator_name, 1 as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email JOIN user_favorites f ON q.id = f.quiz_id WHERE ${whereClauses}`;
     } else if (req.user) {
       countSql = `SELECT COUNT(*) as count FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
-      selectSql = `SELECT q.id, q.name, q.categories, q.created_at, u.username as creator_name, (CASE WHEN f.quiz_id IS NOT NULL THEN 1 ELSE 0 END) as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email LEFT JOIN user_favorites f ON q.id = f.quiz_id AND f.user_email = ? WHERE ${whereClauses}`;
+      selectSql = `SELECT q.id, q.name, q.categories, q.icon, q.created_at, u.username as creator_name, (CASE WHEN f.quiz_id IS NOT NULL THEN 1 ELSE 0 END) as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email LEFT JOIN user_favorites f ON q.id = f.quiz_id AND f.user_email = ? WHERE ${whereClauses}`;
     } else {
       countSql = `SELECT COUNT(*) as count FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
-      selectSql = `SELECT q.id, q.name, q.categories, q.created_at, u.username as creator_name, 0 as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
+      selectSql = `SELECT q.id, q.name, q.categories, q.icon, q.created_at, u.username as creator_name, 0 as is_favorited FROM quizzes q JOIN users u ON q.user_email = u.email WHERE ${whereClauses}`;
     }
 
     selectSql += ' ORDER BY q.created_at DESC LIMIT ? OFFSET ?';
@@ -762,7 +762,7 @@ app.get('/api/community-quizzes', optionalAuthenticateToken, async (req, res) =>
       return {
         id: row.id,
         name: row.name,
-        icon: '🌐',
+        icon: row.icon || '📝',
         creatorName: row.creator_name,
         categoriesCount,
         questionsCount,
@@ -843,7 +843,7 @@ app.get('/api/community-quizzes/:id', async (req, res) => {
     const response = {
       id: quiz.id,
       name: quiz.name,
-      icon: '🌐',
+      icon: quiz.icon || '📝',
       userEmail: quiz.user_email,
       creatorName: quiz.creator_name,
       categories: JSON.parse(quiz.categories),

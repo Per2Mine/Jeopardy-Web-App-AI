@@ -85,6 +85,7 @@ export class StartPageComponent {
   newUsername = signal('');
   settingsError = signal('');
   settingsSuccess = signal('');
+  showCreateQuizWarning = signal(false);
 
   // Legal modal states
   legalModalOpen = signal(false);
@@ -715,6 +716,13 @@ export class StartPageComponent {
   }
 
   onCreateQuizClick() {
+    if (!this.authService.currentUser()) {
+      this.showCreateQuizWarning.set(true);
+      setTimeout(() => {
+        this.showCreateQuizWarning.set(false);
+      }, 5000);
+      return;
+    }
     this.router.navigate(['/create-quiz']);
   }
 
@@ -732,7 +740,7 @@ export class StartPageComponent {
 
   loadCommunityQuizzes() {
     this.communityLoading.set(true);
-    this.quizService.getCommunityQuizzes(this.communityPage(), 6, this.communitySearch(), this.communityFavoritesOnly()).subscribe({
+    this.quizService.getCommunityQuizzes(this.communityPage(), 9, this.communitySearch(), this.communityFavoritesOnly()).subscribe({
       next: (res) => {
         this.communityQuizzes.set(res.quizzes);
         this.communityTotalPages.set(res.totalPages || 1);
@@ -757,12 +765,41 @@ export class StartPageComponent {
         if (this.communityFavoritesOnly() && !newFavStatus) {
           this.loadCommunityQuizzes();
         }
+
+        // If unfavorited, immediately remove from available templates and active selection
+        if (!newFavStatus) {
+          this.quizService.temporaryCommunityQuizzes.update(list => 
+            list.filter(q => q.id !== quiz.id)
+          );
+          this.selectedTemplates.update(ids => ids.filter(id => id !== quiz.id));
+
+          // Sync changes with P2P game state if connected as host
+          if (this.p2pService.isHost() && this.p2pService.connectionState() === 'connected') {
+            const updatedQuizzes = this.selectedTemplates().map(tid => {
+              const tmpl = this.quizTemplates().find(t => t.id === tid);
+              return {
+                id: tid,
+                name: tmpl?.name || 'Unbekanntes Quiz',
+                icon: tmpl?.icon || '❓',
+                categoriesCount: tmpl?.categories.length || 0,
+                questionsCount: tmpl ? tmpl.categories.reduce((acc, cat) => acc + cat.questions.length, 0) : 0
+              };
+            });
+            this.p2pService.updateSelectedQuizzes(updatedQuizzes);
+          }
+        }
       },
       error: (err) => {
         console.error('Failed to toggle favorite:', err);
         alert('Fehler beim Aktualisieren des Favoritenstatus.');
       }
     });
+  }
+
+  unfavoriteCommunityQuiz(quiz: any, event: Event) {
+    event.stopPropagation();
+    const quizToUnfav = { ...quiz, isFavorited: true };
+    this.toggleFavorite(quizToUnfav);
   }
 
   toggleFavoritesFilter() {

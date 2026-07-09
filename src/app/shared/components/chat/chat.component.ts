@@ -108,7 +108,7 @@ import { AvatarComponent } from '../avatar/avatar.component';
                 @for (msg of filteredMessages(); track msg.id) {
                   @let isSelf = msg.senderId === p2pService.myPlayerId();
                   @let isHostMsg = msg.senderId === p2pService.roomCode();
-                  @let isTeamMsg = msg.teamId !== undefined;
+                  @let isTeamMsg = p2pService.teamMode() && msg.teamId !== undefined;
 
                   <div 
                     [class]="'flex flex-col max-w-[85%] ' + (isSelf ? 'self-end' : 'self-start')">
@@ -125,7 +125,7 @@ import { AvatarComponent } from '../avatar/avatar.component';
                         </app-avatar>
                       </div>
 
-                      <div [class]="'flex flex-col ' + (isSelf ? 'items-end' : 'items-start')">
+                      <div [class]="'flex flex-col min-w-0 ' + (isSelf ? 'items-end' : 'items-start')">
                         <!-- Sender Name/Badge -->
                         @if (!isSelf) {
                           <div class="flex items-center gap-1 mb-1 px-1">
@@ -150,14 +150,12 @@ import { AvatarComponent } from '../avatar/avatar.component';
 
                         <!-- Message Bubble -->
                         <div 
-                          [class]="'px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-words border ' + 
+                          [class]="'px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed break-all whitespace-pre-wrap border ' + 
                                    (isSelf ? 
                                      'bg-jeopardy-accent/15 border-jeopardy-accent/30 text-white rounded-tr-none' : 
                                      'bg-white/[0.04] border-white/5 text-white/90 rounded-tl-none')"
                           [style.border-color]="isTeamMsg ? getTeamColor(msg.teamId!) + '40' : ''"
-                          [style.background-color]="isTeamMsg ? (isSelf ? getTeamColor(msg.teamId!) + '20' : getTeamColor(msg.teamId!) + '0c') : ''">
-                          {{ msg.text }}
-                        </div>
+                          [style.background-color]="isTeamMsg ? (isSelf ? getTeamColor(msg.teamId!) + '20' : getTeamColor(msg.teamId!) + '0c') : ''">{{ msg.text }}</div>
 
                         <!-- Timestamp -->
                         <span class="text-[9px] text-white/20 mt-1 px-1 font-semibold">

@@ -7,7 +7,16 @@
     <header class="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-black/10 shrink-0">
       <div class="flex items-center gap-4">
         @if (p2pService.isHost()) {
-          <app-logo size="sm" [clickable]="false" (click)="onLogoClick()" class="cursor-pointer" title="Spiel abbrechen und zur Lobby zurückkehren"></app-logo>
+          <button 
+            type="button"
+            (click)="onLogoClick()"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-white/70 hover:text-red-400 rounded-xl transition-all duration-300 cursor-pointer text-[11px] font-extrabold select-none shadow-sm"
+            title="Spiel abbrechen und zur Lobby zurückkehren">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"></path>
+            </svg>
+            <span>Zur Lobby</span>
+          </button>
         } @else {
           <app-logo size="sm" [clickable]="false"></app-logo>
         }
@@ -151,59 +160,6 @@
 
           </div>
 
-          <!-- STATUS & CONFIRMATION BAR -->
-          <div class="mt-4 w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-            <div class="flex items-center gap-3">
-              <app-avatar [color]="getActiveSelectorColor()" [avatar]="getActiveSelectorAvatar()" [name]="getActiveSelectorName()" size="md" class="shrink-0"></app-avatar>
-              <div class="text-left">
-                <div class="text-[9px] text-white/40 uppercase tracking-widest font-bold">Auswahlsrecht</div>
-                <div class="text-xs sm:text-sm font-extrabold text-white flex items-center gap-1.5">
-                  <span>{{ getActiveSelectorName() }} ist am Zug</span>
-                  <span class="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex-1 text-center sm:text-left sm:pl-6 border-t sm:border-t-0 sm:border-l border-white/5 pt-3 sm:pt-0">
-              <p class="text-xs text-white/60 font-medium">
-                {{ getSelectionStatusText() }}
-              </p>
-            </div>
-
-            <div class="flex gap-2">
-              @if (p2pService.isHost()) {
-                @if (hasNextBoard()) {
-                  <app-button 
-                    variant="primary" 
-                    size="sm" 
-                    (click)="onNextBoard()">
-                    Nächstes Board starten
-                  </app-button>
-                } @else if (canIConfirmSelection()) {
-                  <app-button 
-                    variant="primary" 
-                    size="sm" 
-                    (click)="onConfirmSelectedQuestion()">
-                    Frage öffnen
-                  </app-button>
-                } @else {
-                  <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Auswahl...</span>
-                }
-              } @else {
-                @if (isBoardComplete() && hasNextBoard()) {
-                  <span class="text-xs text-jeopardy-gold font-bold animate-pulse uppercase tracking-wider">Warte darauf, dass der Host das nächste Board startet...</span>
-                } @else if (isBoardComplete() && !hasNextBoard()) {
-                  <span class="text-xs text-red-400 font-bold uppercase tracking-wider">Spiel beendet! Warte auf Auswertung...</span>
-                } @else {
-                  @if (canISelectOrVote()) {
-                    <span class="text-[10px] text-jeopardy-gold font-bold animate-pulse uppercase tracking-wider">Warte auf Freigabe durch Host...</span>
-                  } @else {
-                    <span class="text-[10px] text-white/30 italic font-semibold">Warte auf Host...</span>
-                  }
-                }
-              }
-            </div>
-          </div>
 
         </div>
       }
@@ -216,7 +172,7 @@
 
         <div 
           [style.box-shadow]="isBuzzed ? 'inset 0 0 80px ' + getBuzzedPlayerColor() + '25' : ''"
-          class="w-full max-w-3xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 relative transition-all duration-500 shadow-2xl animate-fade-in">
+          class="w-full max-w-3xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 relative transition-all duration-500 shadow-2xl animate-fade-in overflow-hidden">
           
           <!-- Timer progress bar at the very top of the card -->
           @if (p2pService.gameState().timerSeconds !== null) {
@@ -238,11 +194,11 @@
 
             @if (p2pService.gameState().timerSeconds !== null) {
               <div 
-                [class]="'px-4 py-2 rounded-full text-xs font-black tracking-wider border transition-all duration-300 flex items-center gap-1.5 shadow-md ' + 
+                [class]="'px-5 py-2 rounded-full text-xs font-bold tracking-widest uppercase border transition-all duration-300 flex items-center gap-1.5 shadow-md ' + 
                          (p2pService.gameState().timerSeconds! <= 3 ? 'timer-critical bg-red-500/20 shadow-red-500/20' : 'bg-black/40 border-white/10 text-white')">
                 ⏱️ {{ p2pService.gameState().timerSeconds }}s
                 @if (!p2pService.gameState().timerActive) {
-                  <span class="text-[9px] text-white/50 font-normal uppercase tracking-wider ml-1">(Pausiert)</span>
+                  <span class="text-[9px] text-white/50 font-normal tracking-wider ml-1">(Pausiert)</span>
                 }
               </div>
             }
@@ -665,7 +621,10 @@
         @if (p2pService.teamMode()) {
           <!-- TEAM MODE SIDEBAR LIST -->
           @for (team of sortedTeams(); track team.id; let index = $index) {
-            <div class="flex flex-col gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
+            <div 
+              class="flex flex-col gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300"
+              [class.border-2]="isTeamActive(team.id)"
+              [ngStyle]="getTeamSidebarStyle(team.id)">
               
               <!-- Team Header -->
               <div class="flex items-center justify-between pb-1.5 border-b border-white/5">
@@ -678,7 +637,12 @@
                                  team.id === 4 ? 'bg-purple-500' : 
                                  team.id === 5 ? 'bg-pink-500' : 'bg-yellow-500')">
                   </span>
-                  <span class="text-xs font-black text-white">Team {{ team.id }}</span>
+                  <span class="text-xs font-black text-white flex items-center gap-1.5">
+                    Team {{ team.id }}
+                    @if (isTeamActive(team.id)) {
+                      <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    }
+                  </span>
                 </div>
                 <span class="text-xs font-black text-jeopardy-gold">{{ team.score }} $</span>
               </div>
@@ -698,7 +662,11 @@
         } @else {
           <!-- SOLO MODE SIDEBAR LIST -->
           @for (player of sortedPlayers(); track player.id; let index = $index) {
-            <div class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300" [class.opacity-40]="player.isOffline">
+            <div 
+              class="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all duration-300"
+              [class.opacity-40]="player.isOffline"
+              [class.border-2]="isPlayerActive(player.id)"
+              [ngStyle]="getPlayerSidebarStyle(player)">
               <!-- Position -->
               <span class="text-[10px] font-bold text-white/35 w-3.5">#{{ index + 1 }}</span>
               
@@ -706,7 +674,12 @@
 
               <!-- Profile Name -->
               <div class="flex-1 min-w-0">
-                <span class="text-xs font-bold text-white truncate block">{{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}</span>
+                <span class="text-xs font-bold text-white truncate block flex items-center gap-1.5">
+                  {{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}
+                  @if (isPlayerActive(player.id)) {
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                  }
+                </span>
               </div>
 
               <!-- Score -->
@@ -732,5 +705,34 @@
     </div>
 
   </aside>
+
+  <!-- 11. TURN CHANGE OVERLAY ANIMATION -->
+  @if (showTurnOverlay()) {
+    <div class="turn-flyover-container">
+      <div class="turn-flyover-banner">
+        <div class="turn-flyover-content">
+          @if (turnOverlayAvatar()) {
+            <app-avatar 
+              [color]="turnOverlayColor()" 
+              [avatar]="turnOverlayAvatar()" 
+              [name]="turnOverlayName()" 
+              [size]="48"
+              class="border-2 rounded-2xl shadow-lg shrink-0"
+              [style.border-color]="turnOverlayColor()">
+            </app-avatar>
+          }
+          <div class="flex flex-col">
+            <span class="text-[10px] font-black uppercase tracking-widest text-white/50">Nächster Zug</span>
+            <span 
+              [style.color]="turnOverlayColor()"
+              [style.text-shadow]="'0 0 15px ' + turnOverlayColor() + '60'"
+              class="text-2xl md:text-3xl font-black tracking-wide leading-tight">
+              {{ turnOverlayName() }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 
 </div>

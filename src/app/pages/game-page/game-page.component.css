@@ -212,3 +212,70 @@
   animation: sweep 4s infinite ease-in-out;
   pointer-events: none;
 }
+
+/* Custom fly-through overlay for player turn changes */
+@keyframes fly-across {
+  0% {
+    transform: translate3d(100%, -50%, 0) skewX(-12deg);
+    opacity: 0;
+  }
+  8% {
+    transform: translate3d(-5%, -50%, 0) skewX(-12deg);
+    opacity: 1;
+  }
+  12% {
+    transform: translate3d(0%, -50%, 0) skewX(-12deg);
+    opacity: 1;
+  }
+  80% {
+    transform: translate3d(0%, -50%, 0) skewX(-12deg);
+    opacity: 1;
+  }
+  83% {
+    transform: translate3d(5%, -50%, 0) skewX(-12deg);
+    opacity: 1;
+  }
+  90% {
+    transform: translate3d(-100%, -50%, 0) skewX(-12deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(-100%, -50%, 0) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+.turn-flyover-container {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.turn-flyover-banner {
+  width: 100%;
+  max-width: 100vw;
+  height: 90px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.8) 25%, rgba(0, 0, 0, 0.8) 75%, rgba(0, 0, 0, 0) 100%);
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate3d(100%, -50%, 0) skewX(-12deg);
+  animation: fly-across 2.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  backdrop-filter: blur(4px);
+}
+
+.turn-flyover-content {
+  transform: skewX(12deg); /* Unskew content */
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}

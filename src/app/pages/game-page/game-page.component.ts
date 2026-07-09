@@ -1,4 +1,4 @@
-import { Component, inject, computed, OnInit, effect } from '@angular/core';
+import { Component, inject, computed, OnInit, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { P2pService, Player, GameState } from '../../core/services/p2p.service';
@@ -31,6 +31,11 @@ export class GamePageComponent implements OnInit {
   audioService = inject(AudioService);
   private router = inject(Router);
 
+  showTurnOverlay = signal(false);
+  turnOverlayName = signal('');
+  turnOverlayColor = signal('#f1b814');
+  turnOverlayAvatar = signal('');
+
   constructor() {
     effect(() => {
       const state = this.p2pService.connectionState();
@@ -43,6 +48,20 @@ export class GamePageComponent implements OnInit {
       const phase = this.p2pService.gameState().phase;
       if (phase === 'LOBBY') {
         this.router.navigate(['/']);
+      }
+    });
+
+    // Track active selector change to show custom fly-through animation
+    let lastActiveSelector: string | null = null;
+    effect(() => {
+      const state = this.p2pService.gameState();
+      if (state && state.phase === 'BOARD' && state.activeSelectorId) {
+        if (lastActiveSelector !== state.activeSelectorId) {
+          this.triggerTurnChangeAnimation(state.activeSelectorId);
+        }
+        lastActiveSelector = state.activeSelectorId;
+      } else {
+        lastActiveSelector = null;
       }
     });
   }
@@ -463,5 +482,71 @@ export class GamePageComponent implements OnInit {
 
   onNextBoard() {
     this.p2pService.nextBoard();
+  }
+
+  isTeamActive(teamId: number): boolean {
+    const state = this.p2pService.gameState();
+    return state ? state.activeSelectorId === `team-${teamId}` : false;
+  }
+
+  isPlayerActive(playerId: string): boolean {
+    const state = this.p2pService.gameState();
+    return state ? state.activeSelectorId === playerId : false;
+  }
+
+  getTeamSidebarStyle(teamId: number): { [key: string]: string } {
+    const active = this.isTeamActive(teamId);
+    if (!active) return {};
+    const color = this.getTeamColor(teamId);
+    return {
+      'border-color': color,
+      'box-shadow': `0 0 12px ${color}40`
+    };
+  }
+
+  getPlayerSidebarStyle(player: any): { [key: string]: string } {
+    const active = this.isPlayerActive(player.id);
+    if (!active) return {};
+    const color = player.color;
+    return {
+      'border-color': color,
+      'box-shadow': `0 0 12px ${color}40`
+    };
+  }
+
+  triggerTurnChangeAnimation(activeSelectorId: string) {
+    let name = '';
+    let color = '#f1b814';
+    let avatar = '';
+
+    if (activeSelectorId.startsWith('team-')) {
+      const teamId = parseInt(activeSelectorId.replace('team-', ''), 10);
+      name = `Team ${teamId}`;
+      color = teamId === 1 ? '#3b82f6' : 
+              teamId === 2 ? '#ef4444' : 
+              teamId === 3 ? '#22c55e' : 
+              teamId === 4 ? '#a855f7' : 
+              teamId === 5 ? '#ec4899' : '#eab308';
+    } else {
+      const player = this.p2pService.players().find(p => p.id === activeSelectorId);
+      if (player) {
+        name = player.name;
+        color = player.color;
+        avatar = player.avatar || '';
+      } else {
+        name = 'Host';
+      }
+    }
+
+    this.turnOverlayName.set(name);
+    this.turnOverlayColor.set(color);
+    this.turnOverlayAvatar.set(avatar);
+
+    this.showTurnOverlay.set(true);
+    this.audioService.playTransition();
+
+    setTimeout(() => {
+      this.showTurnOverlay.set(false);
+    }, 2800);
   }
 }

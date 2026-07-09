@@ -34,6 +34,7 @@ async function getDatabase() {
       name TEXT NOT NULL,
       user_email TEXT NOT NULL,
       categories TEXT NOT NULL,
+      icon TEXT DEFAULT '📝',
       is_complete INTEGER DEFAULT 0,
       is_public INTEGER DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -84,6 +85,12 @@ async function getDatabase() {
 
   try {
     await db.run('ALTER TABLE quizzes ADD COLUMN is_public INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.run('ALTER TABLE quizzes ADD COLUMN icon TEXT DEFAULT "📝"');
   } catch (e) {
     // Column already exists, ignore
   }

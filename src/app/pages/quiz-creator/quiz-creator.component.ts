@@ -28,9 +28,17 @@ export class QuizCreatorComponent implements OnInit {
 
   editingId = signal<string | null>(null);
   quizName = signal('');
+  quizIcon = signal('📝');
+  showIconSelector = signal(false);
   isPublic = signal(false);
   errorMessage = signal('');
   rowValues = signal<number[]>([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
+
+  selectableIcons = [
+    '📝', '🎵', '🎮', '🎬', '⚽', '🌍', '🧠', '🔬', '🎨', '🚀',
+    '🍿', '🍔', '🐾', '💻', '💡', '📚', '🎖️', '🦸', '🎭', '🔮',
+    '🎉', '🔥', '🏆', '🧩', '🎸', '📷', '✈️', '🍕', '🍻', '🪐'
+  ];
 
   ngOnInit() {
     const id = this.route.snapshot.queryParamMap.get('id');
@@ -41,6 +49,7 @@ export class QuizCreatorComponent implements OnInit {
       if (template && template.userEmail === email) {
         this.editingId.set(id);
         this.quizName.set(template.name);
+        this.quizIcon.set(template.icon || '📝');
         this.isPublic.set(template.isPublic || false);
         
         const count = template.categories[0]?.questions?.length || 5;
@@ -526,7 +535,7 @@ export class QuizCreatorComponent implements OnInit {
     }
 
     try {
-      this.quizService.saveQuiz(qName, finalCategories, email, this.editingId() || undefined, this.isPublic()).subscribe({
+      this.quizService.saveQuiz(qName, finalCategories, email, this.editingId() || undefined, this.isPublic(), this.quizIcon()).subscribe({
         next: () => {
           this.router.navigate(['/']);
         },
