@@ -584,14 +584,15 @@ async function seedDefaultQuizzes(db) {
   for (const q of quizzes) {
     const categoriesJson = JSON.stringify(q.categories);
     await db.run(`
-      INSERT INTO quizzes (id, name, user_email, categories, is_complete, is_public)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO quizzes (id, name, user_email, categories, icon, is_complete, is_public)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET 
         name=excluded.name, 
         categories=excluded.categories, 
+        icon=excluded.icon,
         is_complete=excluded.is_complete, 
         is_public=excluded.is_public
-    `, [q.id, q.name, aiEmail, categoriesJson, 1, 1]);
+    `, [q.id, q.name, aiEmail, categoriesJson, '🌐', 1, 1]);
   }
 }
 
