@@ -578,63 +578,6 @@ async function seedDefaultQuizzes(db) {
           ]
         }
       ]
-    },
-    {
-      id: 'ai-quiz-flags',
-      name: 'Flaggen-Quiz 🏳️',
-      icon: '🏳️',
-      categories: [
-        {
-          name: 'Europa 🇪🇺',
-          questions: [
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Deutschland', value: 100, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Flag_of_Germany.svg/320px-Flag_of_Germany.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Italien', value: 200, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Flag_of_Italy.svg/320px-Flag_of_Italy.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Spanien', value: 300, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Flag_of_Spain.svg/320px-Flag_of_Spain.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Griechenland', value: 400, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Flag_of_Greece.svg/320px-Flag_of_Greece.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Island', value: 500, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Flag_of_Iceland.svg/320px-Flag_of_Iceland.svg.png', pixelate: true, pixelateStrength: 10 }
-          ]
-        },
-        {
-          name: 'Amerika 🌎',
-          questions: [
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'USA / Vereinigte Staaten von Amerika', value: 100, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/320px-Flag_of_the_United_States.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Kanada', value: 200, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Flag_of_Canada.svg/320px-Flag_of_Canada.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Brasilien', value: 300, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Flag_of_Brazil.svg/320px-Flag_of_Brazil.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Argentinien', value: 400, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Flag_of_Argentina.svg/320px-Flag_of_Argentina.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Mexiko', value: 500, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Flag_of_Mexico.svg/320px-Flag_of_Mexico.svg.png', pixelate: true, pixelateStrength: 10 }
-          ]
-        },
-        {
-          name: 'Asien 🌏',
-          questions: [
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Japan', value: 100, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Flag_of_Japan.svg/320px-Flag_of_Japan.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Südkorea', value: 200, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Flag_of_South_Korea.svg/320px-Flag_of_South_Korea.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Indien', value: 300, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Flag_of_India.svg/320px-Flag_of_India.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'China', value: 400, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Flag_of_the_People%27s_Republic_of_China.svg/320px-Flag_of_the_People%27s_Republic_of_China.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Türkei', value: 500, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Flag_of_Turkey.svg/320px-Flag_of_Turkey.svg.png', pixelate: true, pixelateStrength: 10 }
-          ]
-        },
-        {
-          name: 'Afrika & Ozeanien 🌍',
-          questions: [
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Australien', value: 100, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Flag_of_Australia.svg/320px-Flag_of_Australia.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Ägypten', value: 200, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Flag_of_Egypt.svg/320px-Flag_of_Egypt.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Südafrika', value: 300, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Flag_of_South_Africa.svg/320px-Flag_of_South_Africa.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Neuseeland', value: 400, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Flag_of_New_Zealand.svg/320px-Flag_of_New_Zealand.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge?', answer: 'Marokko', value: 500, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Flag_of_Morocco.svg/320px-Flag_of_Morocco.svg.png', pixelate: true, pixelateStrength: 10 }
-          ]
-        },
-        {
-          name: 'Besondere Flaggen 🗺️',
-          questions: [
-            { text: 'Zu welchem Land gehört diese quadratische Flagge?', answer: 'Schweiz', value: 100, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Switzerland.svg/320px-Flag_of_Switzerland.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge (ohne Rot, Weiß oder Blau)?', answer: 'Jamaika', value: 200, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Flag_of_Jamaica.svg/320px-Flag_of_Jamaica.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese nicht-rechteckige Flagge?', answer: 'Nepal', value: 300, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Flag_of_Nepal.svg/320px-Flag_of_Nepal.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge mit dem Donnerdrachen Druk?', answer: 'Bhutan', value: 400, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Flag_of_Bhutan.svg/320px-Flag_of_Bhutan.svg.png', pixelate: true, pixelateStrength: 10 },
-            { text: 'Zu welchem Land gehört diese Flagge mit Fregattvogel über Sonne und Wellen?', answer: 'Kiribati', value: 500, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Flag_of_Kiribati.svg/320px-Flag_of_Kiribati.svg.png', pixelate: true, pixelateStrength: 10 }
-          ]
-        }
-      ]
     }
   ];
 

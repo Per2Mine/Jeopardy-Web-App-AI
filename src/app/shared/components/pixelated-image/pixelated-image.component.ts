@@ -67,6 +67,7 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
     if (!ctx) return;
 
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       // Map strength (range 1 to 100) to targetWidth (range 300px down to 4px) using a power curve.
       // This gives fine-grained control over the highly-pixelated guessing range (4px - 50px)
