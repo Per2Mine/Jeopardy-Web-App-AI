@@ -578,6 +578,177 @@ async function seedDefaultQuizzes(db) {
           ]
         }
       ]
+    },
+    {
+      id: 'ai-quiz-history',
+      name: 'Weltgeschichte 📜',
+      icon: '🌐',
+      categories: [
+        {
+          name: 'Antike & Imperien 🏛️',
+          questions: [
+            { text: 'Welcher makedonische König baute eines der größten Reiche der Antike auf und eroberte das Perserreich?', answer: 'Alexander der Große', value: 100 },
+            { text: 'Welche antike ägyptische Königin ging Bündnisse mit Julius Caesar und Marcus Antonius ein?', answer: 'Kleopatra', value: 200 },
+            { text: 'Welches gigantische Reich zerfiel im Jahr 476 n. Chr. offiziell mit der Absetzung des Kaisers Romulus Augustulus?', answer: 'Weströmisches Reich (Rom)', value: 300 },
+            { text: 'So hieß die über 6000 km lange antike Handelsroute, die China mit dem Mittelmeerraum verband.', answer: 'Seidenstraße', value: 400 },
+            { text: 'Welcher karthagische Feldherr überquerte im Zweiten Punischen Krieg mit Kriegselefanten die Alpen?', answer: 'Hannibal (Barkas)', value: 500 }
+          ]
+        },
+        {
+          name: 'Mittelalter ⚔️',
+          questions: [
+            { text: 'Welcher italienische Seefahrer landete 1492 auf der Suche nach Indien in Amerika?', answer: 'Christoph Kolumbus', value: 100 },
+            { text: 'Welcher fränkische König wurde im Jahr 800 von Papst Leo III. in Rom zum Kaiser gekrönt?', answer: 'Karl der Große', value: 200 },
+            { text: 'Welche tödliche Pestepidemie löschte im 14. Jahrhundert fast ein Drittel der europäischen Bevölkerung aus?', answer: 'Der Schwarze Tod / Die Pest', value: 300 },
+            { text: 'Welche französische Nationalheldin führte im Hundertjährigen Krieg Truppen an und wurde in Rouen verbrannt?', answer: 'Jeanne d\'Arc (Johanna von Orleans)', value: 400 },
+            { text: 'Welches skandinavische Seefahrervolk landete um 1000 unter Leif Eriksson als erste Europäer in Nordamerika?', answer: 'Wikinger', value: 500 }
+          ]
+        },
+        {
+          name: 'Neuzeit & Kriege 💣',
+          questions: [
+            { text: 'Welcher französische General krönte sich 1804 selbst zum Kaiser und eroberte weite Teile Europas?', answer: 'Napoleon Bonaparte', value: 100 },
+            { text: 'Der Untergang welches berühmten britischen Luxusdampfers im Jahr 1912 kostete über 1500 Menschen das Leben?', answer: 'Titanic', value: 200 },
+            { text: 'Welches historische Ereignis von 1789 beendete die absolute Monarchie in Frankreich?', answer: 'Französische Revolution', value: 300 },
+            { text: 'Welcher US-Präsident verkündete 1863 die Emanzipationserklärung zur Abschaffung der Sklaverei?', answer: 'Abraham Lincoln', value: 400 },
+            { text: 'In welcher deutschen Stadt wurde 1945 das Abkommen über die Aufteilung Deutschlands beschlossen?', answer: 'Potsdam (Potsdamer Abkommen)', value: 500 }
+          ]
+        },
+        {
+          name: 'Kalter Krieg & Moderne 🛰️',
+          questions: [
+            { text: 'In welchem Jahr fiel die Berliner Mauer, was das Ende der deutschen Teilung einläutete?', answer: '1989', value: 100 },
+            { text: 'Welches sowjetische Raumfahrt-Programm schickte 1957 mit Sputnik 1 den ersten künstlichen Satelliten ins All?', answer: 'Sputnik-Programm', value: 200 },
+            { text: 'In welchem asiatischen Land eskalierte in den 1960ern ein Krieg zwischen dem kommunistischen Norden und dem Süden mit US-Beteiligung?', answer: 'Vietnam (Vietnamkrieg)', value: 300 },
+            { text: 'Welche gefährliche Krise im Jahr 1962 brachte die Welt an den Rand eines Atomkriegs?', answer: 'Kubakrise', value: 400 },
+            { text: 'Welcher sowjetische Staatschef leitete mit den Reformen Glasnost und Perestroika das Ende der Sowjetunion ein?', answer: 'Michail Gorbatschow', value: 500 }
+          ]
+        },
+        {
+          name: 'Persönlichkeiten 👤',
+          questions: [
+            { text: 'Welcher indische Freiheitskämpfer predigte gewaltfreien Widerstand gegen die britische Kolonialherrschaft?', answer: 'Mahatma Gandhi', value: 100 },
+            { text: 'Welcher weltberühmte Bürgerrechtler hielt 1963 die historische Rede „I Have a Dream“ in Washington?', answer: 'Martin Luther King', value: 200 },
+            { text: 'Welcher Bürgerrechtler war der erste schwarze Präsident Südafrikas nach dem Ende der Apartheid?', answer: 'Nelson Mandela', value: 300 },
+            { text: 'Welche britische Königin regierte von 1837 bis 1901 und prägte ein ganzes Zeitalter der Expansion?', answer: 'Königin Victoria', value: 400 },
+            { text: 'Welcher Physiker formulierte 1687 die Philosophiae Naturalis Principia Mathematica mit den Gravitationsgesetzen?', answer: 'Isaac Newton', value: 500 }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'ai-quiz-lol',
+      name: 'League of Legends 🎮',
+      icon: '🌐',
+      categories: [
+        {
+          name: 'Champions & Lore 🧙‍♂️',
+          questions: [
+            { text: 'Dieser blaue, runische Magier reist durch Runeterra, um die Weltgeheimnisse zu bewahren.', answer: 'Ryze', value: 100 },
+            { text: 'Welcher Champion ist die verrückte, blauhaarige Schützin aus Zhaun, die Chaos in Piltover stiftet?', answer: 'Jinx', value: 200 },
+            { text: 'Welcher Dämon des Flusses transportiert Reisende gegen einen verhängnisvollen Preis in seinem Schlund?', answer: 'Tahm Kench', value: 300 },
+            { text: 'Welcher asiatisch inspirierte Wächter des Sandes und Wüstenschakal herrscht über Shurima?', answer: 'Nasus', value: 400 },
+            { text: 'Wie heißt die antike Klinge der Düsteren, die von Aatrox geführt wird (Spezies)?', answer: 'Darkin', value: 500 }
+          ]
+        },
+        {
+          name: 'Fähigkeiten 🔥',
+          questions: [
+            { text: 'Wie heißt Lux\' weltberühmte Ultimate-Fähigkeit, die einen massiven Lichtstrahl abfeuert?', answer: 'Letzter Funke (Final Spark)', value: 100 },
+            { text: 'Welcher Champion zieht Gegner mit seinem berüchtigten Raketengriff (Q) heran?', answer: 'Blitzcrank', value: 200 },
+            { text: 'Welcher Champion springt mit seiner Ultimate „Klimax-Angriff“ (R) hoch in die Luft und stürzt als Meteor herab?', answer: 'Pantheon', value: 300 },
+            { text: 'Welche passive Fähigkeit von Anivia lässt sie nach dem Tod als Ei wiederauferstehen?', answer: 'Reinkarnation', value: 400 },
+            { text: 'Welcher Champion besitzt die Ultimate, mit der er Feinde in ein fünfeckiges Geistergefängnis sperrt?', answer: 'Thresh (Ultimate: Das Gefängnis / The Box)', value: 500 }
+          ]
+        },
+        {
+          name: 'Geografie 🗺️',
+          questions: [
+            { text: 'Auf welcher Map wird das klassische 5v5-Hauptspiel von League of Legends ausgetragen?', answer: 'Kluft der Beschwörer (Summoner\'s Rift)', value: 100 },
+            { text: 'Wie heißt die hochentwickelte, schwebende Zwillingsstadt, die direkt über dem giftigen Zhaun liegt?', answer: 'Piltover', value: 200 },
+            { text: 'Aus welcher eisigen Nordregion von Runeterra stammen Champions wie Ashe, Sejuani und Braum?', answer: 'Freljord', value: 300 },
+            { text: 'Welche düstere Inselgruppe ist die Heimat des Nebels der Verdammnis und von Champions wie Hecarim und Kalista?', answer: 'Schatteninseln (Shadow Isles)', value: 400 },
+            { text: 'Welches stolze, militärische Imperium, regiert von Swain, steht im ständigen Krieg mit Demacia?', answer: 'Noxus', value: 500 }
+          ]
+        },
+        {
+          name: 'Items & Dschungel ⚔️',
+          questions: [
+            { text: 'Welcher neutrale Drachenboss verleiht Teams nach dem vierten Kill eine permanente Drachenseele?', answer: 'Elementardrache (Drake)', value: 100 },
+            { text: 'Welches mächtige Dschungelmonster erscheint nach 20 Minuten und verleiht den verstärkten Rückruf sowie Baron-Buff?', answer: 'Baron Nashor', value: 200 },
+            { text: 'Welches legendäre Rüstungsitem belebt den Champion nach dem Tod mit einem Teil seines Lebens wieder?', answer: 'Schutzengel (Guardian Angel)', value: 300 },
+            { text: 'Wie heißt der rote Dschungel-Buff, der normalen Angriffen Verbrennungsschaden und Verlangsamung verleiht?', answer: 'Brambleback-Buff (Red Buff)', value: 400 },
+            { text: 'Welches magische Item entfernt alle Crowd-Control-Effekte und gewährt kurzzeitig Lauftempo?', answer: 'Quecksilberschärpe (Quicksilver Sash / QSS)', value: 500 }
+          ]
+        },
+        {
+          name: 'E-Sport 🏆',
+          questions: [
+            { text: 'Welcher südkoreanische Midlaner gilt als der beste Spieler aller Zeiten („Unkillable Demon King“) und gewann 5 Worlds-Titel?', answer: 'Faker (Lee Sang-hyeok)', value: 100 },
+            { text: 'Welches erfolgreiche südkoreanische Team, angeführt von Faker, gewann die Worlds 2023 und 2024?', answer: 'T1 (SK Telecom T1)', value: 200 },
+            { text: 'Welches europäische Team um Midlaner Caps dominierte 2019 und erreichte das Worlds-Finale?', answer: 'G2 Esports', value: 300 },
+            { text: 'Wie heißt die offizielle europäische Profiliga von League of Legends?', answer: 'LEC (League of Legends EMEA Championship)', value: 400 },
+            { text: 'Welcher Champion wurde beim legendären „xPeke Backdoor“-Play im Jahr 2013 genutzt, um die gegnerische Basis zu zerstören?', answer: 'Kassadin', value: 500 }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'ai-quiz-fortnite',
+      name: 'Fortnite Battle Royale 🎮',
+      icon: '🌐',
+      categories: [
+        {
+          name: 'Waffen & Items 🔫',
+          questions: [
+            { text: 'Welcher Trank lädt den Schild des Spielers um 50 Punkte auf?', answer: 'Großer Schildtrank (Big Pot)', value: 100 },
+            { text: 'Welche höchste Seltenheitsstufe für Gegenstände hat die Farbe Gold?', answer: 'Legendär (Legendary)', value: 200 },
+            { text: 'Welches Transportmittel lässt Spieler hoch in die Luft fliegen und gleiten, wenn sie darauf springen?', answer: 'Jumppad (Sprungfläche)', value: 300 },
+            { text: 'Welcher Heilgegenstand heilt sowohl Kondition als auch Schild im Sekundentakt im Radius?', answer: 'Schlürfsaft / Chug Splash', value: 400 },
+            { text: 'Welches tragbare Fass heilt sowohl Kondition als auch Schild komplett auf 100 % auf?', answer: 'Schlürffass (Chug Jug)', value: 500 }
+          ]
+        },
+        {
+          name: 'Orte & Geografie 🗺️',
+          questions: [
+            { text: 'Welcher legendäre, zentrale Ort mit vielen Hochhäusern war über viele Seasons hinweg der beliebteste Landepunkt?', answer: 'Tilted Towers', value: 100 },
+            { text: 'Wie heißt der grüne, wässrige Sumpf-Ort, der für seine Schlürfsaft-Kanäle bekannt war?', answer: 'Slurpy Swamp', value: 200 },
+            { text: 'Welcher friedliche Ort mit Wohnhäusern und Vorgärten war in der allerersten Fortnite-Map der Nord-Klassiker?', answer: 'Pleasant Park', value: 300 },
+            { text: 'Welcher eisige Ort war der Hauptstützpunkt des Eiskönigs im südwestlichen Schneegebiet von Kapitel 1?', answer: 'Polar Peak', value: 400 },
+            { text: 'Wie heißt die geheime Agentenbasis aus Kapitel 2 Season 2, die von Midas angeführt wurde?', answer: 'The Agency (Die Agentur)', value: 500 }
+          ]
+        },
+        {
+          name: 'Mechaniken 🧱',
+          questions: [
+            { text: 'Welches neutrale, lebendige Tier aus Holz, Stein und Metall muss man abbauen, um Loot zu erhalten?', answer: 'Vorratslama (Loot Lama)', value: 100 },
+            { text: 'Wie lautet der offizielle Name des Sturm-Rands, der sich im Laufe des Spiels verkleinert?', answer: 'Die Zone / Der Sturm', value: 200 },
+            { text: 'Welcher Modus deaktiviert das Bauen von Wänden, Rampen und Böden komplett?', answer: 'Null Bauen (Zero Build)', value: 300 },
+            { text: 'Wie viele Materialien (Holz, Stein, Metall) kostet der Bau einer einzelnen Wand oder Rampe?', answer: '10', value: 400 },
+            { text: 'Welches Feature aus Kapitel 2 ermöglicht es, besiegte Teammitglieder wieder ins Spiel zu holen?', answer: 'Neustart-Bus (Reboot Van)', value: 500 }
+          ]
+        },
+        {
+          name: 'Lore & Storyline 🌀',
+          questions: [
+            { text: 'Wie heißt der mysteriöse, riesige lila Würfel, der sich ab Season 5 über die Insel bewegte?', answer: 'Kevin (der Würfel)', value: 100 },
+            { text: 'Wie heißt das mächtige, kreisförmige Energieobjekt im Zentrum der Insel, das die Realität zusammenhält?', answer: 'Nullpunkt (Zero Point)', value: 200 },
+            { text: 'Welche mysteriöse Organisation unter der Führung von Genō kontrolliert die Schleife?', answer: 'Der Imagined Order (I.O.)', value: 300 },
+            { text: 'Wie heißt die Gruppe aus sieben legendären Kriegern (darunter Der Fundament), die die Insel beschützen?', answer: 'Die Sieben (The Seven)', value: 400 },
+            { text: 'Welches gewaltige Ingame-Event mit einer Rakete läutete in Season 4 die Ära der Live-Events ein?', answer: 'Der Raketenstart (The Rocket Launch)', value: 500 }
+          ]
+        },
+        {
+          name: 'Skins & Tänze 💃',
+          questions: [
+            { text: 'Welcher ikonische Skin mit einem gelben Bananenkörper gehört zu den bekanntesten Fortnite-Maskottchen?', answer: 'Peely (Schali)', value: 100 },
+            { text: 'Wie heißt der allererste legendäre Skin aus Season 3, der an John Wick erinnert?', answer: 'Der Sensenmann (The Reaper)', value: 200 },
+            { text: 'Welcher berühmte Standard-Emote, bei dem die Arme hin- und hergeschwungen werden, stammt von einem Rucksack-Jungen?', answer: 'Floss (Zahnseide-Tanz)', value: 300 },
+            { text: 'Welcher Skin aus dem Kapitel 1 Season 4 Battle Pass ist ein lila leuchtender Omega-Gegenpart?', answer: 'Omega', value: 400 },
+            { text: 'Welcher weltberühmte Rapper veranstaltete im April 2020 das Live-Konzert „Astronomical“ in Fortnite?', answer: 'Travis Scott', value: 500 }
+          ]
+        }
+      ]
     }
   ];
 
