@@ -765,6 +765,16 @@ async function seedDefaultQuizzes(db) {
         is_public=excluded.is_public
     `, [q.id, q.name, aiEmail, categoriesJson, '🌐', 1, 1]);
   }
+
+  // Clean up any AI-seeded quizzes that are no longer present in the seed list
+  const activeAiQuizIds = quizzes.map(q => q.id);
+  if (activeAiQuizIds.length > 0) {
+    const placeholders = activeAiQuizIds.map(() => '?').join(',');
+    await db.run(`
+      DELETE FROM quizzes 
+      WHERE user_email = ? AND id NOT IN (${placeholders})
+    `, [aiEmail, ...activeAiQuizIds]);
+  }
 }
 
 module.exports = { getDatabase };
