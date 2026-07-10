@@ -33,11 +33,6 @@
             Host / Moderator
           </span>
           @if (p2pService.gameState().phase === 'BOARD') {
-            @if (hasNextBoard()) {
-              <app-button variant="primary" size="sm" (click)="onNextBoard()">
-                Nächstes Board
-              </app-button>
-            }
             <app-button variant="danger" size="sm" (click)="onEndGame()">
               Spiel beenden
             </app-button>
@@ -71,10 +66,12 @@
             </p>
           </div>
 
-          <!-- Board Grid -->
-          <div 
-            [style.grid-template-columns]="'repeat(' + categories.length + ', minmax(0, 1fr))'"
-            class="grid gap-3 md:gap-4 lg:gap-5">
+          <!-- Board Grid Container -->
+          <div class="relative w-full">
+            <div 
+              [style.grid-template-columns]="'repeat(' + categories.length + ', minmax(0, 1fr))'"
+              class="grid gap-3 md:gap-4 lg:gap-5 transition-all duration-300"
+              [class.blur-sm]="p2pService.isHost() && hasNextBoard()">
             
             <!-- Category Headers -->
             @for (cat of categories; track cat.name; let catIdx = $index) {
@@ -157,7 +154,31 @@
                 }
               }
             }
+          </div>
 
+            <!-- Centered Next Board button overlay for Host -->
+            @if (p2pService.isHost() && hasNextBoard()) {
+              <div class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-xs rounded-2xl z-20 animate-fade-in">
+                <div class="bg-gradient-to-br from-jeopardy-blue/90 to-jeopardy-dark/95 border border-jeopardy-accent/50 p-8 rounded-3xl text-center shadow-2xl max-w-sm mx-auto flex flex-col items-center gap-5 transform scale-100 transition-all duration-300 hover:scale-[1.03]">
+                  <div class="h-14 w-14 rounded-full bg-jeopardy-accent/20 flex items-center justify-center text-jeopardy-accent border border-jeopardy-accent/30 animate-pulse">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-xl font-black text-white tracking-wide">Board abgeschlossen!</h3>
+                    <p class="text-xs text-white/60 mt-1">Alle Fragen dieses Spielbretts wurden beantwortet.</p>
+                  </div>
+                  <app-button 
+                    variant="primary" 
+                    size="lg" 
+                    class="w-full font-black text-base py-3 px-6 shadow-lg shadow-jeopardy-accent/35"
+                    (click)="onNextBoard()">
+                    Nächstes Board laden
+                  </app-button>
+                </div>
+              </div>
+            }
           </div>
 
 

@@ -1870,7 +1870,9 @@ export class P2pService {
 
     const categories = current.boards[nextIdx];
 
-    const tempStateForSelector: GameState = {
+    // Fix turn changing twice: preserve the current active selector when transitioning to the next board.
+    // Fall back to calculating next selector if the current active selector is not set.
+    const nextSelector = current.activeSelectorId || this.getNextSelectorId({
       ...current,
       categories,
       answeredQuestions: [],
@@ -1878,8 +1880,7 @@ export class P2pService {
       lockedOutTeamIds: [],
       currentBoardIndex: nextIdx,
       votes: {}
-    };
-    const nextSelector = this.getNextSelectorId(tempStateForSelector);
+    });
 
     const nextState: GameState = {
       ...current,
