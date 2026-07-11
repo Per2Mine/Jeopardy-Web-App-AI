@@ -38,6 +38,7 @@ export class AudioService {
   volume = signal<number>(0.5);
   muted = signal<boolean>(false);
   ttsEnabled = signal<boolean>(false);
+  buzzerKey = signal<string>('Space');
 
   // Tracking state to avoid duplicate triggers
   private lastBuzzedId: string | null = null;
@@ -54,6 +55,7 @@ export class AudioService {
     const savedVol = localStorage.getItem('jeopardy_audio_volume');
     const savedMute = localStorage.getItem('jeopardy_audio_muted');
     const savedTts = localStorage.getItem('jeopardy_audio_tts');
+    const savedBuzzerKey = localStorage.getItem('jeopardy_hotkey_buzzer');
 
     if (savedVol !== null) {
       this.volume.set(parseFloat(savedVol));
@@ -63,6 +65,9 @@ export class AudioService {
     }
     if (savedTts !== null) {
       this.ttsEnabled.set(savedTts === 'true');
+    }
+    if (savedBuzzerKey !== null) {
+      this.buzzerKey.set(savedBuzzerKey);
     }
 
     // Persist volume settings changes
@@ -74,6 +79,9 @@ export class AudioService {
     });
     effect(() => {
       localStorage.setItem('jeopardy_audio_tts', this.ttsEnabled().toString());
+    });
+    effect(() => {
+      localStorage.setItem('jeopardy_hotkey_buzzer', this.buzzerKey());
     });
 
     // Reset lastTtsQuestionKey if TTS is toggled on to allow speaking current question
@@ -312,6 +320,20 @@ export class AudioService {
    */
   testTts() {
     this.speakQuestion("Das Vorlese-Feature ist aktiv und bereit.");
+  }
+
+  /**
+   * Translate internal keydown event code to human-readable German button text
+   */
+  getHumanReadableKey(code: string): string {
+    if (!code) return 'Keine';
+    if (code === 'Space') return 'Leertaste';
+    if (code === 'Enter') return 'Enter';
+    if (code === 'Escape') return 'Esc';
+    if (code === 'Backspace') return 'Rücktaste';
+    if (code.startsWith('Key')) return code.slice(3);
+    if (code.startsWith('Digit')) return code.slice(5);
+    return code;
   }
 
   /**

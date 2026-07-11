@@ -125,6 +125,29 @@
         </div>
       </div>
 
+      <!-- Hotkeys Settings Section -->
+      <div class="flex flex-col gap-2 border-t border-white/10 pt-2.5">
+        <span class="text-[11px] font-bold text-white/50 uppercase tracking-wide font-sans">Tastatur-Hotkeys</span>
+        
+        <div class="flex flex-col gap-2.5 bg-white/[0.03] border border-white/5 rounded-xl p-3">
+          <!-- Player Buzzer Key Configuration -->
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-col">
+              <span class="text-xs font-bold text-white font-sans">Buzzer-Taste</span>
+              <span class="text-[9px] text-white/40 leading-normal font-sans">Eigene Taste zum Buzzern</span>
+            </div>
+            
+            <button 
+              (click)="startRebinding($event)"
+              [class]="'text-[10px] border px-2.5 py-1.5 rounded-lg font-bold transition-all duration-200 cursor-pointer outline-none ' + 
+                       (isRebinding() ? 'bg-jeopardy-gold/20 border-jeopardy-gold text-jeopardy-gold animate-pulse' : 'bg-white/5 border-white/10 hover:bg-white/10 text-white')"
+              [title]="isRebinding() ? 'Drücke eine Taste auf deiner Tastatur...' : 'Klicken zum Ändern'">
+              {{ isRebinding() ? 'Taste drücken...' : audioService.getHumanReadableKey(buzzerKey()) }}
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   }
 </div>

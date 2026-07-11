@@ -508,106 +508,369 @@
         </div>
       }
 
-      <!-- PHASE C: GAME SUMMARY (Final Leaderboard) -->
+      <!-- PHASE C: GAME SUMMARY (Final Leaderboard & Statistics) -->
       @if (p2pService.gameState().phase === 'SUMMARY') {
-        <div class="w-full max-w-xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-8 shadow-2xl animate-fade-in">
+        <div class="w-full max-w-4xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 md:p-10 flex flex-col items-center gap-6 shadow-2xl animate-fade-in">
           
           <div class="text-center flex flex-col items-center gap-2">
             <span class="text-xs font-bold text-jeopardy-accent uppercase tracking-widest">Spiel Beendet</span>
             <h2 class="text-3xl font-black text-white">🏆 Endergebnis 🏆</h2>
             <p class="text-xs text-white/50 max-w-xs mt-1">
-              Das Spiel ist vorbei. Hier ist die finale Rangliste der Spieler.
+              Das Spiel ist vorbei. Hier ist die Spielauswertung.
             </p>
           </div>
 
-          <!-- Podium / Leaderboard display (Solo Mode vs Team Mode) -->
-          <div class="w-full flex flex-col gap-4">
-            @if (p2pService.teamMode()) {
-              @for (team of sortedTeams(); track team.id; let index = $index) {
-                <div 
-                  [class]="'flex flex-col gap-3 p-4 border rounded-2xl transition-all duration-300 ' + 
-                           (index === 0 ? 'winner-card' : 'bg-white/[0.01] border-white/10')">
-                  
-                  <!-- Team Header Info -->
-                  <div class="flex items-center justify-between pb-2 border-b border-white/5">
-                    <div class="flex items-center gap-3">
-                      <!-- Rank Badge -->
-                      <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
-                           [ngClass]="index === 0 ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-white/10 text-white'">
-                        {{ index + 1 }}
+          <!-- Tab Navigation -->
+          <div class="flex bg-white/5 border border-white/10 rounded-xl p-1 w-full gap-1">
+            <button 
+              (click)="summaryTab.set('leaderboard')"
+              [class]="'flex-1 text-center py-2 px-3 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer outline-none border-none ' + 
+                       (summaryTab() === 'leaderboard' ? 'bg-jeopardy-gold text-jeopardy-dark shadow-lg font-extrabold' : 'text-white/60 hover:text-white hover:bg-white/5')"
+            >
+              🏆 Rangliste
+            </button>
+            <button 
+              (click)="summaryTab.set('stats')"
+              [class]="'flex-1 text-center py-2 px-3 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer outline-none border-none ' + 
+                       (summaryTab() === 'stats' ? 'bg-jeopardy-gold text-jeopardy-dark shadow-lg font-extrabold' : 'text-white/60 hover:text-white hover:bg-white/5')"
+            >
+              📊 Auszeichnungen
+            </button>
+            <button 
+              (click)="summaryTab.set('chart')"
+              [class]="'flex-1 text-center py-2 px-3 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer outline-none border-none ' + 
+                       (summaryTab() === 'chart' ? 'bg-jeopardy-gold text-jeopardy-dark shadow-lg font-extrabold' : 'text-white/60 hover:text-white hover:bg-white/5')"
+            >
+              📈 Verlauf
+            </button>
+          </div>
+
+          <!-- Tab 1: Leaderboard -->
+          @if (summaryTab() === 'leaderboard') {
+            <div class="w-full flex flex-col gap-4 animate-scale-in">
+              @if (p2pService.teamMode()) {
+                @for (team of sortedTeams(); track team.id; let index = $index) {
+                  <div 
+                    [class]="'flex flex-col gap-3 p-4 border rounded-2xl transition-all duration-300 ' + 
+                             (index === 0 ? 'winner-card' : 'bg-white/[0.01] border-white/10')">
+                    
+                    <!-- Team Header Info -->
+                    <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                      <div class="flex items-center gap-3">
+                        <!-- Rank Badge -->
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
+                             [ngClass]="index === 0 ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-white/10 text-white'">
+                          {{ index + 1 }}
+                        </div>
+                        
+                        <!-- Team Indicator -->
+                        <div class="flex items-center gap-2">
+                          <span [class]="'w-3 h-3 rounded-full ' + 
+                                        (team.id === 1 ? 'bg-blue-500' : 
+                                         team.id === 2 ? 'bg-red-500' : 
+                                         team.id === 3 ? 'bg-green-500' : 
+                                         team.id === 4 ? 'bg-purple-500' : 
+                                         team.id === 5 ? 'bg-pink-500' : 'bg-yellow-500')">
+                          </span>
+                          <span class="text-base font-black text-white font-sans uppercase tracking-wider">Team {{ team.id }}</span>
+                          @if (index === 0) {
+                            <span class="bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-yellow-500/30 tracking-widest animate-pulse ml-2">🏆 GEWINNER</span>
+                          }
+                        </div>
                       </div>
-                      
-                      <!-- Team Indicator -->
-                      <div class="flex items-center gap-2">
-                        <span [class]="'w-3 h-3 rounded-full ' + 
-                                      (team.id === 1 ? 'bg-blue-500' : 
-                                       team.id === 2 ? 'bg-red-500' : 
-                                       team.id === 3 ? 'bg-green-500' : 
-                                       team.id === 4 ? 'bg-purple-500' : 
-                                       team.id === 5 ? 'bg-pink-500' : 'bg-yellow-500')">
-                        </span>
-                        <span class="text-base font-black text-white font-sans uppercase tracking-wider">Team {{ team.id }}</span>
-                        @if (index === 0) {
-                          <span class="bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-yellow-500/30 tracking-widest animate-pulse ml-2">🏆 GEWINNER</span>
-                        }
+
+                      <!-- Team Score -->
+                      <div class="text-lg font-black text-jeopardy-gold">
+                        {{ team.score }} $
                       </div>
                     </div>
 
-                    <!-- Team Score -->
-                    <div class="text-lg font-black text-jeopardy-gold">
-                      {{ team.score }} $
+                    <!-- Team Members List -->
+                    <div class="flex flex-wrap gap-2.5 p-1">
+                      @for (player of team.players; track player.id) {
+                        <div class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/5" [class.opacity-40]="player.isOffline">
+                          <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="xs" class="shrink-0"></app-avatar>
+                          <span class="text-xs font-bold text-white/90 truncate max-w-[100px]">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</span>
+                          <span class="text-[10px] font-black text-jeopardy-gold/70">({{ player.score }} $)</span>
+                        </div>
+                      }
+                    </div>
+
+                  </div>
+                }
+              } @else {
+                @for (player of sortedPlayers(); track player.id; let index = $index) {
+                  <div 
+                    [class]="'flex items-center gap-4 p-4 border rounded-2xl transition-all duration-300 ' + 
+                             (index === 0 ? 'winner-card' : 'bg-white/[0.01] border-white/10') + 
+                             (player.isOffline ? ' opacity-40' : '')">
+                    
+                    <!-- Rank Badge -->
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
+                         [ngClass]="index === 0 ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-white/10 text-white'">
+                      {{ index + 1 }}
+                    </div>
+
+                    <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="md" class="shrink-0"></app-avatar>
+
+                    <!-- Profile -->
+                    <div class="flex-1 min-w-0">
+                      <span class="text-sm font-bold text-white truncate block flex items-center gap-2">
+                        {{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}
+                        @if (index === 0) {
+                          <span class="bg-yellow-500/20 text-yellow-400 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border border-yellow-500/30 tracking-widest animate-pulse">🏆 Gewinner</span>
+                        }
+                      </span>
+                      <span class="text-[9px] uppercase tracking-wider text-white/40 font-bold">
+                        {{ player.isHost ? 'Host' : 'Spieler' }}
+                      </span>
+                    </div>
+
+                    <!-- Score -->
+                    <div class="text-base font-black text-jeopardy-gold">
+                      {{ player.score }} $
                     </div>
                   </div>
+                }
+              }
+            </div>
+          }
 
-                  <!-- Team Members List -->
-                  <div class="flex flex-wrap gap-2.5 p-1">
-                    @for (player of team.players; track player.id) {
-                      <div class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/5" [class.opacity-40]="player.isOffline">
-                        <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="xs" class="shrink-0"></app-avatar>
-                        <span class="text-xs font-bold text-white/90 truncate max-w-[100px]">{{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}</span>
-                        <span class="text-[10px] font-black text-jeopardy-gold/70">({{ player.score }} $)</span>
+          <!-- Tab 2: Detailed Stats & Awards -->
+          @if (summaryTab() === 'stats') {
+            <div class="w-full flex flex-col gap-4 animate-scale-in">
+              
+              <!-- Awards Cards Grid -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                <!-- Buzzer King Card -->
+                <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
+                  <div class="absolute -right-3 -top-3 w-16 h-16 bg-jeopardy-accent/5 rounded-full flex items-center justify-center text-3xl font-bold opacity-30 select-none rotate-12">⚡</div>
+                  <div class="flex flex-col">
+                    <span class="text-[10px] font-bold text-jeopardy-accent uppercase tracking-widest">⚡ Buzzer-König</span>
+                    <span class="text-[9px] text-white/40 leading-normal">Schnellste durchschnittliche Buzzzeit</span>
+                  </div>
+                  @if (buzzerKing(); as king) {
+                    <div class="flex items-center gap-3 pt-1">
+                      @if (king.avatar) {
+                        <app-avatar [color]="king.color" [avatar]="king.avatar" [name]="king.name" size="sm"></app-avatar>
+                      } @else {
+                        <div class="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-white/50 text-xs font-black" [style.background-color]="king.color">T</div>
+                      }
+                      <div class="flex flex-col min-w-0">
+                        <span class="text-sm font-extrabold text-white truncate">{{ king.name }}</span>
+                        <span class="text-xs font-black text-jeopardy-gold">{{ king.value }}</span>
+                      </div>
+                    </div>
+                  } @else {
+                    <span class="text-xs text-white/30 italic py-2">Keine Buzzer-Daten vorhanden</span>
+                  }
+                </div>
+
+                <!-- Risk Master Card -->
+                <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
+                  <div class="absolute -right-3 -top-3 w-16 h-16 bg-red-500/5 rounded-full flex items-center justify-center text-3xl font-bold opacity-30 select-none rotate-12">🔥</div>
+                  <div class="flex flex-col">
+                    <span class="text-[10px] font-bold text-red-400 uppercase tracking-widest">🔥 Risiko-Meister</span>
+                    <span class="text-[9px] text-white/40 leading-normal">Die meisten Punkte durch Fehler verloren</span>
+                  </div>
+                  @if (riskMaster(); as master) {
+                    <div class="flex items-center gap-3 pt-1">
+                      @if (master.avatar) {
+                        <app-avatar [color]="master.color" [avatar]="master.avatar" [name]="master.name" size="sm"></app-avatar>
+                      } @else {
+                        <div class="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-white/50 text-xs font-black" [style.background-color]="master.color">T</div>
+                      }
+                      <div class="flex flex-col min-w-0">
+                        <span class="text-sm font-extrabold text-white truncate">{{ master.name }}</span>
+                        <span class="text-xs font-black text-red-400">{{ master.value }}</span>
+                      </div>
+                    </div>
+                  } @else {
+                    <span class="text-xs text-white/30 italic py-2">Niemand hat Minuspunkte kassiert</span>
+                  }
+                </div>
+              </div>
+
+              <!-- Category Champions Section -->
+              <div class="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col gap-3 w-full">
+                <span class="text-[10px] font-bold text-jeopardy-gold uppercase tracking-widest">👑 Kategorie-Champions</span>
+                <div class="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+                  @if (categoryChampions().length > 0) {
+                    @for (champ of categoryChampions(); track champ.category) {
+                      <div class="flex items-center justify-between gap-3 bg-white/[0.01] border border-white/5 rounded-xl p-2.5 hover:bg-white/[0.02] transition-colors">
+                        <div class="flex flex-col min-w-0">
+                          <span class="text-[10px] font-extrabold text-white/70 truncate">{{ champ.category }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <span class="text-xs font-bold text-white px-2 py-0.5 rounded-lg border border-white/10 text-right" [style.border-color]="champ.color + '30'" [style.background-color]="champ.color + '10'">
+                            {{ champ.name }}
+                          </span>
+                          <span class="text-xs font-black text-jeopardy-gold">+{{ champ.score }} $</span>
+                        </div>
                       </div>
                     }
-                  </div>
-
+                  } @else {
+                    <span class="text-xs text-white/30 italic text-center py-4">Keine Punkte in Kategorien erzielt</span>
+                  }
                 </div>
-              }
-            } @else {
-              @for (player of sortedPlayers(); track player.id; let index = $index) {
-                <div 
-                  [class]="'flex items-center gap-4 p-4 border rounded-2xl transition-all duration-300 ' + 
-                           (index === 0 ? 'winner-card' : 'bg-white/[0.01] border-white/10') + 
-                           (player.isOffline ? ' opacity-40' : '')">
-                  
-                  <!-- Rank Badge -->
-                  <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
-                       [ngClass]="index === 0 ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-white/10 text-white'">
-                    {{ index + 1 }}
-                  </div>
+              </div>
 
-                  <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="md" class="shrink-0"></app-avatar>
+            </div>
+          }
 
-                  <!-- Profile -->
-                  <div class="flex-1 min-w-0">
-                    <span class="text-sm font-bold text-white truncate block flex items-center gap-2">
-                      {{ player.name }}{{ player.isOffline ? ' (Offline)' : '' }}
-                      @if (index === 0) {
-                        <span class="bg-yellow-500/20 text-yellow-400 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border border-yellow-500/30 tracking-widest animate-pulse">🏆 Gewinner</span>
+          <!-- Tab 3: Points Timeline Chart -->
+          @if (summaryTab() === 'chart') {
+            <div class="w-full flex flex-col gap-4 animate-scale-in items-center relative">
+              <span class="text-[10px] font-bold text-white/50 uppercase tracking-widest self-start">📈 Spielverlauf (Punkte-Trend)</span>
+              
+              @if (chartData(); as chart) {
+                @if (chart.totalSteps > 0) {
+                  <!-- Custom Interactive SVG Chart -->
+                  <div class="w-full relative bg-white/[0.02] border border-white/5 rounded-2xl p-3 flex flex-col items-center overflow-visible">
+                    
+                    <svg 
+                      [attr.viewBox]="'0 0 ' + chart.width + ' ' + chart.height" 
+                      class="w-full h-auto overflow-visible select-none"
+                    >
+                      <!-- Definitions for glowing filter and gradients -->
+                      <defs>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#ffffff" flood-opacity="0.15" />
+                        </filter>
+                      </defs>
+
+                      <!-- Grid Y lines -->
+                      @for (line of chart.gridLines; track line.y) {
+                        <line 
+                          [attr.x1]="chart.paddingLeft" 
+                          [attr.y1]="line.y" 
+                          [attr.x2]="chart.width - 20" 
+                          [attr.y2]="line.y" 
+                          stroke="rgba(255, 255, 255, 0.05)" 
+                          stroke-width="1"
+                        />
+                        <text 
+                          [attr.x]="chart.paddingLeft - 8" 
+                          [attr.y]="line.y + 3" 
+                          fill="rgba(255, 255, 255, 0.4)" 
+                          font-size="10" 
+                          font-weight="bold"
+                          text-anchor="end"
+                          font-family="sans-serif"
+                        >
+                          {{ line.label }}
+                        </text>
                       }
-                    </span>
-                    <span class="text-[9px] uppercase tracking-wider text-white/40 font-bold">
-                      {{ player.isHost ? 'Host' : 'Spieler' }}
-                    </span>
-                  </div>
 
-                  <!-- Score -->
-                  <div class="text-base font-black text-jeopardy-gold">
-                    {{ player.score }} $
+                      <!-- Grid X lines -->
+                      @for (label of chart.xAxisLabels; track label.x) {
+                        <line 
+                          [attr.x1]="label.x" 
+                          [attr.y1]="chart.paddingTop" 
+                          [attr.x2]="label.x" 
+                          [attr.y2]="chart.height - 40" 
+                          stroke="rgba(255, 255, 255, 0.03)" 
+                          stroke-width="1"
+                        />
+                        <text 
+                          [attr.x]="label.x" 
+                          [attr.y]="chart.height - 25" 
+                          fill="rgba(255, 255, 255, 0.4)" 
+                          font-size="10" 
+                          font-weight="bold"
+                          text-anchor="middle"
+                          font-family="sans-serif"
+                        >
+                          {{ label.label }}
+                        </text>
+                      }
+
+                      <!-- Main trend lines -->
+                      @for (line of chart.svgLines; track line.name) {
+                        <!-- Glowing Background Path -->
+                        <path 
+                          [attr.d]="line.path" 
+                          fill="none" 
+                          [attr.stroke]="line.color" 
+                          stroke-width="3" 
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          opacity="0.85"
+                          filter="url(#glow)"
+                        />
+
+                        <!-- Data Points Intersections (Interactive Circles) -->
+                        @for (p of line.points; track p.x; let stepIdx = $index) {
+                          <circle 
+                            [attr.cx]="p.x" 
+                            [attr.cy]="p.y" 
+                            r="4.5" 
+                            [attr.fill]="line.color" 
+                            stroke="#171821" 
+                            stroke-width="1.5"
+                            class="chart-point-circle cursor-pointer"
+                            (mouseenter)="activeTooltip.set({ x: p.x, y: p.y, text: line.name + ': ' + p.score + '$ (' + p.stepName + ')' })"
+                            (mouseleave)="activeTooltip.set(null)"
+                          />
+                        }
+                      }
+
+                      <!-- SVG-native Tooltip (renders on top of everything) -->
+                      @if (activeTooltip(); as tooltip) {
+                        <g class="pointer-events-none animate-fade-in">
+                          <!-- Drop shadow backplate -->
+                          <rect 
+                            [attr.x]="tooltip.x - 100" 
+                            [attr.y]="tooltip.y - 36" 
+                            width="200" 
+                            height="22" 
+                            rx="5" 
+                            fill="rgba(0, 0, 0, 0.5)" 
+                            filter="blur(3px)"
+                          />
+                          <!-- Tooltip Glassmorphic Box -->
+                          <rect 
+                            [attr.x]="tooltip.x - 100" 
+                            [attr.y]="tooltip.y - 36" 
+                            width="200" 
+                            height="22" 
+                            rx="5" 
+                            fill="#171821" 
+                            stroke="rgba(255, 255, 255, 0.25)" 
+                            stroke-width="1"
+                          />
+                          <text 
+                            [attr.x]="tooltip.x" 
+                            [attr.y]="tooltip.y - 22" 
+                            fill="white" 
+                            font-size="9" 
+                            font-weight="black" 
+                            text-anchor="middle"
+                            font-family="sans-serif"
+                          >
+                            {{ tooltip.text }}
+                          </text>
+                        </g>
+                      }
+                    </svg>
+
+                    <!-- Legend display -->
+                    <div class="flex flex-wrap gap-4 mt-3 pt-3 border-t border-white/5 w-full justify-center">
+                      @for (line of chart.svgLines; track line.name) {
+                        <div class="flex items-center gap-2">
+                          <span class="w-3 h-1.5 rounded" [style.background-color]="line.color"></span>
+                          <span class="text-[9px] font-bold uppercase tracking-wider text-white/60">{{ line.name }}</span>
+                        </div>
+                      }
+                    </div>
+
                   </div>
-                </div>
+                } @else {
+                  <span class="text-xs text-white/30 italic text-center py-8">Es wurden keine Punkte verteilt oder abgezogen.</span>
+                }
               }
-            }
-          </div>
+            </div>
+          }
 
           <div class="w-full border-t border-white/10 pt-6 flex flex-col gap-3">
             <app-button 
@@ -672,7 +935,15 @@
               <div class="flex flex-col gap-1 pl-4">
                 @for (player of team.players; track player.id) {
                   <div class="flex items-center justify-between gap-1.5" [class.opacity-40]="player.isOffline">
-                    <span class="text-[10px] font-semibold text-white/75 truncate max-w-[120px]">{{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}</span>
+                    <span class="text-[10px] font-semibold text-white/75 truncate max-w-[120px] flex items-center gap-1.5">
+                      <span>{{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}</span>
+                      @if (!player.isOffline) {
+                        <span class="inline-flex items-center gap-0.5 text-white/30 text-[8px]" [title]="player.isHost ? 'Host' : 'Verbindungslatenz zum Host'">
+                          <span class="w-1 h-1 rounded-full" [ngClass]="player.ping !== undefined ? (player.ping < 100 ? 'bg-emerald-500' : player.ping < 250 ? 'bg-amber-500' : 'bg-red-500') : 'bg-emerald-500'"></span>
+                          <span>{{ player.ping !== undefined ? player.ping + 'ms' : '0ms' }}</span>
+                        </span>
+                      }
+                    </span>
                     <span class="text-[9px] font-bold text-white/40">{{ player.score }} $</span>
                   </div>
                 }
@@ -694,11 +965,21 @@
               <app-avatar [color]="player.color" [avatar]="player.avatar || ''" [name]="player.name" size="xs" class="shrink-0"></app-avatar>
 
               <!-- Profile Name -->
-              <div class="flex-1 min-w-0">
+              <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span class="text-xs font-bold text-white truncate block flex items-center gap-1.5">
                   {{ player.name }}{{ player.isOffline ? ' (Off)' : '' }}
                   @if (isPlayerActive(player.id)) {
                     <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                  }
+                </span>
+                <span class="text-[9px] uppercase tracking-wider text-white/35 font-bold flex items-center gap-1.5">
+                  <span>{{ player.isHost ? 'Host' : 'Spieler' }}</span>
+                  <span>{{ player.id === p2pService.myPlayerId() ? '(Du)' : '' }}</span>
+                  @if (!player.isOffline) {
+                    <span class="inline-flex items-center gap-0.5 text-white/30" [title]="player.isHost ? 'Host' : 'Verbindungslatenz zum Host'">
+                      <span class="w-1.5 h-1.5 rounded-full" [ngClass]="player.ping !== undefined ? (player.ping < 100 ? 'bg-emerald-500' : player.ping < 250 ? 'bg-amber-500' : 'bg-red-500') : 'bg-emerald-500'"></span>
+                      <span>{{ player.ping !== undefined ? player.ping + 'ms' : '0ms' }}</span>
+                    </span>
                   }
                 </span>
               </div>

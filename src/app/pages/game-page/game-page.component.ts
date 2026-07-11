@@ -1,7 +1,7 @@
-import { Component, inject, computed, OnInit, effect, signal } from '@angular/core';
+import { Component, inject, computed, OnInit, effect, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { P2pService, Player, GameState } from '../../core/services/p2p.service';
+import { P2pService, Player, GameState, GameEvent } from '../../core/services/p2p.service';
 import { ButtonComponent } from '../../shared/components/button/button.component';
 import { LogoComponent } from '../../shared/components/logo/logo.component';
 
@@ -113,6 +113,331 @@ export class GamePageComponent implements OnInit {
     });
 
     return list.sort((a, b) => b.score - a.score);
+  });
+
+  summaryTab = signal<'leaderboard' | 'stats' | 'chart'>('leaderboard');
+  activeTooltip = signal<{ x: number; y: number; text: string } | null>(null);
+
+  buzzerKing = computed(() => {
+    const history = this.p2pService.gameState().history || [];
+    const players = this.p2pService.players().filter(p => !p.isHost);
+    
+    // Group buzzer events by player or team (depending on mode)
+    const buzzMap = new Map<string, number[]>();
+    history.forEach(ev => {
+      if (ev.type === 'BUZZ') {
+        const key = this.p2pService.teamMode() 
+          ? (players.find(p => p.id === ev.playerId)?.teamId?.toString() || '') 
+          : ev.playerId;
+        if (key) {
+          if (!buzzMap.has(key)) buzzMap.set(key, []);
+          buzzMap.get(key)!.push(ev.value);
+        }
+      }
+    });
+
+    let bestKey: string | null = null;
+    let bestAvg = Infinity;
+
+    buzzMap.forEach((times, key) => {
+      const avg = times.reduce((a, b) => a + b, 0) / times.length;
+      if (avg < bestAvg) {
+        bestAvg = avg;
+        bestKey = key;
+      }
+    });
+
+    if (!bestKey) return null;
+
+    if (this.p2pService.teamMode()) {
+      const teamId = parseInt(bestKey, 10);
+      return {
+        name: `Team ${teamId}`,
+        value: `${Math.round(bestAvg)} ms`,
+        avatar: '',
+        color: teamId === 1 ? '#3b82f6' : teamId === 2 ? '#ef4444' : teamId === 3 ? '#10b981' : '#8b5cf6'
+      };
+    } else {
+      const p = players.find(player => player.id === bestKey);
+      return p ? {
+        name: p.name,
+        value: `${Math.round(bestAvg)} ms`,
+        avatar: p.avatar || '',
+        color: p.color
+      } : null;
+    }
+  });
+
+  riskMaster = computed(() => {
+    const history = this.p2pService.gameState().history || [];
+    const players = this.p2pService.players().filter(p => !p.isHost);
+    const lossMap = new Map<string, number>();
+
+    history.forEach(ev => {
+      if (ev.type === 'AWARD' && ev.value < 0) {
+        const key = this.p2pService.teamMode()
+          ? (players.find(p => p.id === ev.playerId)?.teamId?.toString() || '')
+          : ev.playerId;
+        if (key) {
+          lossMap.set(key, (lossMap.get(key) || 0) + Math.abs(ev.value));
+        }
+      }
+    });
+
+    let worstKey: string | null = null;
+    let maxLoss = 0;
+
+    lossMap.forEach((loss, key) => {
+      if (loss > maxLoss) {
+        maxLoss = loss;
+        worstKey = key;
+      }
+    });
+
+    if (!worstKey) return null;
+
+    if (this.p2pService.teamMode()) {
+      const teamId = parseInt(worstKey, 10);
+      return {
+        name: `Team ${teamId}`,
+        value: `-${maxLoss} $`,
+        avatar: '',
+        color: teamId === 1 ? '#3b82f6' : teamId === 2 ? '#ef4444' : teamId === 3 ? '#10b981' : '#8b5cf6'
+      };
+    } else {
+      const p = players.find(player => player.id === worstKey);
+      return p ? {
+        name: p.name,
+        value: `-${maxLoss} $`,
+        avatar: p.avatar || '',
+        color: p.color
+      } : null;
+    }
+  });
+
+  categoryChampions = computed(() => {
+    const history = this.p2pService.gameState().history || [];
+    const players = this.p2pService.players().filter(p => !p.isHost);
+    
+    // Group: categoryName -> playerKey/teamKey -> netPoints
+    const catMap = new Map<string, Map<string, number>>();
+
+    history.forEach(ev => {
+      if (ev.type === 'AWARD' && ev.categoryName) {
+        const key = this.p2pService.teamMode()
+          ? (players.find(p => p.id === ev.playerId)?.teamId?.toString() || '')
+          : ev.playerId;
+        if (key) {
+          if (!catMap.has(ev.categoryName)) {
+            catMap.set(ev.categoryName, new Map<string, number>());
+          }
+          const pMap = catMap.get(ev.categoryName)!;
+          pMap.set(key, (pMap.get(key) || 0) + ev.value);
+        }
+      }
+    });
+
+    const champs: { category: string; name: string; score: number; color: string }[] = [];
+
+    catMap.forEach((pMap, category) => {
+      let bestKey: string | null = null;
+      let maxScore = -Infinity;
+
+      pMap.forEach((score, key) => {
+        if (score > maxScore && score > 0) { // Only count positive contributions
+          maxScore = score;
+          bestKey = key;
+        }
+      });
+
+      if (bestKey) {
+        if (this.p2pService.teamMode()) {
+          const teamId = parseInt(bestKey, 10);
+          champs.push({
+            category,
+            name: `Team ${teamId}`,
+            score: maxScore,
+            color: teamId === 1 ? '#3b82f6' : teamId === 2 ? '#ef4444' : teamId === 3 ? '#10b981' : '#8b5cf6'
+          });
+        } else {
+          const p = players.find(player => player.id === bestKey);
+          if (p) {
+            champs.push({
+              category,
+              name: p.name,
+              score: maxScore,
+              color: p.color
+            });
+          }
+        }
+      }
+    });
+
+    return champs;
+  });
+
+  chartData = computed(() => {
+    const history = this.p2pService.gameState().history || [];
+    const players = this.p2pService.players().filter(p => !p.isHost);
+    
+    // 1. Filter out only AWARD events which affect scores
+    const awardEvents = history.filter(ev => ev.type === 'AWARD');
+    
+    // 2. Identify the series (players or teams)
+    interface Series {
+      id: string;
+      name: string;
+      color: string;
+      scores: number[]; // cumulative scores at each step
+    }
+
+    const seriesList: Series[] = [];
+
+    if (this.p2pService.teamMode()) {
+      const limit = this.p2pService.maxTeamsLimit();
+      for (let t = 1; t <= limit; t++) {
+        // Only include teams that have at least one player
+        const hasPlayers = players.some(p => p.teamId === t);
+        if (hasPlayers) {
+          seriesList.push({
+            id: t.toString(),
+            name: `Team ${t}`,
+            color: t === 1 ? '#3b82f6' : t === 2 ? '#ef4444' : t === 3 ? '#10b981' : '#8b5cf6',
+            scores: [0] // start at 0
+          });
+        }
+      }
+    } else {
+      players.forEach(p => {
+        seriesList.push({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          scores: [0] // start at 0
+        });
+      });
+    }
+
+    // 3. Populate cumulative scores step-by-step
+    awardEvents.forEach(ev => {
+      const activePlayer = players.find(p => p.id === ev.playerId);
+      const targetId = this.p2pService.teamMode() 
+        ? (activePlayer?.teamId?.toString() || '')
+        : ev.playerId;
+
+      seriesList.forEach(s => {
+        const lastScore = s.scores[s.scores.length - 1];
+        if (s.id === targetId) {
+          s.scores.push(lastScore + ev.value);
+        } else {
+          s.scores.push(lastScore); // remains unchanged
+        }
+      });
+    });
+
+    // 4. Calculate bounds for scaling the SVG
+    let minVal = 0;
+    let maxVal = 1000;
+    seriesList.forEach(s => {
+      s.scores.forEach(val => {
+        if (val < minVal) minVal = val;
+        if (val > maxVal) maxVal = val;
+      });
+    });
+
+    // Pad maxVal and minVal for spacing
+    const yRange = maxVal - minVal;
+    const yBuffer = yRange > 0 ? yRange * 0.15 : 200;
+    maxVal += yBuffer;
+    minVal -= yBuffer;
+
+    const totalSteps = awardEvents.length; // number of steps = events + 1 (start)
+
+    // Generate paths for each series
+    // SVG width: 800, height: 350
+    const width = 800;
+    const height = 350;
+    const paddingLeft = 60;
+    const paddingRight = 30;
+    const paddingTop = 30;
+    const paddingBottom = 40;
+
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+
+    interface Point {
+      x: number;
+      y: number;
+      score: number;
+      stepName: string;
+    }
+
+    const svgLines = seriesList.map(s => {
+      const points: Point[] = s.scores.map((score, stepIdx) => {
+        const x = paddingLeft + (totalSteps > 0 ? (stepIdx / totalSteps) * chartWidth : 0);
+        
+        // Y scale: inverse because SVG (0,0) is top-left
+        const scoreRange = maxVal - minVal;
+        const percent = scoreRange > 0 ? (score - minVal) / scoreRange : 0.5;
+        const y = paddingTop + chartHeight - (percent * chartHeight);
+
+        let stepName = stepIdx === 0 ? 'Start' : `Frage ${stepIdx}`;
+        if (stepIdx > 0 && awardEvents[stepIdx - 1]) {
+          const ev = awardEvents[stepIdx - 1];
+          stepName = `${ev.playerName}: ${ev.value > 0 ? '+' : ''}${ev.value}$ (${ev.categoryName || 'Quiz'})`;
+        }
+
+        return { x, y, score, stepName };
+      });
+
+      // Construct path command 'M x0 y0 L x1 y1 ...'
+      let d = '';
+      if (points.length > 0) {
+        d = `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+      }
+
+      return {
+        name: s.name,
+        color: s.color,
+        path: d,
+        points: points
+      };
+    });
+
+    // Generate Y-axis grid labels
+    const gridLines: { y: number; label: string }[] = [];
+    const stepsCount = 4;
+    for (let i = 0; i <= stepsCount; i++) {
+      const percent = i / stepsCount;
+      const score = Math.round(minVal + percent * (maxVal - minVal));
+      const y = paddingTop + chartHeight - (percent * chartHeight);
+      gridLines.push({ y, label: `${score} $` });
+    }
+
+    // Generate X-axis step labels
+    const xAxisLabels: { x: number; label: string }[] = [];
+    if (totalSteps > 0) {
+      const labelInterval = Math.max(1, Math.ceil(totalSteps / 5));
+      for (let i = 0; i <= totalSteps; i += labelInterval) {
+        const x = paddingLeft + (i / totalSteps) * chartWidth;
+        xAxisLabels.push({ x, label: i === 0 ? 'Start' : `F${i}` });
+      }
+    } else {
+      xAxisLabels.push({ x: paddingLeft + chartWidth / 2, label: 'Keine Ereignisse' });
+    }
+
+    return {
+      svgLines,
+      gridLines,
+      xAxisLabels,
+      totalSteps,
+      width,
+      height,
+      paddingLeft,
+      paddingTop,
+      chartWidth,
+      chartHeight
+    };
   });
 
   // Check if a question is already played
@@ -448,6 +773,69 @@ export class GamePageComponent implements OnInit {
 
   onToggleAudio() {
     this.p2pService.toggleQuestionAudio();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  handleKeyboardEvent(event: KeyboardEvent) {
+    // 1. Ignore if typing in input fields
+    const target = event.target as HTMLElement;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    const state = this.p2pService.gameState();
+    if (!state) return;
+
+    const isHost = this.p2pService.isHost();
+    const isBuzzed = state.buzzedPlayerId !== null;
+
+    if (isHost) {
+      // Host Moderation Hotkeys
+      if (state.phase === 'QUESTION') {
+        if (state.showAnswer) {
+          // If answer is shown, Enter/Escape/Space goes back to board
+          if (event.key === 'Enter' || event.key === 'Escape' || event.key === ' ') {
+            event.preventDefault();
+            this.onBackToBoard();
+          }
+          return;
+        }
+
+        if (isBuzzed) {
+          // A player has buzzed, award points Richtig (Enter) or Falsch (Backspace)
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            this.onAwardPoints(true);
+          } else if (event.key === 'Backspace') {
+            event.preventDefault();
+            this.onAwardPoints(false);
+          }
+        } else {
+          // Waiting for buzz
+          if (state.buzzerLocked) {
+            // Buzzer is locked after failure, Space unlocks
+            if (event.key === ' ') {
+              event.preventDefault();
+              this.onUnlockBuzzer();
+            }
+          }
+          
+          if (event.key === 'Backspace' || event.key === 'Escape') {
+            event.preventDefault();
+            this.onSkipQuestion();
+          }
+        }
+      }
+    } else {
+      // Player Buzzing Hotkey
+      if (state.phase === 'QUESTION' && !isBuzzed && !this.isBuzzerDisabled()) {
+        const configuredKey = this.audioService.buzzerKey();
+        if (event.code === configuredKey) {
+          event.preventDefault();
+          this.p2pService.buzz();
+        }
+      }
+    }
   }
 
   onEndGame() {

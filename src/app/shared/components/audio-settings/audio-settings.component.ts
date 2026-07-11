@@ -14,16 +14,40 @@ export class AudioSettingsComponent {
   private elementRef = inject(ElementRef);
 
   isOpen = signal<boolean>(false);
+  isRebinding = signal<boolean>(false);
   volume = this.audioService.volume;
   muted = this.audioService.muted;
   ttsEnabled = this.audioService.ttsEnabled;
+  buzzerKey = this.audioService.buzzerKey;
 
   @HostListener('document:click', ['$event'])
   onClickOutside(event: Event) {
     // Automatically close the popover if a click happens outside the component
-    if (!this.elementRef.nativeElement.contains(event.target)) {
+    // Avoid closing if we are currently rebinding a key
+    if (!this.elementRef.nativeElement.contains(event.target) && !this.isRebinding()) {
       this.isOpen.set(false);
     }
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent) {
+    if (this.isRebinding()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.audioService.buzzerKey.set(event.code);
+      this.isRebinding.set(false);
+      return;
+    }
+    
+    // Close dropdown on Escape
+    if (this.isOpen() && event.key === 'Escape') {
+      this.isOpen.set(false);
+    }
+  }
+
+  startRebinding(event: Event) {
+    event.stopPropagation();
+    this.isRebinding.set(true);
   }
 
   toggleDropdown(event: Event) {

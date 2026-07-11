@@ -13,6 +13,16 @@ export interface Player {
   score: number;
   teamId?: number; // 1-indexed team identifier
   isOffline?: boolean;
+  ping?: number;
+}
+
+export interface GameEvent {
+  type: 'BUZZ' | 'AWARD';
+  timestamp: number;
+  playerId: string;
+  playerName: string;
+  value: number; // reactionTime in ms for BUZZ, score delta for AWARD
+  categoryName?: string;
 }
 
 export type GamePhase = 'LOBBY' | 'BOARD' | 'QUESTION' | 'SUMMARY';
@@ -58,9 +68,11 @@ export interface GameState {
   autoStartTimer?: boolean;
   timerActive?: boolean;
   isInitialTurn: boolean;
-  audioPlaying?: boolean;
+  audioPlaying: boolean;
   boards?: Category[][];
   currentBoardIndex?: number;
+  totalBoardsCount?: number;
+  history?: GameEvent[];
   selectedQuizzes?: {
     id: string;
     name: string;
@@ -82,7 +94,7 @@ export interface ChatMessage {
 }
 
 export interface P2pMessage {
-  type: 'JOIN_ACK' | 'PLAYER_LIST' | 'GAME_STATE' | 'KICK' | 'BUZZ' | 'START_GAME' | 'SELECT_TEAM' | 'CHAT_MSG' | 'VOTE_QUESTION' | 'JOIN_REQ' | 'HEARTBEAT';
+  type: 'JOIN_ACK' | 'PLAYER_LIST' | 'GAME_STATE' | 'KICK' | 'BUZZ' | 'START_GAME' | 'SELECT_TEAM' | 'CHAT_MSG' | 'VOTE_QUESTION' | 'JOIN_REQ' | 'HEARTBEAT' | 'PING' | 'PONG';
   senderId: string;
   payload: any;
 }
@@ -179,6 +191,7 @@ export class P2pService {
   players = signal<Player[]>([]);
   errorMessage = signal<string>('');
   wasKicked = signal<boolean>(false);
+  myPing = signal<number>(0);
   hostDisconnected = signal<boolean>(false);
   gameState = signal<GameState>({
     phase: 'LOBBY',
@@ -199,7 +212,8 @@ export class P2pService {
     autoStartTimer: true,
     timerActive: false,
     isInitialTurn: false,
-    audioPlaying: false
+    audioPlaying: false,
+    history: []
   });
   chatMessages = signal<ChatMessage[]>([]);
 
@@ -277,6 +291,7 @@ export class P2pService {
   // Debounce timer for broadcastPlayerList during rapid joins
   private broadcastPlayerListTimer: any = null;
   private readonly BROADCAST_DEBOUNCE_MS = 300;
+  private buzzerActiveTime: number = 0; // Host: tracks when buzzer was activated for current question/unlock
 
   // HTTP Polling Fallback System
   private isPolling = false;
@@ -508,7 +523,7 @@ export class P2pService {
     // 3. Add player to the list
     const updatedPlayers = [
       ...this.players(),
-      { id: playerId, name: playerName, color: playerColor, avatar: playerAvatar, isHost: false, score: 0, teamId, isOffline: false }
+      { id: playerId, name: playerName, color: playerColor, avatar: playerAvatar, isHost: false, score: 0, teamId, isOffline: false, ping: 0 }
     ];
     this.players.set(updatedPlayers);
 
@@ -576,6 +591,27 @@ export class P2pService {
         sessionStorage.setItem('jeopardy_p2p_session', JSON.stringify(sessionData));
       } else if (state === 'disconnected' || state === 'error') {
         sessionStorage.removeItem('jeopardy_p2p_session');
+      }
+    });
+
+    // Ping/Pong Interval for Clients to monitor latency to the Host
+    let pingInterval: any = null;
+    effect(() => {
+      const state = this.connectionState();
+      const isHost = this.isHost();
+      
+      if (state === 'connected' && !isHost) {
+        if (!pingInterval) {
+          pingInterval = setInterval(() => {
+            this.sendPingToHost();
+          }, 3000);
+        }
+      } else {
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+          this.myPing.set(0);
+        }
       }
     });
   }
@@ -857,7 +893,8 @@ export class P2pService {
           color: hostColor,
           avatar: hostAvatar,
           isHost: true,
-          score: 0
+          score: 0,
+          ping: 0
         }]);
 
         // Listen for incoming player connections
@@ -1132,7 +1169,28 @@ export class P2pService {
 
       this.lastSeenMap.set(playerId, Date.now());
 
-      if ((msg.type as any) === 'HEARTBEAT') {
+      if ((msg.type as any) === 'HEARTBEAT' || (msg.type as any) === 'PING' || (msg.type as any) === 'PONG') {
+        if (msg.type === 'PING') {
+          // Reply with PONG containing the same timestamp
+          const pongMsg: P2pMessage = {
+            type: 'PONG' as any,
+            senderId: this.myPlayerId() || 'HOST',
+            payload: { timestamp: msg.payload.timestamp }
+          };
+          conn.send(pongMsg);
+
+          // Update player's ping metadata
+          if (msg.payload && typeof msg.payload.lastPing === 'number') {
+            const updatedPlayers = this.players().map(p => {
+              if (p.id === playerId) {
+                return { ...p, ping: msg.payload.lastPing };
+              }
+              return p;
+            });
+            this.players.set(updatedPlayers);
+            this.debouncedBroadcastPlayerList();
+          }
+        }
         return;
       }
 
@@ -1183,6 +1241,14 @@ export class P2pService {
     conn.on('data', (data: any) => {
       const msg = data as P2pMessage;
       if (!msg) return;
+
+      if ((msg.type as any) === 'HEARTBEAT' || (msg.type as any) === 'PONG') {
+        if (msg.type === 'PONG') {
+          const rtt = Date.now() - msg.payload.timestamp;
+          this.myPing.set(Math.round(rtt / 2));
+        }
+        return;
+      }
 
       console.log(`Client received [${msg.type}] from Host:`, msg.payload);
 
@@ -1242,6 +1308,19 @@ export class P2pService {
           break;
       }
     });
+  }
+
+  private sendPingToHost() {
+    if (!this.clientConnection || !this.clientConnection.open) return;
+    const msg: P2pMessage = {
+      type: 'PING' as any,
+      senderId: this.myPlayerId() || '',
+      payload: {
+        timestamp: Date.now(),
+        lastPing: this.myPing()
+      }
+    };
+    this.clientConnection.send(msg);
   }
 
   /**
@@ -1404,6 +1483,7 @@ export class P2pService {
 
   unlockBuzzer() {
     if (!this.isHost()) return;
+    this.buzzerActiveTime = Date.now();
     const current = this.gameState();
     const nextState: GameState = {
       ...current,
@@ -1596,6 +1676,26 @@ export class P2pService {
       };
     }
 
+    // Append AWARD event to history log if points were deducted
+    if (shouldDeduct && value > 0 && current.activeQuestion) {
+      const player = this.players().find(p => p.id === playerId);
+      const categoryName = current.categories[current.activeQuestion.categoryIndex]?.name || 'Unbekannt';
+      const scoreDelta = -value;
+      const timeoutEvent: GameEvent = {
+        type: 'AWARD',
+        timestamp: Date.now(),
+        playerId,
+        playerName: player ? player.name : 'Spieler',
+        value: scoreDelta,
+        categoryName
+      };
+
+      nextState = {
+        ...nextState,
+        history: [...(nextState.history || []), timeoutEvent]
+      };
+    }
+
     this.gameState.set(nextState);
     this.broadcast({
       type: 'GAME_STATE',
@@ -1624,11 +1724,22 @@ export class P2pService {
 
     // Only accept buzzer if in QUESTION phase, no one has buzzed yet, and buzzer isn't locked
     if (current.phase === 'QUESTION' && current.buzzedPlayerId === null) {
+      const reactionTime = Date.now() - this.buzzerActiveTime;
+      const player = this.players().find(p => p.id === playerId);
+      const buzzEvent: GameEvent = {
+        type: 'BUZZ',
+        timestamp: Date.now(),
+        playerId,
+        playerName: player ? player.name : 'Spieler',
+        value: reactionTime
+      };
+
       const nextState: GameState = {
         ...current,
         buzzedPlayerId: playerId,
         buzzerLocked: true,
-        audioPlaying: true
+        audioPlaying: true,
+        history: [...(current.history || []), buzzEvent]
       };
       this.gameState.set(nextState);
       
@@ -1831,8 +1942,10 @@ export class P2pService {
       timerActive: false,
       timerSeconds: null,
       isInitialTurn: false,
+      audioPlaying: false,
       boards: strippedBoards,
-      currentBoardIndex: 0
+      currentBoardIndex: 0,
+      history: []
     };
     const firstSelector = this.getNextSelectorId(tempStateForSelector);
 
@@ -1944,6 +2057,7 @@ export class P2pService {
       return;
     }
 
+    this.buzzerActiveTime = Date.now();
     const value = question.value;
     const text = question.text;
     const answer = question.answer;
@@ -2116,6 +2230,24 @@ export class P2pService {
         };
       }
     }
+
+    // Append AWARD event to history log
+    const player = this.players().find(p => p.id === playerId);
+    const categoryName = current.categories[current.activeQuestion.categoryIndex]?.name || 'Unbekannt';
+    const scoreDelta = correct ? value : -value;
+    const awardEvent: GameEvent = {
+      type: 'AWARD',
+      timestamp: Date.now(),
+      playerId,
+      playerName: player ? player.name : 'Spieler',
+      value: scoreDelta,
+      categoryName
+    };
+
+    nextState = {
+      ...nextState,
+      history: [...(nextState.history || []), awardEvent]
+    };
 
     this.gameState.set(nextState);
     this.broadcast({
