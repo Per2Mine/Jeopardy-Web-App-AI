@@ -158,6 +158,36 @@ async function initDb() {
 }
 initDb();
 
+// Request logging middleware
+app.use((req, res, next) => {
+  // Exclude static assets
+  const isAsset = /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)$/i.test(req.path);
+  if (!isAsset && db) {
+    db.run('INSERT INTO request_logs (path) VALUES (?)', [req.path]).catch(err => {
+      // Silent error during boot or database locks
+    });
+  }
+  next();
+});
+
+// Lobby creation logging endpoint
+app.post('/api/lobby/create', async (req, res) => {
+  const { roomCode } = req.body;
+  if (!roomCode) {
+    return res.status(400).json({ error: 'roomCode ist erforderlich.' });
+  }
+
+  try {
+    if (db) {
+      await db.run('INSERT INTO lobby_creations (room_code) VALUES (?)', [roomCode.toUpperCase().trim()]);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to log lobby creation:', err);
+    res.status(500).json({ error: 'Fehler beim Erfassen der Lobby-Erstellung.' });
+  }
+});
+
 // Authentication Middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -1127,3 +1157,11 @@ app.use(express.static(angularBuildPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(angularBuildPath, 'index.html'));
 });
+
+// Start local admin panel server
+try {
+  require('./admin');
+} catch (err) {
+  console.error('[Admin Panel] Failed to start admin server:', err);
+}
+

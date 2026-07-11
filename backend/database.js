@@ -50,6 +50,18 @@ async function getDatabase() {
       FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE,
       FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS lobby_creations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS request_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Migrations for existing databases

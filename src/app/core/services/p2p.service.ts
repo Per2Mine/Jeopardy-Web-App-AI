@@ -840,6 +840,12 @@ export class P2pService {
         this.isHost.set(true);
         this.roomCode.set(id);
         this.myPlayerId.set(id);
+
+        // Log lobby creation on the backend
+        this.http.post('/api/lobby/create', { roomCode: id }).subscribe({
+          error: (err) => console.warn('Failed to log lobby creation:', err)
+        });
+
         this.startPolling(id);
         this.connectionState.set('connected');
         this.startHostHeartbeatCheck();

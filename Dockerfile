@@ -27,6 +27,7 @@ ENV PORT=3000
 ENV NODE_ENV=production
 ENV DATABASE_DIR=/app/data
 EXPOSE 3000
+EXPOSE 3001
 
 # Start backend server
 CMD ["node", "backend/server.js"]

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeopardy! Admin Panel</title>
+  
+  <!-- Modern Google Font: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Admin Auth Modal (Overlay) -->
+  <div id="loginModal" class="modal-overlay active" style="display: none;">
+    <div class="modal-card login-card">
+      <div class="login-header">
+        <i data-lucide="shield-check" class="icon-warning" id="loginIcon"></i>
+        <h2 id="loginModalTitle">Admin-Verifizierung</h2>
+        <p id="loginModalDesc">Bitte melde dich mit deinen Admin-Zugangsdaten an.</p>
+      </div>
+      <form id="loginForm" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label for="adminUsername">Benutzername</label>
+          <input type="text" id="adminUsername" placeholder="z.B. admin" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="adminPassword">Passwort</label>
+          <input type="password" id="adminPassword" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div class="form-group" id="adminConfirmGroup" style="display: none;">
+          <label for="adminConfirmPassword">Passwort bestätigen</label>
+          <input type="password" id="adminConfirmPassword" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div id="loginError" class="error-msg" style="display: none;">Ungültige Anmeldedaten.</div>
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block">Anmelden</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="admin-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="logo-text">Jeopardy! <span class="accent-text">Admin</span></span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="switchTab('dashboard')">
+          <i data-lucide="layout-dashboard"></i> Dashboard
+        </button>
+        <button class="nav-item" onclick="switchTab('users')">
+          <i data-lucide="users"></i> Benutzer
+        </button>
+        <button class="nav-item" onclick="switchTab('quizzes')">
+          <i data-lucide="library"></i> Quizzes
+        </button>
+        <button class="nav-item" onclick="switchTab('git')">
+          <i data-lucide="git-branch"></i> Versionen
+        </button>
+        <button class="nav-item" onclick="switchTab('system')">
+          <i data-lucide="server"></i> System
+        </button>
+      </nav>
+      <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
+        <div class="badge badge-success"><span class="pulse"></span> Lokal gehostet</div>
+        <div id="env-badge" class="badge badge-info" style="display: none;">Lade Modus...</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="top-bar-right">
+          <!-- Timeframe Range Selector -->
+          <div class="filter-group" id="dashboard-range-filter" style="margin-right: 18px; display: flex; align-items: center; gap: 8px;">
+            <label for="statRange" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Zeitraum:</label>
+            <select id="statRange" onchange="fetchData()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); border-radius: var(--border-radius-sm); color: var(--text-primary); padding: 6px 12px; font-size: 0.85rem; outline: none; cursor: pointer;">
+              <option value="days">Tage (30 Tage)</option>
+              <option value="weeks">Wochen (12 Wochen)</option>
+              <option value="years">Jahre (5 Jahre)</option>
+            </select>
+          </div>
+          <div class="auto-refresh-control">
+            <label class="switch">
+              <input type="checkbox" id="autoRefreshToggle" checked>
+              <span class="slider"></span>
+            </label>
+            <span class="switch-label">Auto-Update (10s)</span>
+          </div>
+          <button class="btn btn-secondary btn-icon" onclick="fetchData()" title="Aktualisieren">
+            <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- TAB: Dashboard -->
+      <section id="tab-dashboard" class="tab-panel active">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon purple-bg">
+              <i data-lucide="users"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Benutzer</h3>
+              <p class="stat-number" id="stat-users">-</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue-bg">
+              <i data-lucide="library"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Quizzes insgesamt</h3>
+              <p class="stat-number" id="stat-quizzes">-</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green-bg">
+              <i data-lucide="globe"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Öffentliche Quizzes</h3>
+              <p class="stat-number" id="stat-public">-</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple-bg" style="background: linear-gradient(135deg, #a855f7, #7c3aed);">
+              <i data-lucide="play-circle"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Erstellte Lobbys</h3>
+              <p class="stat-number" id="stat-lobbies">-</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue-bg" style="background: linear-gradient(135deg, #14b8a6, #0d9488);">
+              <i data-lucide="activity"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Server-Anfragen (Heute)</h3>
+              <p class="stat-number" id="stat-requests">-</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts & Recent Activity -->
+        <div class="dashboard-grid">
+          <!-- Left Column: Double Stacked Charts -->
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div class="grid-card chart-card">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <h2 id="growthChartTitle" style="margin: 0;">Registrierungen & Quizzes</h2>
+                <div class="chart-toggle-group" style="display: flex; gap: 6px;">
+                  <button class="btn btn-primary btn-sm" id="btn-chart-cumulative" onclick="toggleGrowthChartMode('cumulative')">Gesamt</button>
+                  <button class="btn btn-secondary btn-sm" id="btn-chart-daily" onclick="toggleGrowthChartMode('daily')">Pro Intervall</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <canvas id="growthChart"></canvas>
+              </div>
+            </div>
+            <div class="grid-card chart-card">
+              <div class="card-header">
+                <h2 id="activityChartTitle">Lobby-Erstellungen & Server-Anfragen</h2>
+              </div>
+              <div class="card-body">
+                <canvas id="activityChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-card recent-card">
+            <div class="card-header">
+              <h2>Neueste Registrierungen</h2>
+            </div>
+            <div class="card-body">
+              <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Benutzername</th>
+                      <th>E-Mail</th>
+                      <th>Registriert am</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recent-users-body">
+                    <tr><td colspan="3" class="text-center">Lade Daten...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Users -->
+      <section id="tab-users" class="tab-panel">
+        <div class="grid-card">
+          <div class="card-header table-actions-header">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="userSearch" placeholder="Benutzername oder E-Mail suchen..." oninput="filterUsers()">
+            </div>
+            <div class="filter-group">
+              <label for="userFilter">Filter:</label>
+              <select id="userFilter" onchange="filterUsers()">
+                <option value="all">Alle Benutzer</option>
+                <option value="today">Heute registriert</option>
+                <option value="week">Diese Woche registriert</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="sortable-header" onclick="sortUsers('username')" style="cursor: pointer; user-select: none;">Benutzername <span id="sort-icon-username" style="opacity: 0.3;">↕</span></th>
+                    <th class="sortable-header" onclick="sortUsers('email')" style="cursor: pointer; user-select: none;">E-Mail-Adresse <span id="sort-icon-email" style="opacity: 0.3;">↕</span></th>
+                    <th class="sortable-header" onclick="sortUsers('last_login_at')" style="cursor: pointer; user-select: none;">Letzter Login <span id="sort-icon-last_login_at" style="opacity: 0.3;">↕</span></th>
+                    <th class="sortable-header" onclick="sortUsers('created_at')" style="cursor: pointer; user-select: none;">Registrierdatum <span id="sort-icon-created_at" style="opacity: 1;">▼</span></th>
+                    <th class="text-right">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body">
+                  <tr><td colspan="5" class="text-center">Lade Benutzer...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Quizzes -->
+      <section id="tab-quizzes" class="tab-panel">
+        <div class="grid-card">
+          <div class="card-header table-actions-header">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="quizSearch" placeholder="Quiz-Name oder Ersteller-E-Mail suchen..." oninput="filterQuizzes()">
+            </div>
+            <div class="filter-group">
+              <label for="quizFilter">Sichtbarkeit:</label>
+              <select id="quizFilter" onchange="filterQuizzes()">
+                <option value="all">Alle Quizzes</option>
+                <option value="public">Nur Öffentlich</option>
+                <option value="private">Nur Privat</option>
+                <option value="complete">Vollständig spielbar</option>
+                <option value="incomplete">Entwurf (Unvollständig)</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Ersteller</th>
+                    <th>Kategorien</th>
+                    <th>Fragen</th>
+                    <th>Status</th>
+                    <th>Sichtbarkeit</th>
+                    <th>Erstellt am</th>
+                    <th class="text-right">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody id="quizzes-table-body">
+                  <tr><td colspan="8" class="text-center">Lade Quizzes...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Git (Versionen) -->
+      <section id="tab-git" class="tab-panel">
+        <!-- Unavailable Message -->
+        <div id="git-unavailable-alert" class="grid-card" style="display: none;">
+          <div class="card-body text-center" style="padding: 40px 20px;">
+            <i data-lucide="alert-triangle" class="icon-warning" style="width: 48px; height: 48px; display: inline-block;"></i>
+            <h2 style="margin-top: 12px; margin-bottom: 8px;">Git nicht verfügbar</h2>
+            <p id="git-unavailable-reason" class="text-secondary">Git ist in dieser Laufzeitumgebung nicht installiert oder das Verzeichnis ist kein Git-Repository.</p>
+          </div>
+        </div>
+
+        <!-- Git Content (Show/Hide dynamically) -->
+        <div id="git-content" style="display: none; flex-direction: column; gap: 24px;">
+          <!-- Git Overview Details -->
+          <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            <div class="stat-card">
+              <div class="stat-icon purple-bg">
+                <i data-lucide="git-branch"></i>
+              </div>
+              <div class="stat-details">
+                <h3>Aktueller Branch</h3>
+                <p class="stat-number text-monospace" id="git-active-branch" style="font-size: 1.3rem; margin-top: 4px;">-</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue-bg">
+                <i data-lucide="git-commit"></i>
+              </div>
+              <div class="stat-details">
+                <h3>Letzter Commit</h3>
+                <p class="stat-number text-monospace" id="git-active-commit" style="font-size: 1.3rem; margin-top: 4px;">-</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" id="git-status-icon-bg">
+                <i data-lucide="info" id="git-status-icon"></i>
+              </div>
+              <div class="stat-details">
+                <h3>Arbeitsverzeichnis</h3>
+                <p class="stat-number" id="git-working-dir-status" style="font-size: 1.2rem; margin-top: 4px;">-</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Branches and Commits Layout -->
+          <div class="dashboard-grid">
+            <!-- Left Column: Tags and Branches stacked -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              <!-- Tags (Releases) Card -->
+              <div class="grid-card">
+                <div class="card-header">
+                  <h2>Veröffentlichte Versionen (Tags)</h2>
+                </div>
+                <div class="card-body">
+                  <div class="scrollable-table-container">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Version</th>
+                          <th>Beschreibung / Info</th>
+                          <th class="text-right">Aktionen</th>
+                        </tr>
+                      </thead>
+                      <tbody id="git-tags-body">
+                        <tr><td colspan="3" class="text-center">Lade Versionen...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Branches Card -->
+              <div class="grid-card">
+                <div class="card-header">
+                  <h2>Verfügbare Branches</h2>
+                </div>
+                <div class="card-body">
+                  <div class="scrollable-table-container">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Branch</th>
+                          <th>Typ</th>
+                          <th class="text-right">Aktionen</th>
+                        </tr>
+                      </thead>
+                      <tbody id="git-branches-body">
+                        <tr><td colspan="3" class="text-center">Lade Branches...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Card: Commit History -->
+            <div class="grid-card">
+              <div class="card-header">
+                <h2>Commit Historie (Letzte 20)</h2>
+              </div>
+              <div class="card-body">
+                <div class="scrollable-table-container">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Commit / Info</th>
+                        <th>Nachricht</th>
+                        <th class="text-right">Aktionen</th>
+                      </tr>
+                    </thead>
+                    <tbody id="git-commits-body">
+                      <tr><td colspan="3" class="text-center">Lade Commit-Log...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: System -->
+      <section id="tab-system" class="tab-panel">
+        <div class="system-grid">
+          <div class="grid-card">
+            <div class="card-header">
+              <h2>Datenbank-Details</h2>
+            </div>
+            <div class="card-body">
+              <ul class="system-list">
+                <li>
+                  <span class="label">Datenbank-Treiber</span>
+                  <span class="val">SQLite3 (node-sqlite)</span>
+                </li>
+                <li>
+                  <span class="label">Dateigröße (database.sqlite)</span>
+                  <span class="val" id="sys-db-size">-</span>
+                </li>
+                <li>
+                  <span class="label">Pfad zum Datenbank-Verzeichnis</span>
+                  <span class="val text-monospace">backend/database.sqlite (oder /app/data in Docker)</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="grid-card">
+            <div class="card-header">
+              <h2>Server-Konfiguration</h2>
+            </div>
+            <div class="card-body">
+              <ul class="system-list">
+                <li>
+                  <span class="label">Node.js Version</span>
+                  <span class="val text-monospace">v24-alpine</span>
+                </li>
+                <li>
+                  <span class="label">Haupt-Anwendung Port</span>
+                  <span class="val">3000</span>
+                </li>
+                <li>
+                  <span class="label">Admin Panel Port</span>
+                  <span class="val">3001</span>
+                </li>
+                <li>
+                  <span class="label">IP-Sperre Aktiv</span>
+                  <span class="val badge badge-success">Ja (Nur lokale Netzwerke)</span>
+                </li>
+                <li>
+                  <span class="label">Passcode Absicherung</span>
+                  <span class="val" id="sys-passcode-status">-</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="grid-card">
+            <div class="card-header">
+              <h2>System-Steuerung</h2>
+            </div>
+            <div class="card-body">
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.45;">
+                Hier kannst du die Server-Instanz steuern.
+                <br><strong style="color: var(--accent-blue);">Hinweis:</strong> Im Live-System (Docker) werden Backend und Frontend gemeinsam im selben Container betrieben. Ein Neustart des Servers startet somit die gesamte Anwendung neu.
+              </p>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn btn-secondary" onclick="controlSystem('restart')" style="display: flex; align-items: center; justify-content: center; gap: 8px; border-color: var(--accent-blue); color: var(--text-primary);">
+                  <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> Server neu starten
+                </button>
+                <button class="btn btn-danger" onclick="controlSystem('stop')" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <i data-lucide="power" style="width: 16px; height: 16px;"></i> Server stoppen
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: Quiz details view -->
+  <div id="quizDetailModal" class="modal-overlay">
+    <div class="modal-card quiz-detail-card">
+      <div class="modal-header">
+        <h2 id="detailQuizName">Quiz Details</h2>
+        <button class="close-btn" onclick="closeQuizDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="detailQuizContent">
+        <!-- Dyn. content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Confirmation Dialog (Delete) -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-card confirm-card">
+      <div class="modal-header">
+        <h2>Bist du sicher?</h2>
+        <button class="close-btn" onclick="closeConfirmModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmText">Möchtest du diese Aktion wirklich ausführen? Das kann nicht rückgängig gemacht werden.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeConfirmModal()">Abbrechen</button>
+        <button class="btn btn-danger" id="confirmSubmitBtn">Ja, löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Password Reset Result -->
+  <div id="passwordResetModal" class="modal-overlay">
+    <div class="modal-card pw-reset-card">
+      <div class="modal-header">
+        <h2>Passwort erfolgreich zurückgesetzt</h2>
+        <button class="close-btn" onclick="closePasswordResetModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Ein neues, temporäres Passwort wurde generiert. Bitte teile es dem Benutzer mit. Die Sicherheitsfrage des Benutzers wurde zurückgesetzt.</p>
+        <div class="temp-password-box">
+          <code id="tempPasswordText">Warten...</code>
+          <button class="btn btn-secondary btn-sm" onclick="copyPasswordToClipboard()">
+            <i data-lucide="copy" class="btn-icon-sz"></i> Kopieren
+          </button>
+        </div>
+        <div id="copySuccessMsg" class="copy-success" style="display: none;">In die Zwischenablage kopiert!</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closePasswordResetModal()">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="app.js"></script>
+</body>
+</html>

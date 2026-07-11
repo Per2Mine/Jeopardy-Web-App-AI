@@ -6,6 +6,7 @@ services:
     container_name: jeopardy-app
     ports:
       - "3000:3000"
+      - "3001:3001"
     volumes:
       - jeopardy_db_data:/app/data
     environment:
