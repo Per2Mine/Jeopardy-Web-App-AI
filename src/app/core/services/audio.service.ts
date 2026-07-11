@@ -32,9 +32,12 @@ export class AudioService {
   private isSolutionPlaying = false;
   private manualStop = false;
 
+  private ttsAudio: HTMLAudioElement | null = null;
+
   // Local settings signals
   volume = signal<number>(0.5);
   muted = signal<boolean>(false);
+  ttsEnabled = signal<boolean>(false);
 
   // Tracking state to avoid duplicate triggers
   private lastBuzzedId: string | null = null;
@@ -44,17 +47,22 @@ export class AudioService {
   private lastQuestionBuzzedId: string | null = null;
   private lastAudioPlayingState = false;
   private hasFinishedPlaying = false;
+  private lastTtsQuestionKey: string | null = null;
 
   constructor() {
     // Load settings from localStorage
     const savedVol = localStorage.getItem('jeopardy_audio_volume');
     const savedMute = localStorage.getItem('jeopardy_audio_muted');
+    const savedTts = localStorage.getItem('jeopardy_audio_tts');
 
     if (savedVol !== null) {
       this.volume.set(parseFloat(savedVol));
     }
     if (savedMute !== null) {
       this.muted.set(savedMute === 'true');
+    }
+    if (savedTts !== null) {
+      this.ttsEnabled.set(savedTts === 'true');
     }
 
     // Persist volume settings changes
@@ -63,6 +71,16 @@ export class AudioService {
     });
     effect(() => {
       localStorage.setItem('jeopardy_audio_muted', this.muted().toString());
+    });
+    effect(() => {
+      localStorage.setItem('jeopardy_audio_tts', this.ttsEnabled().toString());
+    });
+
+    // Reset lastTtsQuestionKey if TTS is toggled on to allow speaking current question
+    effect(() => {
+      if (this.ttsEnabled()) {
+        this.lastTtsQuestionKey = null;
+      }
     });
 
     // Update active question audio volume/mute settings
@@ -73,6 +91,9 @@ export class AudioService {
       }
       if (this.solutionGainNode) {
         this.solutionGainNode.gain.setValueAtTime(finalVolume, this.getAudioContext().currentTime);
+      }
+      if (this.ttsAudio) {
+        this.ttsAudio.volume = finalVolume;
       }
     });
 
@@ -92,6 +113,15 @@ export class AudioService {
     // Reactive listener to trigger sounds based on game state changes
     effect(() => {
       const state = this.p2pService.gameState();
+      const tts = this.ttsEnabled();
+      const vol = this.volume();
+      const isMuted = this.muted();
+
+      // Stop speaking if TTS is disabled or muted
+      if (!tts || isMuted) {
+        this.stopSpeaking();
+      }
+
       if (!state) return;
 
       // 1. Buzzer Trigger
@@ -176,7 +206,112 @@ export class AudioService {
         this.lastAudioPlayingState = false;
         this.hasFinishedPlaying = false;
       }
+
+      // 6. Text-to-Speech (TTS) Question Playback
+      const questionKey = activeQ ? `${activeQ.categoryIndex}-${activeQ.questionIndex}` : null;
+      const shouldSpeak = tts && 
+                          !isMuted && 
+                          state.phase === 'QUESTION' && 
+                          !state.showAnswer && 
+                          state.buzzedPlayerId === null &&
+                          activeQ &&
+                          activeQ.text &&
+                          activeQ.text.trim() !== '';
+
+      if (shouldSpeak) {
+        if (questionKey !== this.lastTtsQuestionKey) {
+          this.speakQuestion(activeQ.text);
+          this.lastTtsQuestionKey = questionKey;
+        }
+      } else {
+        this.stopSpeaking();
+        if (state.phase !== 'QUESTION') {
+          this.lastTtsQuestionKey = null;
+        }
+      }
     });
+  }
+
+  /**
+   * Speak a given text using Google Translate TTS (primary) or Web Speech API (fallback)
+   */
+  private speakQuestion(text: string) {
+    this.stopSpeaking();
+    
+    if (!text || text.trim() === '') return;
+    
+    const finalVolume = this.muted() ? 0 : this.volume();
+    
+    // Primary: Google Translate TTS via our backend proxy (bypasses all CORS/ORB/Referrer issues)
+    try {
+      const url = `/api/tts?text=${encodeURIComponent(text)}`;
+      const audio = new Audio(url);
+      
+      let fallbackTriggered = false;
+      const triggerFallback = (err: any) => {
+        if (fallbackTriggered) return;
+        fallbackTriggered = true;
+        console.warn("Proxy Google Translate TTS failed, falling back to native SpeechSynthesis:", err);
+        this.speakNativeFallback(text, finalVolume);
+      };
+      
+      audio.onerror = (e) => {
+        triggerFallback(e);
+      };
+      
+      audio.volume = finalVolume;
+      this.ttsAudio = audio;
+      
+      audio.play().catch(err => {
+        triggerFallback(err);
+      });
+    } catch (e) {
+      console.warn("Failed to initialize proxy TTS audio, trying native fallback:", e);
+      this.speakNativeFallback(text, finalVolume);
+    }
+  }
+
+  /**
+   * Fallback: Speak text using the browser's native Web Speech API
+   */
+  private speakNativeFallback(text: string, volume: number) {
+    if (!('speechSynthesis' in window)) return;
+    
+    try {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'de-DE';
+      utterance.volume = volume;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const deVoice = voices.find(v => v.lang.startsWith('de') || v.lang.includes('DE'));
+      if (deVoice) {
+        utterance.voice = deVoice;
+      }
+      
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error("Native SpeechSynthesis fallback failed:", e);
+    }
+  }
+
+  /**
+   * Stop any active speech synthesis or audio playback
+   */
+  private stopSpeaking() {
+    if (this.ttsAudio) {
+      this.ttsAudio.pause();
+      this.ttsAudio = null;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  /**
+   * Play a test text-to-speech message to verify settings
+   */
+  testTts() {
+    this.speakQuestion("Das Vorlese-Feature ist aktiv und bereit.");
   }
 
   /**

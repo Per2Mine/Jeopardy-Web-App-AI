@@ -1507,7 +1507,7 @@
     <button 
       (click)="patchNotesModalOpen.set(true)"
       class="px-2.5 py-1 text-[10px] font-bold text-white/40 hover:text-jeopardy-accent bg-white/[0.01] hover:bg-white/[0.05] border border-white/10 hover:border-jeopardy-accent/30 rounded-full transition-all duration-300 flex items-center gap-1 cursor-pointer shadow-md backdrop-blur-sm">
-      <span>v1.2.2</span>
+      <span>v1.2.3</span>
       <span class="w-1.5 h-1.5 rounded-full bg-jeopardy-accent animate-pulse"></span>
     </button>
   </div>
@@ -1542,11 +1542,25 @@
         <!-- Changelog Content -->
         <div class="flex-1 overflow-y-auto pr-2 flex flex-col gap-6 scrollbar-thin scrollbar-thumb-white/10">
           
-          <!-- Version 1.2.2 -->
+          <!-- Version 1.2.3 -->
           <div class="flex flex-col gap-3">
             <div class="flex justify-between items-center bg-jeopardy-accent/10 border border-jeopardy-accent/20 px-4 py-2 rounded-xl">
-              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.2.2 — Premium-Design & QoL-Features 🚀</span>
+              <span class="text-sm font-black text-jeopardy-accent uppercase tracking-wider">v1.2.3 — Text-to-Speech (TTS) & Premium Audio-Menü 🗣️</span>
               <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Aktuelle Version</span>
+            </div>
+            <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
+              <li><strong class="text-white">Text-to-Speech Vorlese-Feature:</strong> Der Host und alle Spieler können nun Fragen im Spiel automatisch vorlesen lassen. Reine Bild-Fragen bleiben dabei stumm. Das Feature ist standardmäßig ausgeschaltet.</li>
+              <li><strong class="text-white">Premium Audio- &amp; Stimmeinstellungen:</strong> Das Lautstärke-Menü wurde durch ein modernes, glassmorphes Dropdown-Panel ersetzt. Es bietet eine detaillierte Steuerung der Gesamtlautstärke sowie einen Schalter für das Vorlese-Feature.</li>
+              <li><strong class="text-white">Integrierter Stimmen-Test:</strong> Ein „Stimme testen“-Button ermöglicht das sofortige Abspielen eines Testsatzes directly in den Einstellungen, um die Tonqualität und Lautstärke vorab zu prüfen.</li>
+              <li><strong class="text-white">Smarte Linux-Kompatibilität:</strong> Firefox unter Linux benötigt dank eines neu entwickelten serverseitigen Proxies keine zusätzliche Installation von System-Paketen wie `speech-dispatcher` mehr.</li>
+            </ul>
+          </div>
+
+          <!-- Version 1.2.2 -->
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2 rounded-xl">
+              <span class="text-sm font-black text-white uppercase tracking-wider font-semibold">v1.2.2 — Premium-Design & QoL-Features 🚀</span>
+              <span class="text-[10px] text-white/40 font-bold uppercase font-mono">Juli 2026</span>
             </div>
             <ul class="list-disc pl-5 text-xs text-white/70 space-y-1.5 leading-relaxed">
               <li><strong class="text-white">Quiz-Icons &amp; Emoji-Wähler:</strong> Du kannst nun beim Erstellen/Bearbeiten deiner Quizzes aus 30 passenden Emojis (z. B. 🎵 für Musik) ein passendes Icon wählen, welches auch im Community-Pool angezeigt wird.</li>

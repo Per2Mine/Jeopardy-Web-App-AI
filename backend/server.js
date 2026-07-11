@@ -924,6 +924,30 @@ app.post('/api/quizzes/sync', authenticateToken, async (req, res) => {
   }
 });
 
+// Proxy for Google Translate Text-to-Speech to avoid CORS and browser blocking (ORB/CORB)
+app.get('/api/tts', (req, res) => {
+  const text = req.query.text;
+  if (!text) {
+    return res.status(400).send('Missing text parameter');
+  }
+
+  const https = require('https');
+  const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=de&client=tw-ob&q=${encodeURIComponent(text)}`;
+
+  const clientReq = https.get(url, (googleRes) => {
+    res.setHeader('Content-Type', googleRes.headers['content-type'] || 'audio/mpeg');
+    if (googleRes.headers['content-length']) {
+      res.setHeader('Content-Length', googleRes.headers['content-length']);
+    }
+    googleRes.pipe(res);
+  });
+
+  clientReq.on('error', (err) => {
+    console.error('TTS Proxy Error:', err);
+    res.status(500).send('Error fetching speech audio');
+  });
+});
+
 // 10. Get WebRTC ICE Servers (STUN/TURN)
 app.get('/api/webrtc/ice-servers', (req, res) => {
   const turnUrl = process.env.TURN_URL;
