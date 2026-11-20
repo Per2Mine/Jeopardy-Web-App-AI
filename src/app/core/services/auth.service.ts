@@ -1,6 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove } from '../utils/storage.util';
 
 export interface User {
   username: string;
@@ -22,9 +23,14 @@ export class AuthService {
   currentUser = signal<User | null>(null);
 
   private TOKEN_KEY = 'jeopardy_token';
+  private readyPromise: Promise<void>;
 
   constructor() {
-    this.restoreSession();
+    this.readyPromise = this.restoreSession();
+  }
+
+  whenReady(): Promise<void> {
+    return this.readyPromise;
   }
 
   /**
@@ -145,7 +151,7 @@ export class AuthService {
    * Log out current user
    */
   logout() {
-    localStorage.removeItem(this.TOKEN_KEY);
+    safeLocalStorageRemove(this.TOKEN_KEY);
     this.currentUser.set(null);
   }
 
@@ -196,7 +202,7 @@ export class AuthService {
   }
 
   private async restoreSession() {
-    const token = localStorage.getItem(this.TOKEN_KEY);
+    const token = safeLocalStorageGet(this.TOKEN_KEY);
     if (!token) return;
 
     try {
@@ -204,14 +210,17 @@ export class AuthService {
         this.http.get<{ user: User }>('/api/auth/me')
       );
       this.currentUser.set(res.user);
-    } catch (e) {
-      // If token expired or invalid, log out
-      this.logout();
+    } catch (e: any) {
+      // Only clear stored token on explicit auth errors (401/403/404), not transient network/5xx errors
+      const status = e?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        this.logout();
+      }
     }
   }
 
   private handleAuthSuccess(res: AuthResponse) {
-    localStorage.setItem(this.TOKEN_KEY, res.token);
+    safeLocalStorageSet(this.TOKEN_KEY, res.token);
     this.currentUser.set(res.user);
   }
 }

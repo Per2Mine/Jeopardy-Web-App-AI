@@ -6,13 +6,14 @@ services:
     container_name: jeopardy-app
     ports:
       - "3000:3000"
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     volumes:
       - jeopardy_db_data:/app/data
     environment:
       - PORT=3000
       - NODE_ENV=production
-      - JWT_SECRET=jeopardy_super_secret_production_key_xyz_123
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in your environment or .env file}
+      - ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET:-}
     restart: unless-stopped
 
 volumes:

@@ -16,19 +16,19 @@ export class ButtonComponent {
   loading = input<boolean>(false);
 
   buttonClass = computed(() => {
-    const baseClasses = 'inline-flex items-center justify-center font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-jeopardy-dark focus:ring-jeopardy-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none transition-all duration-300';
-    
+    const baseClasses = 'inline-flex items-center justify-center font-semibold cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-jeopardy-dark focus-visible:ring-jeopardy-gold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none transition-all duration-200 ease-out active:scale-[0.97]';
+
     const variantClasses = {
-      primary: 'bg-jeopardy-gold hover:bg-jeopardy-goldLight text-jeopardy-dark font-extrabold shadow-md shadow-jeopardy-gold/10 hover:shadow-lg hover:shadow-jeopardy-gold/20 transform hover:-translate-y-0.5 active:translate-y-0',
-      secondary: 'bg-jeopardy-blue/40 hover:bg-jeopardy-blue/80 text-white border border-jeopardy-accent/30 shadow-sm transform hover:-translate-y-0.5 active:translate-y-0',
-      accent: 'bg-jeopardy-accent hover:bg-blue-600 text-white shadow-md shadow-jeopardy-accent/10 active:scale-98',
-      danger: 'bg-red-600/80 hover:bg-red-600 text-white shadow-md shadow-red-600/10 active:scale-98',
-      ghost: 'bg-transparent hover:bg-white/5 text-white border border-transparent hover:border-white/10 active:scale-98'
+      primary: 'shimmer-hover bg-gradient-to-b from-jeopardy-gold-light via-jeopardy-gold to-amber-500 hover:brightness-110 text-jeopardy-dark font-extrabold shadow-lg shadow-jeopardy-gold/20 hover:shadow-xl hover:shadow-jeopardy-gold/35 hover:-translate-y-0.5 active:translate-y-0 border border-yellow-200/40',
+      secondary: 'bg-jeopardy-blue/45 hover:bg-jeopardy-blue/80 text-white border border-white/12 hover:border-jeopardy-accent/50 shadow-sm hover:shadow-md hover:shadow-jeopardy-accent/15 hover:-translate-y-0.5 active:translate-y-0',
+      accent: 'shimmer-hover bg-gradient-to-b from-blue-500 to-jeopardy-accent hover:from-blue-400 hover:to-jeopardy-accent-hover text-white shadow-md shadow-jeopardy-accent/25 hover:shadow-lg hover:shadow-jeopardy-accent/40 hover:-translate-y-0.5 active:translate-y-0 border border-blue-400/25',
+      danger: 'bg-gradient-to-b from-red-500/90 to-red-600/90 hover:from-red-500 hover:to-red-600 text-white shadow-md shadow-red-600/20 hover:shadow-lg hover:shadow-red-600/35 hover:-translate-y-0.5 active:translate-y-0 border border-red-400/20',
+      ghost: 'bg-transparent hover:bg-white/8 text-white border border-transparent hover:border-white/12'
     };
 
     const sizeClasses = {
-      sm: 'px-3 py-1.5 text-xs rounded-md',
-      md: 'px-5 py-2.5 text-sm rounded-lg',
+      sm: 'px-3 py-1.5 text-xs rounded-lg',
+      md: 'px-5 py-2.5 text-sm rounded-xl',
       lg: 'px-7 py-3 text-base rounded-xl'
     };
 

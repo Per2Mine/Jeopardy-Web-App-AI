@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Peer, DataConnection } from 'peerjs';
 import { Category } from './quiz.service';
+import { safeSessionStorageGet, safeSessionStorageSet, safeSessionStorageRemove } from '../utils/storage.util';
 
 export interface Player {
   id: string;
@@ -186,35 +187,68 @@ export class P2pService {
   roomCode = signal<string | null>(null);
   isHost = signal<boolean>(false);
   connectionState = signal<'disconnected' | 'connecting' | 'connected' | 'error'>(
-    sessionStorage.getItem('jeopardy_p2p_session') ? 'connecting' : 'disconnected'
+    safeSessionStorageGet('jeopardy_p2p_session') ? 'connecting' : 'disconnected'
   );
   players = signal<Player[]>([]);
   errorMessage = signal<string>('');
   wasKicked = signal<boolean>(false);
   myPing = signal<number>(0);
   hostDisconnected = signal<boolean>(false);
-  gameState = signal<GameState>({
-    phase: 'LOBBY',
-    activeQuestion: null,
-    buzzedPlayerId: null,
-    buzzerLocked: false,
-    answeredQuestions: [],
-    lockedOutPlayerIds: [],
-    lockedOutTeamIds: [],
-    categories: [],
-    activeSelectorId: null,
-    votes: {},
-    showAnswer: false,
-    lastAnswerResult: null,
-    buzzerTimeout: 20,
-    deductPointsOnTimeout: false,
-    timerSeconds: null,
-    autoStartTimer: true,
-    timerActive: false,
-    isInitialTurn: false,
-    audioPlaying: false,
-    history: []
-  });
+  private createInitialGameState(): GameState {
+    return {
+      phase: 'LOBBY',
+      activeQuestion: null,
+      buzzedPlayerId: null,
+      buzzerLocked: false,
+      answeredQuestions: [],
+      lockedOutPlayerIds: [],
+      lockedOutTeamIds: [],
+      categories: [],
+      activeSelectorId: null,
+      votes: {},
+      showAnswer: false,
+      lastAnswerResult: null,
+      buzzerTimeout: 20,
+      deductPointsOnTimeout: false,
+      timerSeconds: null,
+      autoStartTimer: true,
+      timerActive: false,
+      isInitialTurn: false,
+      audioPlaying: false,
+      history: []
+    };
+  }
+
+  private sanitizeColor(color: any, fallback: string = '#f1b814'): string {
+    return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color.trim())
+      ? color.trim()
+      : fallback;
+  }
+
+  private sanitizeAvatar(avatar: any): string {
+    if (typeof avatar !== 'string') return 'b2e0m0a0';
+    const trimmed = avatar.trim();
+    return /^b\d{1,2}e\d{1,2}m\d{1,2}a\d{1,2}$/.test(trimmed) ? trimmed : 'b2e0m0a0';
+  }
+
+  private sanitizeGameStateForClients(state: GameState): GameState {
+    if (!state || !state.activeQuestion || state.showAnswer) {
+      return state;
+    }
+    return {
+      ...state,
+      activeQuestion: {
+        ...state.activeQuestion,
+        answer: ''
+      }
+    };
+  }
+
+  private getFilteredChatForPlayer(teamId?: number): ChatMessage[] {
+    return this.chatMessages().filter(m => m.teamId === undefined || (teamId !== undefined && m.teamId === teamId));
+  }
+
+  gameState = signal<GameState>(this.createInitialGameState());
   chatMessages = signal<ChatMessage[]>([]);
 
   // Team Mode Signals
@@ -247,7 +281,7 @@ export class P2pService {
       host: host,
       path: '/peerjs',
       secure: secure,
-      debug: 3,
+      debug: 1,
       config: {
         iceServers: this.iceServers
       }
@@ -295,6 +329,9 @@ export class P2pService {
 
   // HTTP Polling Fallback System
   private isPolling = false;
+  private pollTimer: any = null;
+  private reconnectingOldIds = new Set<string>();
+
   private startPolling(myId: string) {
     if (this.isPolling) return;
     this.isPolling = true;
@@ -303,32 +340,37 @@ export class P2pService {
 
   private stopPolling() {
     this.isPolling = false;
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   private pollNext(myId: string) {
     if (!this.isPolling || !this.peer) return;
 
-    this.http.get<{ messages: Array<{ senderId: string, message: any }> }>(`/api/p2p/poll/${myId}`).subscribe({
+    this.http.get<{ messages: Array<{ senderId: string, message: any }> }>(`/api/p2p/poll/${encodeURIComponent(myId)}`).subscribe({
       next: (res) => {
+        if (!this.isPolling) return;
         if (res && res.messages) {
           for (const item of res.messages) {
             this.handleRelayedMessage(item.senderId, item.message);
           }
         }
-        // Poll again immediately
-        setTimeout(() => this.pollNext(myId), 100);
+        this.pollTimer = setTimeout(() => this.pollNext(myId), 100);
       },
       error: (err) => {
+        if (!this.isPolling) return;
         console.warn('HTTP poll failed, retrying in 2s...', err);
-        setTimeout(() => this.pollNext(myId), 2000);
+        this.pollTimer = setTimeout(() => this.pollNext(myId), 2000);
       }
     });
   }
 
   private handleRelayedMessage(senderId: string, msg: any) {
+    if (!msg || typeof msg !== 'object') return;
     if (this.isHost()) {
       if (msg.type === 'JOIN_REQ') {
-        // Create an HTTP Relay Connection for this player
         const relayConn = new HttpRelayConnection(
           senderId,
           this.myPlayerId()!,
@@ -352,117 +394,14 @@ export class P2pService {
   private handleIncomingConnection(conn: any) {
     const metadata = conn.metadata || {};
     const playerId = conn.peer;
-    const playerName = metadata.name || 'Unbekannt';
-    const playerColor = metadata.color || '#0052cc';
-    const playerAvatar = metadata.avatar || '';
+    const rawName = typeof metadata.name === 'string' ? metadata.name : 'Unbekannt';
+    const playerName = rawName.trim() || 'Unbekannt';
+    const playerColor = this.sanitizeColor(metadata.color, '#0052cc');
+    const playerAvatar = this.sanitizeAvatar(metadata.avatar);
 
-    // Check if player is reconnecting with an existing session (by ID or matching name when offline)
-    const originalPlayerId = metadata.originalPlayerId;
-    let existingPlayerIndex = -1;
-
-    this.logDebug('[Host] Incoming connection request:', {
-      playerId,
-      playerName,
-      originalPlayerId,
-      players: this.players().map(p => ({ id: p.id, name: p.name, isOffline: p.isOffline, isHost: p.isHost }))
-    });
-
-    if (originalPlayerId) {
-      existingPlayerIndex = this.players().findIndex(p => p.id === originalPlayerId);
-      this.logDebug('[Host] Checked originalPlayerId, existingPlayerIndex:', existingPlayerIndex);
-    }
-    
-    if (existingPlayerIndex === -1 && playerName) {
-      existingPlayerIndex = this.players().findIndex(
-        p => p.isOffline && p.name.trim().toLowerCase() === playerName.trim().toLowerCase()
-      );
-      this.logDebug('[Host] Checked offline name match, existingPlayerIndex:', existingPlayerIndex);
-    }
-
-    if (existingPlayerIndex !== -1) {
-      const existingPlayer = this.players()[existingPlayerIndex];
-      const oldPlayerId = existingPlayer.id;
-
-      // Close old connection if it exists
-      const oldConn = this.hostConnectionMap.get(oldPlayerId);
-      if (oldConn) {
-        try {
-          oldConn.close();
-        } catch (e) {
-          console.warn('Error closing old connection during takeover:', e);
-        }
-      }
-
-      // Update the connection in map (remove old, add new)
-      this.hostConnectionMap.delete(oldPlayerId);
-      this.hostConnectionMap.set(playerId, conn);
-      
-      this.lastSeenMap.delete(oldPlayerId);
-      this.lastSeenMap.set(playerId, Date.now());
-      
-      // Update player list with new Peer ID, clear isOffline
-      const updatedPlayers = [...this.players()];
-      updatedPlayers[existingPlayerIndex] = {
-        ...existingPlayer,
-        id: playerId, // Update to new Peer ID
-        name: playerName,
-        color: playerColor,
-        avatar: playerAvatar,
-        isOffline: false
-      };
-      this.players.set(updatedPlayers);
-
-      // Update game state references if they reference oldPlayerId
-      const currentGameState = this.gameState();
-      let stateChanged = false;
-      let updatedBuzzedPlayerId = currentGameState.buzzedPlayerId;
-      let updatedLockedOutPlayerIds = [...currentGameState.lockedOutPlayerIds];
-
-      if (currentGameState.buzzedPlayerId === oldPlayerId) {
-        updatedBuzzedPlayerId = playerId;
-        stateChanged = true;
-      }
-      if (currentGameState.lockedOutPlayerIds.includes(oldPlayerId)) {
-        updatedLockedOutPlayerIds = currentGameState.lockedOutPlayerIds.map(id => id === oldPlayerId ? playerId : id);
-        stateChanged = true;
-      }
-
-      if (stateChanged) {
-        this.gameState.set({
-          ...currentGameState,
-          buzzedPlayerId: updatedBuzzedPlayerId,
-          lockedOutPlayerIds: updatedLockedOutPlayerIds
-        });
-      }
-
-      // Acknowledge the connection and send initial welcome with the current game state and chat
-      const ackMessage: P2pMessage = {
-        type: 'JOIN_ACK',
-        senderId: this.myPlayerId()!,
-        payload: { 
-          success: true,
-          teamMode: this.teamMode(),
-          maxTeamsLimit: this.maxTeamsLimit(),
-          maxPlayersPerTeam: this.maxPlayersPerTeam(),
-          gameState: this.gameState(),
-          chatHistory: this.chatMessages()
-        }
-      };
-      conn.send(ackMessage);
-
-      // Broadcast updated player list & game state to everyone (debounced to avoid O(n²) broadcast storm)
-      this.debouncedBroadcastPlayerList();
-      this.debouncedBroadcastGameState();
-
-      // Handle messages from this client
-      this.setupMessageListener(conn, playerId);
-      return;
-    }
-
-    // Validate player name length and characters (Host authority validation)
-    const trimmedName = playerName ? playerName.trim() : '';
+    // Validate player name length and characters (Host authority validation — applies to all joins and reconnects)
     const nameRegex = /^[a-zA-Z0-9_\-\säöüÄÖÜß]+$/;
-    if (trimmedName.length < 2 || trimmedName.length > 14 || !nameRegex.test(trimmedName)) {
+    if (playerName.length < 2 || playerName.length > 14 || !nameRegex.test(playerName)) {
       conn.send({
         type: 'JOIN_ACK',
         senderId: this.myPlayerId()!,
@@ -472,11 +411,128 @@ export class P2pService {
       return;
     }
 
+    // Check if an OFFLINE non-host player is reconnecting (never allow overwriting the Host or an active online player)
+    const originalPlayerId = typeof metadata.originalPlayerId === 'string' ? metadata.originalPlayerId : '';
+    let existingPlayerIndex = -1;
+
+    if (originalPlayerId) {
+      existingPlayerIndex = this.players().findIndex(
+        p => !p.isHost && p.isOffline && p.id === originalPlayerId
+      );
+    }
+
+    if (existingPlayerIndex === -1 && playerName) {
+      existingPlayerIndex = this.players().findIndex(
+        p => !p.isHost && p.isOffline && p.name.trim().toLowerCase() === playerName.toLowerCase()
+      );
+    }
+
+    if (existingPlayerIndex !== -1) {
+      const existingPlayer = this.players()[existingPlayerIndex];
+      const oldPlayerId = existingPlayer.id;
+
+      // Mark old ID as reconnecting so closing oldConn doesn't wipe votes/selector
+      this.reconnectingOldIds.add(oldPlayerId);
+
+      // Update the connection in map (remove old, add new) BEFORE closing oldConn
+      const oldConn = this.hostConnectionMap.get(oldPlayerId);
+      this.hostConnectionMap.delete(oldPlayerId);
+      this.hostConnectionMap.set(playerId, conn);
+
+      this.lastSeenMap.delete(oldPlayerId);
+      this.lastSeenMap.set(playerId, Date.now());
+
+      if (oldConn) {
+        try {
+          oldConn.close();
+        } catch (e) {
+          console.warn('Error closing old connection during reconnect:', e);
+        }
+      }
+      setTimeout(() => this.reconnectingOldIds.delete(oldPlayerId), 1000);
+
+      // Update player list with new Peer ID, clear isOffline
+      const updatedPlayers = [...this.players()];
+      updatedPlayers[existingPlayerIndex] = {
+        ...existingPlayer,
+        id: playerId,
+        name: playerName,
+        color: playerColor,
+        avatar: playerAvatar,
+        isOffline: false
+      };
+      this.players.set(updatedPlayers);
+
+      // Migrate ALL game state references from oldPlayerId -> playerId
+      const currentGameState = this.gameState();
+      let stateChanged = false;
+      let updatedBuzzedPlayerId = currentGameState.buzzedPlayerId;
+      let updatedLockedOutPlayerIds = [...currentGameState.lockedOutPlayerIds];
+      let updatedActiveSelectorId = currentGameState.activeSelectorId;
+      const updatedVotes: { [key: string]: string[] } = {};
+      let updatedHistory = currentGameState.history || [];
+
+      if (currentGameState.buzzedPlayerId === oldPlayerId) {
+        updatedBuzzedPlayerId = playerId;
+        stateChanged = true;
+      }
+      if (currentGameState.lockedOutPlayerIds.includes(oldPlayerId)) {
+        updatedLockedOutPlayerIds = currentGameState.lockedOutPlayerIds.map(id => id === oldPlayerId ? playerId : id);
+        stateChanged = true;
+      }
+      if (currentGameState.activeSelectorId === oldPlayerId) {
+        updatedActiveSelectorId = playerId;
+        stateChanged = true;
+      }
+      for (const [k, voters] of Object.entries(currentGameState.votes || {})) {
+        if (voters.includes(oldPlayerId)) {
+          updatedVotes[k] = voters.map(id => id === oldPlayerId ? playerId : id);
+          stateChanged = true;
+        } else {
+          updatedVotes[k] = voters;
+        }
+      }
+      if (updatedHistory.some(ev => ev.playerId === oldPlayerId)) {
+        updatedHistory = updatedHistory.map(ev => ev.playerId === oldPlayerId ? { ...ev, playerId } : ev);
+        stateChanged = true;
+      }
+
+      if (stateChanged) {
+        this.gameState.set({
+          ...currentGameState,
+          buzzedPlayerId: updatedBuzzedPlayerId,
+          lockedOutPlayerIds: updatedLockedOutPlayerIds,
+          activeSelectorId: updatedActiveSelectorId,
+          votes: updatedVotes,
+          history: updatedHistory
+        });
+      }
+
+      // Acknowledge the connection with sanitized gameState and team-filtered chatHistory
+      const ackMessage: P2pMessage = {
+        type: 'JOIN_ACK',
+        senderId: this.myPlayerId()!,
+        payload: {
+          success: true,
+          teamMode: this.teamMode(),
+          maxTeamsLimit: this.maxTeamsLimit(),
+          maxPlayersPerTeam: this.maxPlayersPerTeam(),
+          gameState: this.sanitizeGameStateForClients(this.gameState()),
+          chatHistory: this.getFilteredChatForPlayer(existingPlayer.teamId)
+        }
+      };
+      conn.send(ackMessage);
+
+      this.debouncedBroadcastPlayerList();
+      this.debouncedBroadcastGameState();
+      this.setupMessageListener(conn, playerId);
+      return;
+    }
+
     // Check if there is an ACTIVE player with the same name (case-insensitive)
     const isNameTaken = this.players().some(
-      p => !p.isOffline && p.name.trim().toLowerCase() === trimmedName.toLowerCase()
+      p => !p.isOffline && p.name.trim().toLowerCase() === playerName.toLowerCase()
     );
-    this.logDebug('[Host] Checking if name is taken:', { playerName: trimmedName, isNameTaken });
 
     if (isNameTaken) {
       conn.send({
@@ -489,7 +545,7 @@ export class P2pService {
     }
 
     // Check if player limit is reached (excludes the host/owner)
-    const maxAllowed = this.teamMode() 
+    const maxAllowed = this.teamMode()
       ? this.maxTeamsLimit() * this.maxPlayersPerTeam()
       : this.maxPlayersLimit;
 
@@ -502,7 +558,7 @@ export class P2pService {
       setTimeout(() => conn.close(), 500);
       return;
     }
-    
+
     // 1. Add connection to host map
     this.hostConnectionMap.set(playerId, conn);
     this.lastSeenMap.set(playerId, Date.now());
@@ -527,17 +583,17 @@ export class P2pService {
     ];
     this.players.set(updatedPlayers);
 
-    // 4. Acknowledge the connection and send initial welcome
+    // 4. Acknowledge the connection with sanitized gameState and team-filtered chatHistory
     const ackMessage: P2pMessage = {
       type: 'JOIN_ACK',
       senderId: this.myPlayerId()!,
-      payload: { 
+      payload: {
         success: true,
         teamMode: this.teamMode(),
         maxTeamsLimit: this.maxTeamsLimit(),
         maxPlayersPerTeam: this.maxPlayersPerTeam(),
-        gameState: this.gameState(),
-        chatHistory: this.chatMessages()
+        gameState: this.sanitizeGameStateForClients(this.gameState()),
+        chatHistory: this.getFilteredChatForPlayer(teamId)
       }
     };
     conn.send(ackMessage);
@@ -556,7 +612,7 @@ export class P2pService {
     this.fetchIceServers();
     
     // Attempt session restoration if there is a saved session
-    if (sessionStorage.getItem('jeopardy_p2p_session')) {
+    if (safeSessionStorageGet('jeopardy_p2p_session')) {
       this.tryRestoreSession();
     }
 
@@ -586,11 +642,15 @@ export class P2pService {
           maxTeamsLimit: maxTeams,
           maxPlayersPerTeam: maxPerTeam,
           players: playersList,
-          gameState: gState
+          gameState: isHost ? gState : this.sanitizeGameStateForClients(gState)
         };
-        sessionStorage.setItem('jeopardy_p2p_session', JSON.stringify(sessionData));
+        try {
+          safeSessionStorageSet('jeopardy_p2p_session', JSON.stringify(sessionData));
+        } catch (err) {
+          console.warn('Could not persist session to sessionStorage (quota exceeded):', err);
+        }
       } else if (state === 'disconnected' || state === 'error') {
-        sessionStorage.removeItem('jeopardy_p2p_session');
+        safeSessionStorageRemove('jeopardy_p2p_session');
       }
     });
 
@@ -620,7 +680,7 @@ export class P2pService {
    * Attempt to restore session from sessionStorage
    */
   tryRestoreSession(): Promise<boolean> {
-    const dataStr = sessionStorage.getItem('jeopardy_p2p_session');
+    const dataStr = safeSessionStorageGet('jeopardy_p2p_session');
     this.logDebug('tryRestoreSession called. Session data from storage:', dataStr);
     if (!dataStr) return Promise.resolve(false);
 
@@ -628,7 +688,7 @@ export class P2pService {
       const session = JSON.parse(dataStr);
       if (!session || !session.roomCode) {
         this.logDebug('Session data invalid, removing session.');
-        sessionStorage.removeItem('jeopardy_p2p_session');
+        safeSessionStorageRemove('jeopardy_p2p_session');
         this.connectionState.set('disconnected');
         return Promise.resolve(false);
       }
@@ -645,7 +705,7 @@ export class P2pService {
     } catch (e: any) {
       this.logDebug('Failed to parse saved session, error:', e.message);
       console.error('Failed to parse saved session:', e);
-      sessionStorage.removeItem('jeopardy_p2p_session');
+      safeSessionStorageRemove('jeopardy_p2p_session');
       this.connectionState.set('disconnected');
       return Promise.resolve(false);
     }
@@ -656,7 +716,7 @@ export class P2pService {
       this.cleanupForReconnection(); // Clear any existing instance state first
       
       // Restore hostFullBoards
-      const fullBoardsStr = sessionStorage.getItem('jeopardy_host_full_boards');
+      const fullBoardsStr = safeSessionStorageGet('jeopardy_host_full_boards');
       if (fullBoardsStr) {
         try {
           this.hostFullBoards = JSON.parse(fullBoardsStr);
@@ -729,7 +789,7 @@ export class P2pService {
         } else {
           this.errorMessage.set('Verbindung zum Signalisierungsserver bei Wiederherstellung fehlgeschlagen.');
         }
-        sessionStorage.removeItem('jeopardy_p2p_session');
+        safeSessionStorageRemove('jeopardy_p2p_session');
         resolve(false);
       });
     });
@@ -774,7 +834,7 @@ export class P2pService {
             resolve(true);
           }, (err) => {
             this.logDebug('[Client] Session restore failed in listeners:', err);
-            sessionStorage.removeItem('jeopardy_p2p_session');
+            safeSessionStorageRemove('jeopardy_p2p_session');
             resolve(false);
           });
         });
@@ -804,7 +864,7 @@ export class P2pService {
             this.setupClientListeners(relayConn as any, formattedCode, () => {
               resolve(true);
             }, (err) => {
-              sessionStorage.removeItem('jeopardy_p2p_session');
+              safeSessionStorageRemove('jeopardy_p2p_session');
               resolve(false);
             });
 
@@ -852,9 +912,8 @@ export class P2pService {
       this.maxTeamsLimit.set(maxPlayers);
       this.maxPlayersPerTeam.set(maxPlayersPerTeam);
 
-      const current = this.gameState();
       this.gameState.set({
-        ...current,
+        ...this.createInitialGameState(),
         buzzerTimeout,
         deductPointsOnTimeout,
         autoStartTimer,
@@ -868,6 +927,8 @@ export class P2pService {
       this.errorMessage.set('');
 
       const formattedCode = roomCode.toUpperCase().trim();
+      const safeHostColor = this.sanitizeColor(hostColor, '#f1b814');
+      const safeHostAvatar = this.sanitizeAvatar(hostAvatar);
       
       // Initialize Peer with the custom room code
       this.peer = new Peer(formattedCode, this.getPeerOptions());
@@ -890,8 +951,8 @@ export class P2pService {
         this.players.set([{
           id: id,
           name: hostName,
-          color: hostColor,
-          avatar: hostAvatar,
+          color: safeHostColor,
+          avatar: safeHostAvatar,
           isHost: true,
           score: 0,
           ping: 0
@@ -1014,6 +1075,14 @@ export class P2pService {
     this.stopPolling();
     this.stopHeartbeat();
     this.stopHostHeartbeatCheck();
+    if (this.broadcastPlayerListTimer) {
+      clearTimeout(this.broadcastPlayerListTimer);
+      this.broadcastPlayerListTimer = null;
+    }
+    if (this.broadcastGameStateTimer) {
+      clearTimeout(this.broadcastGameStateTimer);
+      this.broadcastGameStateTimer = null;
+    }
     
     // Client disconnect
     if (this.clientConnection) {
@@ -1024,13 +1093,14 @@ export class P2pService {
     // Host disconnect
     this.hostConnectionMap.forEach(conn => conn.close());
     this.hostConnectionMap.clear();
+    this.reconnectingOldIds.clear();
 
     if (this.peer) {
       this.peer.destroy();
       this.peer = null;
     }
 
-    // Reset state
+    // Reset state cleanly so subsequent lobbies never inherit stale game phase
     this.roomCode.set(null);
     this.isHost.set(false);
     this.connectionState.set('disconnected');
@@ -1040,8 +1110,9 @@ export class P2pService {
     this.maxTeamsLimit.set(4);
     this.maxPlayersPerTeam.set(2);
     this.chatMessages.set([]);
+    this.gameState.set(this.createInitialGameState());
     this.hostFullBoards = [];
-    sessionStorage.removeItem('jeopardy_host_full_boards');
+    safeSessionStorageRemove('jeopardy_host_full_boards');
   }
 
   cleanupForReconnection() {
@@ -1113,7 +1184,7 @@ export class P2pService {
         this.disconnect();
         return;
       }
-      const hasSavedSession = sessionStorage.getItem('jeopardy_p2p_session');
+      const hasSavedSession = safeSessionStorageGet('jeopardy_p2p_session');
       if (hasSavedSession && !this.wasKicked()) {
         console.log('Connection closed unexpectedly. Attempting to reconnect...');
         this.connectionState.set('connecting');
@@ -1165,25 +1236,25 @@ export class P2pService {
   private setupMessageListener(conn: DataConnection, playerId: string) {
     conn.on('data', (data: any) => {
       const msg = data as P2pMessage;
-      if (!msg) return;
+      if (!msg || typeof msg !== 'object') return;
+      const payload = msg.payload && typeof msg.payload === 'object' ? msg.payload : {};
 
       this.lastSeenMap.set(playerId, Date.now());
 
       if ((msg.type as any) === 'HEARTBEAT' || (msg.type as any) === 'PING' || (msg.type as any) === 'PONG') {
-        if (msg.type === 'PING') {
-          // Reply with PONG containing the same timestamp
+        if (msg.type === 'PING' && typeof payload.timestamp === 'number') {
           const pongMsg: P2pMessage = {
             type: 'PONG' as any,
             senderId: this.myPlayerId() || 'HOST',
-            payload: { timestamp: msg.payload.timestamp }
+            payload: { timestamp: payload.timestamp }
           };
           conn.send(pongMsg);
 
-          // Update player's ping metadata
-          if (msg.payload && typeof msg.payload.lastPing === 'number') {
+          if (typeof payload.lastPing === 'number' && Number.isFinite(payload.lastPing)) {
+            const safePing = Math.max(0, Math.min(9999, Math.round(payload.lastPing)));
             const updatedPlayers = this.players().map(p => {
               if (p.id === playerId) {
-                return { ...p, ping: msg.payload.lastPing };
+                return { ...p, ping: safePing };
               }
               return p;
             });
@@ -1194,21 +1265,22 @@ export class P2pService {
         return;
       }
 
-      console.log(`Host received [${msg.type}] from player ${playerId}:`, msg.payload);
-      
       switch (msg.type) {
         case 'BUZZ':
-          // Handle Buzzer events (Host handles timing conflict resolution)
           this.handleHostBuzzer(playerId);
           break;
         case 'SELECT_TEAM':
-          this.handleHostSelectTeam(playerId, msg.payload.teamId);
+          if (typeof payload.teamId === 'number') {
+            this.handleHostSelectTeam(playerId, payload.teamId);
+          }
           break;
         case 'CHAT_MSG':
-          this.handleHostChatMessage(msg);
+          this.handleHostChatMessage(playerId, msg);
           break;
         case 'VOTE_QUESTION':
-          this.handleHostVoteQuestion(playerId, msg.payload.categoryIndex, msg.payload.questionIndex);
+          if (typeof payload.categoryIndex === 'number' && typeof payload.questionIndex === 'number') {
+            this.handleHostVoteQuestion(playerId, payload.categoryIndex, payload.questionIndex);
+          }
           break;
         default:
           break;
@@ -1216,6 +1288,12 @@ export class P2pService {
     });
 
     conn.on('close', () => {
+      if (this.reconnectingOldIds.has(playerId)) {
+        return;
+      }
+      if (this.hostConnectionMap.get(playerId) !== conn) {
+        return;
+      }
       this.lastSeenMap.delete(playerId);
       this.hostConnectionMap.delete(playerId);
       const updatedPlayers = this.players().map(p => {
@@ -1240,21 +1318,18 @@ export class P2pService {
   ) {
     conn.on('data', (data: any) => {
       const msg = data as P2pMessage;
-      if (!msg) return;
+      if (!msg || typeof msg !== 'object') return;
 
       if ((msg.type as any) === 'HEARTBEAT' || (msg.type as any) === 'PONG') {
-        if (msg.type === 'PONG') {
-          const rtt = Date.now() - msg.payload.timestamp;
+        if (msg.type === 'PONG' && msg.payload && typeof msg.payload.timestamp === 'number') {
+          const rtt = Math.max(0, Date.now() - msg.payload.timestamp);
           this.myPing.set(Math.round(rtt / 2));
         }
         return;
       }
 
-      console.log(`Client received [${msg.type}] from Host:`, msg.payload);
-
       switch (msg.type) {
         case 'JOIN_ACK':
-          this.logDebug('Client received JOIN_ACK from host:', msg.payload);
           if (msg.payload?.success) {
             this.connectionState.set('connected');
             this.roomCode.set(this.clientConnection?.peer || null);
@@ -1272,7 +1347,6 @@ export class P2pService {
             }
             resolve();
           } else {
-            this.logDebug('JOIN_ACK failed, reason:', msg.payload?.reason);
             this.disconnect();
             if (msg.payload?.reason === 'lobby_full') {
               this.errorMessage.set('Diese Lobby ist leider bereits voll.');
@@ -1299,10 +1373,12 @@ export class P2pService {
         case 'KICK':
           this.disconnect();
           this.wasKicked.set(true);
+          this.router.navigate(['/']);
           break;
         case 'CHAT_MSG':
-          const chatMsg = msg.payload as ChatMessage;
-          this.chatMessages.update(msgs => [...msgs, chatMsg]);
+          if (msg.payload) {
+            this.chatMessages.update(msgs => [...msgs.slice(-199), msg.payload as ChatMessage]);
+          }
           break;
         default:
           break;
@@ -1374,17 +1450,20 @@ export class P2pService {
   broadcast(message: P2pMessage) {
     if (!this.isHost()) return;
 
+    const outboundMessage: P2pMessage =
+      (message.type === 'GAME_STATE' || message.type === 'START_GAME') && message.payload
+        ? { ...message, payload: this.sanitizeGameStateForClients(message.payload as GameState) }
+        : message;
+
     // Collect HTTP relay receivers for batch sending
     const httpRelayReceivers: string[] = [];
 
     this.hostConnectionMap.forEach((conn) => {
       if (conn.open) {
         if (conn instanceof HttpRelayConnection) {
-          // Collect for batch send instead of individual HTTP POST per player
           httpRelayReceivers.push(conn.peer);
         } else {
-          // WebRTC: fire-and-forget (already fast)
-          conn.send(message);
+          conn.send(outboundMessage);
         }
       }
     });
@@ -1394,7 +1473,7 @@ export class P2pService {
       this.http.post('/api/p2p/send-batch', {
         senderId: this.myPlayerId()!,
         receiverIds: httpRelayReceivers,
-        message: message
+        message: outboundMessage
       }).subscribe({
         error: (err) => console.error('Failed to send batch HTTP relay message:', err)
       });
@@ -1404,10 +1483,7 @@ export class P2pService {
   broadcastToTeam(message: P2pMessage, teamId: number) {
     if (!this.isHost()) return;
 
-    // Collect HTTP relay receivers for batch sending
     const httpRelayReceivers: string[] = [];
-
-    // Filter players by teamId
     const teamPlayerIds = this.players()
       .filter(p => !p.isHost && p.teamId === teamId)
       .map(p => p.id);
@@ -1415,16 +1491,13 @@ export class P2pService {
     this.hostConnectionMap.forEach((conn) => {
       if (conn.open && teamPlayerIds.includes(conn.peer)) {
         if (conn instanceof HttpRelayConnection) {
-          // Collect for batch send instead of individual HTTP POST per player
           httpRelayReceivers.push(conn.peer);
         } else {
-          // WebRTC: fire-and-forget
           conn.send(message);
         }
       }
     });
 
-    // Batch send to all HTTP relay players in this team
     if (httpRelayReceivers.length > 0) {
       this.http.post('/api/p2p/send-batch', {
         senderId: this.myPlayerId()!,
@@ -1461,6 +1534,12 @@ export class P2pService {
   kickPlayer(playerId: string) {
     if (!this.isHost()) return;
     const conn = this.hostConnectionMap.get(playerId);
+    this.hostConnectionMap.delete(playerId);
+    this.lastSeenMap.delete(playerId);
+    this.players.set(this.players().filter(p => p.id !== playerId));
+    this.broadcastPlayerList();
+    this.handlePlayerDisconnect(playerId);
+
     if (conn) {
       try {
         conn.send({
@@ -1468,15 +1547,13 @@ export class P2pService {
           senderId: this.myPlayerId()!,
           payload: {}
         });
-        conn.close();
+        setTimeout(() => {
+          try { conn.close(); } catch (e) {}
+        }, 300);
       } catch (e) {
         console.warn('Error sending KICK message or closing connection:', e);
       }
     }
-    this.hostConnectionMap.delete(playerId);
-    this.lastSeenMap.delete(playerId);
-    this.players.set(this.players().filter(p => p.id !== playerId));
-    this.broadcastPlayerList();
   }
 
   private timerId: any = null;
@@ -1600,14 +1677,11 @@ export class P2pService {
     this.stopHostTimer();
     const current = this.gameState();
     const playerId = current.buzzedPlayerId;
-    if (!playerId) return;
+    if (!playerId || !current.activeQuestion || current.showAnswer) return;
 
-    // Deduct points?
-    // Deduct points if it's NOT the initial turn, OR if deductPointsOnTimeout is true
-    let shouldDeduct = !current.isInitialTurn || current.deductPointsOnTimeout;
+    const shouldDeduct = !current.isInitialTurn || current.deductPointsOnTimeout;
+    const value = current.activeQuestion.value;
 
-    const value = current.activeQuestion ? current.activeQuestion.value : 0;
-    
     if (shouldDeduct && value > 0) {
       const updatedPlayers = this.players().map(p => {
         if (p.id === playerId) {
@@ -1617,6 +1691,17 @@ export class P2pService {
       });
       this.players.set(updatedPlayers);
       this.broadcastPlayerList();
+    }
+
+    // Reduce pixelation if enabled on wrong/timeout
+    let updatedActiveQuestion = current.activeQuestion;
+    if (updatedActiveQuestion.pixelate && updatedActiveQuestion.reducePixelationOnWrong) {
+      const currentStrength = updatedActiveQuestion.pixelateStrength ?? 80;
+      const amount = updatedActiveQuestion.reducePixelationAmount ?? 5;
+      updatedActiveQuestion = {
+        ...updatedActiveQuestion,
+        pixelateStrength: Math.max(1, currentStrength - amount)
+      };
     }
 
     // Add to lock out lists
@@ -1633,7 +1718,6 @@ export class P2pService {
       }
     }
 
-    // Check if everyone is locked out
     const activePlayers = this.players().filter(p => !p.isHost && !p.isOffline);
     const allLockedOut = this.teamMode()
       ? this.teamsArray().every(teamId => {
@@ -1645,10 +1729,13 @@ export class P2pService {
 
     let nextState: GameState;
     if (allLockedOut) {
-      // Everyone failed: show answer
-      const questionKey = `${current.activeQuestion!.categoryIndex}-${current.activeQuestion!.questionIndex}`;
+      const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
+      const answeredQuestions = current.answeredQuestions.includes(questionKey)
+        ? current.answeredQuestions
+        : [...current.answeredQuestions, questionKey];
       nextState = {
         ...current,
+        activeQuestion: updatedActiveQuestion,
         showAnswer: true,
         buzzedPlayerId: null,
         buzzerLocked: true,
@@ -1656,7 +1743,7 @@ export class P2pService {
         isInitialTurn: false,
         lockedOutPlayerIds: lockedOutPlayers,
         lockedOutTeamIds: lockedOutTeams,
-        answeredQuestions: [...current.answeredQuestions, questionKey],
+        answeredQuestions,
         lastAnswerResult: {
           correct: false,
           playerName: '',
@@ -1664,29 +1751,30 @@ export class P2pService {
         }
       };
     } else {
+      if (!current.isInitialTurn) {
+        this.buzzerActiveTime = Date.now();
+      }
       nextState = {
         ...current,
+        activeQuestion: updatedActiveQuestion,
         buzzedPlayerId: null,
         buzzerLocked: current.isInitialTurn,
         timerSeconds: null,
-        isInitialTurn: false, // Initial turn is over after first failure/timeout
+        isInitialTurn: false,
         lockedOutPlayerIds: lockedOutPlayers,
         lockedOutTeamIds: lockedOutTeams,
         audioPlaying: false
       };
     }
 
-    // Append AWARD event to history log if points were deducted
-    if (shouldDeduct && value > 0 && current.activeQuestion) {
-      const player = this.players().find(p => p.id === playerId);
+    if (shouldDeduct && value > 0) {
       const categoryName = current.categories[current.activeQuestion.categoryIndex]?.name || 'Unbekannt';
-      const scoreDelta = -value;
       const timeoutEvent: GameEvent = {
         type: 'AWARD',
         timestamp: Date.now(),
         playerId,
         playerName: player ? player.name : 'Spieler',
-        value: scoreDelta,
+        value: -value,
         categoryName
       };
 
@@ -1708,24 +1796,19 @@ export class P2pService {
     if (!this.isHost()) return;
     const current = this.gameState();
 
-    // Check if buzzer is locked or if it's still the initial turn (buzzing not allowed yet)
     if (current.isInitialTurn || current.buzzerLocked) return;
 
-    // Check if player is locked out
     if (current.lockedOutPlayerIds && current.lockedOutPlayerIds.includes(playerId)) {
       return;
     }
-    
-    // Check if player's team is locked out
+
     const player = this.players().find(p => p.id === playerId);
     if (this.teamMode() && player && player.teamId && current.lockedOutTeamIds && current.lockedOutTeamIds.includes(player.teamId)) {
       return;
     }
 
-    // Only accept buzzer if in QUESTION phase, no one has buzzed yet, and buzzer isn't locked
     if (current.phase === 'QUESTION' && current.buzzedPlayerId === null) {
       const reactionTime = Date.now() - this.buzzerActiveTime;
-      const player = this.players().find(p => p.id === playerId);
       const buzzEvent: GameEvent = {
         type: 'BUZZ',
         timestamp: Date.now(),
@@ -1742,15 +1825,17 @@ export class P2pService {
         history: [...(current.history || []), buzzEvent]
       };
       this.gameState.set(nextState);
-      
-      // Start the countdown timer for this buzz!
-      this.startHostTimer();
 
-      this.broadcast({
-        type: 'GAME_STATE',
-        senderId: this.myPlayerId()!,
-        payload: nextState
-      });
+      // Start countdown timer (which updates gameState and broadcasts with timerSeconds set)
+      if (current.buzzerTimeout > 0) {
+        this.startHostTimer();
+      } else {
+        this.broadcast({
+          type: 'GAME_STATE',
+          senderId: this.myPlayerId()!,
+          payload: this.gameState()
+        });
+      }
     }
   }
 
@@ -1840,6 +1925,18 @@ export class P2pService {
     const current = this.gameState();
     if (current.phase !== 'BOARD') return;
 
+    // Validate integer bounds against active categories
+    if (
+      !Number.isInteger(categoryIndex) ||
+      !Number.isInteger(questionIndex) ||
+      categoryIndex < 0 ||
+      categoryIndex >= current.categories.length ||
+      questionIndex < 0 ||
+      questionIndex >= (current.categories[categoryIndex]?.questions?.length || 0)
+    ) {
+      return;
+    }
+
     const player = this.players().find(p => p.id === playerId);
     if (!player) return;
 
@@ -1856,20 +1953,17 @@ export class P2pService {
 
     if (!authorized) return;
 
-    // Check if the question is already answered
     const questionKey = `${categoryIndex}-${questionIndex}`;
     if (current.answeredQuestions.includes(questionKey)) return;
 
     const nextVotes = { ...current.votes };
 
     if (this.teamMode()) {
-      // Remove this player's vote from any other question
       for (const key in nextVotes) {
         if (nextVotes[key] && nextVotes[key].includes(playerId)) {
           nextVotes[key] = nextVotes[key].filter(id => id !== playerId);
         }
       }
-      // Add to this question
       if (!nextVotes[questionKey]) {
         nextVotes[questionKey] = [];
       }
@@ -1877,7 +1971,6 @@ export class P2pService {
         nextVotes[questionKey].push(playerId);
       }
     } else {
-      // Solo mode: clear all votes and set this one
       for (const key in nextVotes) {
         delete nextVotes[key];
       }
@@ -1907,9 +2000,13 @@ export class P2pService {
   startGame(boards: Category[][]) {
     if (!this.isHost()) return;
     
-    // Save host full boards
+    // Save host full boards (wrapped in try/catch to avoid QuotaExceededError with large media)
     this.hostFullBoards = boards;
-    sessionStorage.setItem('jeopardy_host_full_boards', JSON.stringify(boards));
+    try {
+      safeSessionStorageSet('jeopardy_host_full_boards', JSON.stringify(boards));
+    } catch (err) {
+      console.warn('Could not persist full boards to sessionStorage (quota exceeded):', err);
+    }
 
     // Reset all player scores to 0
     const resetPlayers = this.players().map(p => ({ ...p, score: 0 }));
@@ -2123,10 +2220,10 @@ export class P2pService {
 
   awardPoints(playerId: string, correct: boolean) {
     if (!this.isHost()) return;
-    this.stopHostTimer(); // STOP TIMEOUT COUNTDOWN
-    
     const current = this.gameState();
-    if (!current.activeQuestion) return;
+    if (!current.activeQuestion || current.showAnswer) return;
+
+    this.stopHostTimer(); // STOP TIMEOUT COUNTDOWN
 
     // 1. Update score of target player
     const value = current.activeQuestion.value;
@@ -2140,10 +2237,13 @@ export class P2pService {
     this.broadcastPlayerList();
 
     // 2. Compute next game state
+    const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
+    const withAnswered = current.answeredQuestions.includes(questionKey)
+      ? current.answeredQuestions
+      : [...current.answeredQuestions, questionKey];
+
     let nextState: GameState;
     if (correct) {
-      // Correct answer: question resolved, show answer first
-      const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
       const winnerName = this.players().find(p => p.id === playerId)?.name || 'Ein Spieler';
       nextState = {
         ...current,
@@ -2152,7 +2252,7 @@ export class P2pService {
         buzzerLocked: true,
         timerSeconds: null,
         isInitialTurn: false,
-        answeredQuestions: [...current.answeredQuestions, questionKey],
+        answeredQuestions: withAnswered,
         lastAnswerResult: {
           correct: true,
           playerName: winnerName,
@@ -2160,7 +2260,6 @@ export class P2pService {
         }
       };
     } else {
-      // Calculate updated activeQuestion with reduced pixelateStrength if enabled
       let updatedActiveQuestion = current.activeQuestion;
       if (updatedActiveQuestion && updatedActiveQuestion.pixelate && updatedActiveQuestion.reducePixelationOnWrong) {
         const currentStrength = updatedActiveQuestion.pixelateStrength ?? 80;
@@ -2172,7 +2271,6 @@ export class P2pService {
         };
       }
 
-      // Incorrect answer: lock this player / team out of buzzing
       const lockedOutPlayers = [...(current.lockedOutPlayerIds || [])];
       if (!lockedOutPlayers.includes(playerId)) {
         lockedOutPlayers.push(playerId);
@@ -2186,7 +2284,6 @@ export class P2pService {
         }
       }
 
-      // Check if all active players/teams are now locked out
       const activePlayers = this.players().filter(p => !p.isHost && !p.isOffline);
       const allLockedOut = this.teamMode()
         ? this.teamsArray().every(teamId => {
@@ -2197,8 +2294,6 @@ export class P2pService {
         : activePlayers.every(p => lockedOutPlayers.includes(p.id));
 
       if (allLockedOut) {
-        // Everyone failed: show answer
-        const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
         nextState = {
           ...current,
           activeQuestion: updatedActiveQuestion,
@@ -2209,7 +2304,7 @@ export class P2pService {
           isInitialTurn: false,
           lockedOutPlayerIds: lockedOutPlayers,
           lockedOutTeamIds: lockedOutTeams,
-          answeredQuestions: [...current.answeredQuestions, questionKey],
+          answeredQuestions: withAnswered,
           lastAnswerResult: {
             correct: false,
             playerName: '',
@@ -2217,13 +2312,16 @@ export class P2pService {
           }
         };
       } else {
+        if (!current.isInitialTurn) {
+          this.buzzerActiveTime = Date.now();
+        }
         nextState = {
           ...current,
           activeQuestion: updatedActiveQuestion,
           buzzedPlayerId: null,
           buzzerLocked: current.isInitialTurn,
           timerSeconds: null,
-          isInitialTurn: false, // Initial turn is over after first failure
+          isInitialTurn: false,
           lockedOutPlayerIds: lockedOutPlayers,
           lockedOutTeamIds: lockedOutTeams,
           audioPlaying: false
@@ -2231,7 +2329,6 @@ export class P2pService {
       }
     }
 
-    // Append AWARD event to history log
     const player = this.players().find(p => p.id === playerId);
     const categoryName = current.categories[current.activeQuestion.categoryIndex]?.name || 'Unbekannt';
     const scoreDelta = correct ? value : -value;
@@ -2259,12 +2356,15 @@ export class P2pService {
 
   skipQuestion() {
     if (!this.isHost()) return;
-    this.stopHostTimer(); // STOP TIMEOUT COUNTDOWN
-    
     const current = this.gameState();
-    if (!current.activeQuestion) return;
+    if (!current.activeQuestion || current.showAnswer) return;
+    this.stopHostTimer();
 
     const questionKey = `${current.activeQuestion.categoryIndex}-${current.activeQuestion.questionIndex}`;
+    const answeredQuestions = current.answeredQuestions.includes(questionKey)
+      ? current.answeredQuestions
+      : [...current.answeredQuestions, questionKey];
+
     const nextState: GameState = {
       ...current,
       showAnswer: true,
@@ -2272,7 +2372,7 @@ export class P2pService {
       buzzerLocked: true,
       timerSeconds: null,
       isInitialTurn: false,
-      answeredQuestions: [...current.answeredQuestions, questionKey],
+      answeredQuestions,
       lastAnswerResult: {
         correct: false,
         playerName: '',
@@ -2296,7 +2396,7 @@ export class P2pService {
     
     // Check if the game is completely over (no more questions and no more boards left)
     const totalQuestions = current.categories ? current.categories.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0) : 0;
-    const isBoardComplete = current.answeredQuestions.length === totalQuestions;
+    const isBoardComplete = current.answeredQuestions.length >= totalQuestions;
     const hasNextBoard = current.boards && current.currentBoardIndex !== undefined && (current.currentBoardIndex + 1 < current.boards.length);
 
     if (isBoardComplete && !hasNextBoard) {
@@ -2380,7 +2480,10 @@ export class P2pService {
 
   private handleHostSelectTeam(playerId: string, teamId: number) {
     if (!this.isHost()) return;
-    
+    // Prevent mid-game team switching & invalid team IDs
+    if (this.gameState().phase !== 'LOBBY' || !this.teamMode()) return;
+    if (!Number.isInteger(teamId) || teamId < 1 || teamId > this.maxTeamsLimit()) return;
+
     // Check space limit
     const teamCount = this.players().filter(p => p.teamId === teamId).length;
     if (teamCount < this.maxPlayersPerTeam()) {
@@ -2426,64 +2529,61 @@ export class P2pService {
     };
 
     if (this.isHost()) {
-      // Host: Add directly to own log and broadcast
-      this.chatMessages.update(msgs => [...msgs, chatMsg]);
+      this.chatMessages.update(msgs => [...msgs.slice(-199), chatMsg]);
       this.broadcast({
         type: 'CHAT_MSG',
         senderId: this.myPlayerId()!,
         payload: chatMsg
       });
     } else {
-      // Client: Send to Host
       this.sendToHost({
         type: 'CHAT_MSG',
         senderId: this.myPlayerId()!,
         payload: {
-          senderName,
-          senderColor,
-          senderAvatar,
           text: trimmed,
-          teamId
+          isTeam: Boolean(isTeam)
         }
       });
     }
   }
 
-  private handleHostChatMessage(msg: P2pMessage) {
+  private handleHostChatMessage(verifiedPlayerId: string, msg: P2pMessage) {
     if (!this.isHost()) return;
 
     const rawText = msg.payload?.text;
     if (typeof rawText !== 'string' || !rawText.trim() || rawText.trim().length > 200) {
-      return; // Ignore invalid/empty/overflow chat messages
+      return;
     }
 
-    const senderName = msg.payload?.senderName ? String(msg.payload.senderName).substring(0, 14) : 'Spieler';
-    const teamId = typeof msg.payload?.teamId === 'number' ? msg.payload.teamId : undefined;
+    // Derive sender identity and team strictly from Host's authoritative player list
+    const senderPlayer = this.players().find(p => p.id === verifiedPlayerId && !p.isHost);
+    if (!senderPlayer) return;
+
+    const wantsTeamChat = msg.payload?.isTeam === true || typeof msg.payload?.teamId === 'number';
+    const teamId = wantsTeamChat && this.teamMode() && senderPlayer.teamId !== undefined
+      ? senderPlayer.teamId
+      : undefined;
 
     const chatMsg: ChatMessage = {
       id: Math.random().toString(36).substring(2, 9),
-      senderId: msg.senderId,
-      senderName: senderName,
-      senderColor: msg.payload.senderColor || '#f1b814',
-      senderAvatar: msg.payload.senderAvatar || '',
+      senderId: senderPlayer.id,
+      senderName: senderPlayer.name,
+      senderColor: this.sanitizeColor(senderPlayer.color),
+      senderAvatar: this.sanitizeAvatar(senderPlayer.avatar),
       text: rawText.trim(),
       timestamp: Date.now(),
       teamId
     };
 
-    // Add to Host's list
-    this.chatMessages.update(msgs => [...msgs, chatMsg]);
+    this.chatMessages.update(msgs => [...msgs.slice(-199), chatMsg]);
 
-    // Broadcast
     if (teamId !== undefined) {
-      // Team message: Broadcast only to the teammates
       this.broadcastToTeam({
         type: 'CHAT_MSG',
         senderId: this.myPlayerId()!,
         payload: chatMsg
       }, teamId);
     } else {
-      // Global message: Broadcast to everyone
       this.broadcast({
         type: 'CHAT_MSG',
         senderId: this.myPlayerId()!,
@@ -2519,22 +2619,31 @@ export class P2pService {
     this.stopHostHeartbeatCheck();
     this.hostHeartbeatCheckIntervalId = setInterval(() => {
       const now = Date.now();
-      let changed = false;
+      const timedOutIds: string[] = [];
+
       const updatedPlayers = this.players().map(p => {
         if (p.isHost || p.isOffline) return p;
 
         const lastSeen = this.lastSeenMap.get(p.id);
         if (!lastSeen || now - lastSeen > 9000) {
-          console.log(`Player ${p.name} (${p.id}) timed out (no heartbeat for ${now - (lastSeen || 0)}ms). Marking offline.`);
-          changed = true;
-          this.handlePlayerDisconnect(p.id);
+          timedOutIds.push(p.id);
           return { ...p, isOffline: true };
         }
         return p;
       });
 
-      if (changed) {
+      if (timedOutIds.length > 0) {
+        // Update players list FIRST so handlePlayerDisconnect sees isOffline === true
         this.players.set(updatedPlayers);
+        for (const id of timedOutIds) {
+          const staleConn = this.hostConnectionMap.get(id);
+          this.hostConnectionMap.delete(id);
+          this.lastSeenMap.delete(id);
+          if (staleConn) {
+            try { staleConn.close(); } catch (e) {}
+          }
+          this.handlePlayerDisconnect(id);
+        }
         this.broadcastPlayerList();
       }
     }, 3000);
@@ -2548,11 +2657,7 @@ export class P2pService {
     this.lastSeenMap.clear();
   }
 
-  private logDebug(message: string, data?: any) {
-    const msgStr = `${message} ${data ? JSON.stringify(data) : ''}`;
-    console.log('[Client Log]', msgStr);
-    this.http.post('/api/debug/log', { message: msgStr }).subscribe({
-      error: () => {}
-    });
+  private logDebug(_message: string, _data?: any) {
+    // Debug logging disabled in production to avoid leaking session state
   }
 }

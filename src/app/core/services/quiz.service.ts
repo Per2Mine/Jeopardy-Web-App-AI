@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from './auth.service';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { safeLocalStorageGet, safeLocalStorageRemove } from '../utils/storage.util';
 
 export interface Question {
   text: string;
@@ -51,6 +52,7 @@ export class QuizService {
   // Custom quizzes fetched from backend
   customQuizzes = signal<QuizTemplate[]>([]);
   temporaryCommunityQuizzes = signal<QuizTemplate[]>([]);
+  private quizzesLoadedPromise: Promise<void> = Promise.resolve();
 
   // Default system templates
   private defaultTemplates: QuizTemplate[] = [];
@@ -63,23 +65,32 @@ export class QuizService {
         this.syncLegacyQuizzes();
       } else {
         this.customQuizzes.set([]);
+        this.temporaryCommunityQuizzes.set([]);
       }
     });
   }
 
+  whenQuizzesLoaded(): Promise<void> {
+    return this.quizzesLoadedPromise;
+  }
+
   loadQuizzes() {
-    this.http.get<QuizTemplate[]>('/api/quizzes').subscribe({
-      next: (quizzes) => {
-        this.customQuizzes.set(quizzes);
-      },
-      error: (err) => {
-        console.error('Failed to load custom quizzes from backend:', err);
-      }
+    this.quizzesLoadedPromise = new Promise<void>((resolve) => {
+      this.http.get<QuizTemplate[]>('/api/quizzes').subscribe({
+        next: (quizzes) => {
+          this.customQuizzes.set(quizzes);
+          resolve();
+        },
+        error: (err) => {
+          console.error('Failed to load custom quizzes from backend:', err);
+          resolve();
+        }
+      });
     });
   }
 
   private syncLegacyQuizzes() {
-    const quizzesStr = localStorage.getItem(this.QUIZZES_KEY);
+    const quizzesStr = safeLocalStorageGet(this.QUIZZES_KEY);
     if (!quizzesStr) return;
 
     try {
@@ -88,7 +99,7 @@ export class QuizService {
         this.http.post('/api/quizzes/sync', { quizzes: legacyQuizzes }).subscribe({
           next: () => {
             console.log('Legacy custom quizzes successfully migrated to backend.');
-            localStorage.removeItem(this.QUIZZES_KEY);
+            safeLocalStorageRemove(this.QUIZZES_KEY);
             this.loadQuizzes();
           },
           error: (err) => {
@@ -96,21 +107,29 @@ export class QuizService {
           }
         });
       } else {
-        localStorage.removeItem(this.QUIZZES_KEY);
+        safeLocalStorageRemove(this.QUIZZES_KEY);
       }
     } catch (e) {
-      localStorage.removeItem(this.QUIZZES_KEY);
+      safeLocalStorageRemove(this.QUIZZES_KEY);
     }
   }
 
   /**
-   * Get all templates available to a user (defaults + their custom ones)
+   * Get all templates available to a user (defaults + their custom ones + temporary community ones, deduplicated by id)
    */
   getTemplates(userEmail?: string): QuizTemplate[] {
-    const base = userEmail 
+    const base = userEmail
       ? [...this.defaultTemplates, ...this.customQuizzes()]
       : this.defaultTemplates;
-    return [...base, ...this.temporaryCommunityQuizzes()];
+    const seen = new Set<string>();
+    const combined: QuizTemplate[] = [];
+    for (const tmpl of [...base, ...this.temporaryCommunityQuizzes()]) {
+      if (!seen.has(tmpl.id)) {
+        seen.add(tmpl.id);
+        combined.push(tmpl);
+      }
+    }
+    return combined;
   }
 
   /**
@@ -132,25 +151,36 @@ export class QuizService {
       throw new Error('Ein Quiz darf maximal 10 Kategorien besitzen.');
     }
 
+    const allowedImageRegex = /^data:image\/(png|jpeg|jpg|webp|gif);base64,/i;
+    const allowedAudioRegex = /^data:audio\/(mp3|mpeg);base64,/i;
+
     // Validate images and audio if present
     categories.forEach((cat) => {
       cat.questions.forEach((q) => {
         if (q.image) {
-          if (!q.image.startsWith('data:image/')) {
-            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Bildformat bei ${q.value} $.`);
+          if (!allowedImageRegex.test(q.image)) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Bildformat bei ${q.value} $ (nur PNG, JPEG, WEBP, GIF).`);
           }
-          const approximateSize = q.image.length * 0.75;
-          if (approximateSize > 6.8 * 1024 * 1024) {
+          const base64Body = q.image.split(',')[1] || '';
+          const approximateSize = base64Body.length * 0.75;
+          if (approximateSize > 5 * 1024 * 1024) {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein zu großes Bild bei ${q.value} $ (max. 5 MB).`);
           }
         }
         if (q.audio) {
-          if (!q.audio.startsWith('data:audio/mp3') && !q.audio.startsWith('data:audio/mpeg')) {
+          if (!allowedAudioRegex.test(q.audio)) {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat ein ungültiges Audioformat bei ${q.value} $. Nur MP3 erlaubt.`);
           }
-          const approximateSize = q.audio.length * 0.75;
+          const base64Body = q.audio.split(',')[1] || '';
+          const approximateSize = base64Body.length * 0.75;
           if (approximateSize > 10 * 1024 * 1024) {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat eine zu große Audiodatei bei ${q.value} $ (max. 10 MB).`);
+          }
+          if (q.audioStart !== undefined && q.audioEnd !== undefined && q.audioEnd < q.audioStart) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat einen ungültigen Audio-Zeitbereich bei ${q.value} $.`);
+          }
+          if (q.audioSpeed !== undefined && (q.audioSpeed < 0.5 || q.audioSpeed > 2.0)) {
+            throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat einen ungültigen Geschwindigkeitswert bei ${q.value} $.`);
           }
           if (q.audioPitch !== undefined && (q.audioPitch < -12 || q.audioPitch > 12)) {
             throw new Error(`Kategorie "${cat.name || 'Unbenannt'}" hat einen ungültigen Tonhöhenwert bei ${q.value} $.`);
@@ -163,8 +193,8 @@ export class QuizService {
     });
 
     const body = { name: name.trim(), categories, isPublic, icon };
-    const request$ = id 
-      ? this.http.put<any>(`/api/quizzes/${id}`, body)
+    const request$ = id
+      ? this.http.put<any>(`/api/quizzes/${encodeURIComponent(id)}`, body)
       : this.http.post<any>('/api/quizzes', body);
 
     return request$.pipe(
@@ -188,7 +218,7 @@ export class QuizService {
    * Fetch the full details of a community quiz and save it temporarily
    */
   loadFullCommunityQuiz(id: string): Observable<QuizTemplate> {
-    return this.http.get<QuizTemplate>(`/api/community-quizzes/${id}`).pipe(
+    return this.http.get<QuizTemplate>(`/api/community-quizzes/${encodeURIComponent(id)}`).pipe(
       tap((quiz) => {
         this.temporaryCommunityQuizzes.update((quizzes) => {
           if (quizzes.some((q) => q.id === quiz.id)) {
@@ -204,7 +234,7 @@ export class QuizService {
    * Toggle public visibility of a quiz
    */
   toggleQuizPublic(id: string, isPublic: boolean): Observable<any> {
-    return this.http.patch<any>(`/api/quizzes/${id}/public`, { isPublic }).pipe(
+    return this.http.patch<any>(`/api/quizzes/${encodeURIComponent(id)}/public`, { isPublic }).pipe(
       tap(() => {
         this.loadQuizzes();
       })
@@ -215,9 +245,10 @@ export class QuizService {
    * Toggle favorite status of a quiz for the current user
    */
   toggleFavorite(id: string, isFavorite: boolean): Observable<any> {
-    const request$ = isFavorite 
-      ? this.http.post<any>(`/api/quizzes/${id}/favorite`, {})
-      : this.http.delete<any>(`/api/quizzes/${id}/favorite`);
+    const safeId = encodeURIComponent(id);
+    const request$ = isFavorite
+      ? this.http.post<any>(`/api/quizzes/${safeId}/favorite`, {})
+      : this.http.delete<any>(`/api/quizzes/${safeId}/favorite`);
     return request$;
   }
 
@@ -225,7 +256,7 @@ export class QuizService {
    * Delete a custom quiz via Express API. Returns Observable.
    */
   deleteQuiz(id: string): Observable<any> {
-    return this.http.delete<any>(`/api/quizzes/${id}`).pipe(
+    return this.http.delete<any>(`/api/quizzes/${encodeURIComponent(id)}`).pipe(
       tap(() => {
         this.loadQuizzes();
       })

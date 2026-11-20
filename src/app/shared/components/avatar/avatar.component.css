@@ -1,0 +1,246 @@
+:host {
+  display: inline-block;
+}
+
+.avatar-stage {
+  perspective: 260px;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.avatar-stage:hover {
+  transform: scale(1.06) translateY(-1px);
+}
+
+/* Living idle breathing body */
+.avatar-body-breathe {
+  transform-origin: 50px 88px;
+  animation: avatarBreathe 3.6s ease-in-out infinite;
+}
+
+/* Ethereal floating ghost */
+.avatar-body-ghost {
+  transform-origin: 50px 55px;
+  animation: avatarGhostFloat 2.9s ease-in-out infinite;
+}
+
+/* Ground shadow breathes inversely with body */
+.avatar-ground-shadow {
+  transform-origin: 50px 92px;
+  animation: avatarShadowPulse 3.6s ease-in-out infinite;
+}
+
+.avatar-ground-shadow-ghost {
+  transform-origin: 50px 92px;
+  animation: avatarGhostShadow 2.9s ease-in-out infinite;
+}
+
+/* Natural periodic eye blink */
+.avatar-eyes-blink {
+  transform-origin: 50px 48px;
+  animation: avatarBlink 4.8s ease-in-out infinite;
+}
+
+/* Cat tail sway */
+.avatar-tail-sway {
+  transform-origin: 73px 75px;
+  animation: avatarTailSway 2.4s ease-in-out infinite;
+}
+
+/* Octopus tentacles gentle wave */
+.avatar-tentacle-l {
+  transform-origin: 35px 60px;
+  animation: avatarTentacleL 2.8s ease-in-out infinite;
+}
+
+.avatar-tentacle-r {
+  transform-origin: 65px 60px;
+  animation: avatarTentacleR 2.8s ease-in-out infinite;
+}
+
+/* Penguin flippers subtle wiggle */
+.avatar-flipper-l {
+  transform-origin: 28px 55px;
+  animation: avatarFlipperL 3.2s ease-in-out infinite;
+}
+
+.avatar-flipper-r {
+  transform-origin: 72px 55px;
+  animation: avatarFlipperR 3.2s ease-in-out infinite;
+}
+
+/* Robot antenna glow pulse */
+.avatar-antenna-pulse {
+  transform-origin: 50px 14px;
+  animation: avatarAntennaGlow 1.8s ease-in-out infinite;
+}
+
+/* Mood: Excited (Buzzed!) */
+.avatar-mood-excited {
+  animation: avatarExcitedJump 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  filter: drop-shadow(0 6px 16px rgba(241, 184, 20, 0.45));
+}
+
+/* Mood: Winner (Summary Champion!) */
+.avatar-mood-winner {
+  animation: avatarWinnerCelebrate 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 8px 20px rgba(241, 184, 20, 0.55));
+}
+
+@keyframes avatarBreathe {
+  0%, 100% {
+    transform: translateY(0) scaleY(1) scaleX(1);
+  }
+  50% {
+    transform: translateY(-1.8px) scaleY(1.022) scaleX(0.985);
+  }
+}
+
+@keyframes avatarGhostFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1.5deg);
+  }
+}
+
+@keyframes avatarShadowPulse {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.42;
+  }
+  50% {
+    transform: scaleX(0.93);
+    opacity: 0.32;
+  }
+}
+
+@keyframes avatarGhostShadow {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.38;
+  }
+  50% {
+    transform: scaleX(0.76);
+    opacity: 0.2;
+  }
+}
+
+@keyframes avatarBlink {
+  0%, 92%, 100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes avatarTailSway {
+  0%, 100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(9deg);
+  }
+}
+
+@keyframes avatarTentacleL {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes avatarTentacleR {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes avatarFlipperL {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(9deg);
+  }
+  70% {
+    transform: rotate(-3deg);
+  }
+}
+
+@keyframes avatarFlipperR {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(-9deg);
+  }
+  70% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes avatarAntennaGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@keyframes avatarExcitedJump {
+  0%, 100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  20% {
+    transform: translateY(2px) scale(1.07, 0.92);
+  }
+  55% {
+    transform: translateY(-7px) scale(0.96, 1.05);
+  }
+  80% {
+    transform: translateY(0) scale(1.03, 0.97);
+  }
+}
+
+@keyframes avatarWinnerCelebrate {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-4deg) scale(1.04);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  75% {
+    transform: translateY(-4px) rotate(4deg) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-body-breathe,
+  .avatar-body-ghost,
+  .avatar-ground-shadow,
+  .avatar-ground-shadow-ghost,
+  .avatar-eyes-blink,
+  .avatar-tail-sway,
+  .avatar-tentacle-l,
+  .avatar-tentacle-r,
+  .avatar-flipper-l,
+  .avatar-flipper-r,
+  .avatar-antenna-pulse,
+  .avatar-mood-excited,
+  .avatar-mood-winner {
+    animation: none !important;
+  }
+}

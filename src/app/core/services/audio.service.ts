@@ -1,5 +1,6 @@
 import { Injectable, signal, inject, effect } from '@angular/core';
 import { P2pService } from './p2p.service';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/storage.util';
 
 @Injectable({
   providedIn: 'root'
@@ -15,6 +16,8 @@ export class AudioService {
   private audioSpeed = 1.0;
   private audioPitch = 0;
   questionAudioPlaying = signal<boolean>(false);
+  isPopoverOpen = signal<boolean>(false);
+  isRebindingKey = signal<boolean>(false);
 
   // Web Audio Nodes for Altered Playback
   private decodedBuffer: AudioBuffer | null = null;
@@ -49,16 +52,20 @@ export class AudioService {
   private lastAudioPlayingState = false;
   private hasFinishedPlaying = false;
   private lastTtsQuestionKey: string | null = null;
+  private ttsGeneration = 0;
 
   constructor() {
     // Load settings from localStorage
-    const savedVol = localStorage.getItem('jeopardy_audio_volume');
-    const savedMute = localStorage.getItem('jeopardy_audio_muted');
-    const savedTts = localStorage.getItem('jeopardy_audio_tts');
-    const savedBuzzerKey = localStorage.getItem('jeopardy_hotkey_buzzer');
+    const savedVol = safeLocalStorageGet('jeopardy_audio_volume');
+    const savedMute = safeLocalStorageGet('jeopardy_audio_muted');
+    const savedTts = safeLocalStorageGet('jeopardy_audio_tts');
+    const savedBuzzerKey = safeLocalStorageGet('jeopardy_hotkey_buzzer');
 
     if (savedVol !== null) {
-      this.volume.set(parseFloat(savedVol));
+      const parsed = parseFloat(savedVol);
+      if (Number.isFinite(parsed)) {
+        this.volume.set(Math.max(0, Math.min(1, parsed)));
+      }
     }
     if (savedMute !== null) {
       this.muted.set(savedMute === 'true');
@@ -72,16 +79,16 @@ export class AudioService {
 
     // Persist volume settings changes
     effect(() => {
-      localStorage.setItem('jeopardy_audio_volume', this.volume().toString());
+      safeLocalStorageSet('jeopardy_audio_volume', this.volume().toString());
     });
     effect(() => {
-      localStorage.setItem('jeopardy_audio_muted', this.muted().toString());
+      safeLocalStorageSet('jeopardy_audio_muted', this.muted().toString());
     });
     effect(() => {
-      localStorage.setItem('jeopardy_audio_tts', this.ttsEnabled().toString());
+      safeLocalStorageSet('jeopardy_audio_tts', this.ttsEnabled().toString());
     });
     effect(() => {
-      localStorage.setItem('jeopardy_hotkey_buzzer', this.buzzerKey());
+      safeLocalStorageSet('jeopardy_hotkey_buzzer', this.buzzerKey());
     });
 
     // Reset lastTtsQuestionKey if TTS is toggled on to allow speaking current question
@@ -93,7 +100,7 @@ export class AudioService {
 
     // Update active question audio volume/mute settings
     effect(() => {
-      const finalVolume = this.muted() ? 0 : this.volume();
+      const finalVolume = this.muted() ? 0 : Math.max(0, Math.min(1, this.volume()));
       if (this.gainNode) {
         this.gainNode.gain.setValueAtTime(finalVolume, this.getAudioContext().currentTime);
       }
@@ -112,8 +119,8 @@ export class AudioService {
       } else {
         this.getAudioContext();
       }
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('click', unlock, { capture: true });
+      window.removeEventListener('keydown', unlock, { capture: true });
     };
     window.addEventListener('click', unlock, { capture: true, passive: true });
     window.addEventListener('keydown', unlock, { capture: true, passive: true });
@@ -122,7 +129,6 @@ export class AudioService {
     effect(() => {
       const state = this.p2pService.gameState();
       const tts = this.ttsEnabled();
-      const vol = this.volume();
       const isMuted = this.muted();
 
       // Stop speaking if TTS is disabled or muted
@@ -248,7 +254,9 @@ export class AudioService {
     
     if (!text || text.trim() === '') return;
     
-    const finalVolume = this.muted() ? 0 : this.volume();
+    const generation = ++this.ttsGeneration;
+    const finalVolume = this.muted() ? 0 : Math.max(0, Math.min(1, this.volume()));
+    if (finalVolume <= 0) return;
     
     // Primary: Google Translate TTS via our backend proxy (bypasses all CORS/ORB/Referrer issues)
     try {
@@ -257,7 +265,7 @@ export class AudioService {
       
       let fallbackTriggered = false;
       const triggerFallback = (err: any) => {
-        if (fallbackTriggered) return;
+        if (fallbackTriggered || this.ttsGeneration !== generation) return;
         fallbackTriggered = true;
         console.warn("Proxy Google Translate TTS failed, falling back to native SpeechSynthesis:", err);
         this.speakNativeFallback(text, finalVolume);
@@ -274,6 +282,7 @@ export class AudioService {
         triggerFallback(err);
       });
     } catch (e) {
+      if (this.ttsGeneration !== generation) return;
       console.warn("Failed to initialize proxy TTS audio, trying native fallback:", e);
       this.speakNativeFallback(text, finalVolume);
     }
@@ -288,7 +297,7 @@ export class AudioService {
     try {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'de-DE';
-      utterance.volume = volume;
+      utterance.volume = Math.max(0, Math.min(1, volume));
       
       const voices = window.speechSynthesis.getVoices();
       const deVoice = voices.find(v => v.lang.startsWith('de') || v.lang.includes('DE'));
@@ -306,7 +315,9 @@ export class AudioService {
    * Stop any active speech synthesis or audio playback
    */
   private stopSpeaking() {
+    this.ttsGeneration++;
     if (this.ttsAudio) {
+      this.ttsAudio.onerror = null;
       this.ttsAudio.pause();
       this.ttsAudio = null;
     }
@@ -538,7 +549,11 @@ export class AudioService {
    */
   private async decodeBase64Audio(base64: string): Promise<AudioBuffer> {
     const ctx = this.getAudioContext();
-    const base64Data = base64.split(',')[1];
+    const parts = base64.split(',');
+    const base64Data = parts.length > 1 ? parts[1] : parts[0];
+    if (!base64Data) {
+      throw new Error('Invalid base64 audio payload');
+    }
     const binaryStr = window.atob(base64Data);
     const len = binaryStr.length;
     const bytes = new Uint8Array(len);
@@ -551,10 +566,10 @@ export class AudioService {
   async setupQuestionAudio(base64Url: string, start?: number, end?: number, speed?: number, pitch?: number) {
     this.stopQuestionAudio();
     this.currentAudioUrl = base64Url;
-    this.audioStart = start !== undefined ? start : 0;
-    this.audioEnd = end !== undefined ? end : 10;
-    this.audioSpeed = speed !== undefined ? speed : 1.0;
-    this.audioPitch = pitch !== undefined ? pitch : 0;
+    this.audioStart = start !== undefined && Number.isFinite(start) ? Math.max(0, start) : 0;
+    this.audioEnd = end !== undefined && Number.isFinite(end) ? Math.max(this.audioStart, end) : this.audioStart + 10;
+    this.audioSpeed = speed !== undefined && Number.isFinite(speed) && speed > 0 ? Math.max(0.5, Math.min(2.0, speed)) : 1.0;
+    this.audioPitch = pitch !== undefined && Number.isFinite(pitch) ? Math.max(-12, Math.min(12, pitch)) : 0;
 
     try {
       const buffer = await this.decodeBase64Audio(base64Url);
@@ -584,6 +599,21 @@ export class AudioService {
     if (!this.decodedBuffer) return;
     if (this.isCurrentlyPlaying || this.isSolutionPlaying) return;
 
+    const durationLimit = Math.max(0, Math.min(this.audioEnd, this.decodedBuffer.duration) - this.audioStart);
+    if (durationLimit <= 0.05) {
+      this.questionAudioPlaying.set(false);
+      this.hasFinishedPlaying = true;
+      return;
+    }
+
+    if (this.elapsedOffset >= durationLimit - 0.02) {
+      this.elapsedOffset = 0;
+    }
+
+    const remainingBufferDuration = Math.max(0.05, durationLimit - this.elapsedOffset);
+    const safeSpeed = Math.max(0.5, Math.min(2.0, this.audioSpeed || 1.0));
+    const realTimeDuration = remainingBufferDuration / safeSpeed;
+
     this.isCurrentlyPlaying = true;
     this.questionAudioPlaying.set(true);
     this.manualStop = false;
@@ -591,24 +621,14 @@ export class AudioService {
     const ctx = this.getAudioContext();
     this.playStartTime = ctx.currentTime;
 
-    // Calculate remaining duration
-    const durationLimit = this.audioEnd - this.audioStart;
-    const remainingDuration = durationLimit - this.elapsedOffset;
-
-    if (remainingDuration <= 0) {
-      this.elapsedOffset = 0;
-      this.playQuestionAudio();
-      return;
-    }
-
     // 1. Source Node
     this.sourceNode = ctx.createBufferSource();
     this.sourceNode.buffer = this.decodedBuffer;
-    this.sourceNode.playbackRate.value = this.audioSpeed;
+    this.sourceNode.playbackRate.value = safeSpeed;
 
     // 2. Volume Gain Node
     this.gainNode = ctx.createGain();
-    const finalVolume = this.muted() ? 0 : this.volume();
+    const finalVolume = this.muted() ? 0 : Math.max(0, Math.min(1, this.volume()));
     this.gainNode.gain.setValueAtTime(finalVolume, ctx.currentTime);
 
     // 3. Pitch Shifter Node (Jungle)
@@ -619,23 +639,20 @@ export class AudioService {
     this.jungleNode.output.connect(this.gainNode);
     this.gainNode.connect(ctx.destination);
 
-    // Apply Pitch shift.
-    // Calculate the compensation offset for speed changes:
-    // If playbackRate = S, it shifts the pitch by 12 * log2(S) semitones.
-    // We adjust setPitchTranspose to target exactly this.audioPitch semitones.
-    const speedPitchShift = 12 * Math.log2(this.audioSpeed);
+    // Apply Pitch shift compensation for playbackRate
+    const speedPitchShift = 12 * Math.log2(safeSpeed);
     const targetTranspose = this.audioPitch - speedPitchShift;
     this.jungleNode.setPitchTranspose(targetTranspose);
 
-    // Start playback
+    // Start playback (3rd parameter is real-time seconds in Web Audio API)
     const startPositionInFile = this.audioStart + this.elapsedOffset;
-    this.sourceNode.start(0, startPositionInFile, remainingDuration);
+    this.sourceNode.start(0, startPositionInFile, realTimeDuration);
 
     this.sourceNode.onended = () => {
       if (!this.manualStop) {
         this.questionAudioPlaying.set(false);
         this.isCurrentlyPlaying = false;
-        this.elapsedOffset = 0; // reset
+        this.elapsedOffset = 0;
         this.hasFinishedPlaying = true;
       }
     };
@@ -737,10 +754,15 @@ export class AudioService {
       const buffer = await this.decodeBase64Audio(base64Url);
       if (!this.isPreviewPlaying) return; // stopped while decoding
 
+      const safeSpeed = Math.max(0.5, Math.min(2.0, speed || 1.0));
+      const safeStart = Math.max(0, start);
+      const bufferDuration = Math.max(0.05, Math.min(end, buffer.duration) - safeStart);
+      const realTimeDuration = bufferDuration / safeSpeed;
+
       const ctx = this.getAudioContext();
       this.previewSourceNode = ctx.createBufferSource();
       this.previewSourceNode.buffer = buffer;
-      this.previewSourceNode.playbackRate.value = speed;
+      this.previewSourceNode.playbackRate.value = safeSpeed;
 
       this.previewGainNode = ctx.createGain();
       this.previewGainNode.gain.setValueAtTime(0.5, ctx.currentTime); // default preview volume
@@ -751,12 +773,11 @@ export class AudioService {
       this.previewJungleNode.output.connect(this.previewGainNode);
       this.previewGainNode.connect(ctx.destination);
 
-      const speedPitchShift = 12 * Math.log2(speed);
+      const speedPitchShift = 12 * Math.log2(safeSpeed);
       const targetTranspose = pitch - speedPitchShift;
       this.previewJungleNode.setPitchTranspose(targetTranspose);
 
-      const duration = end - start;
-      this.previewSourceNode.start(0, start, duration);
+      this.previewSourceNode.start(0, safeStart, realTimeDuration);
 
       this.previewSourceNode.onended = () => {
         this.isPreviewPlaying = false;
@@ -775,6 +796,7 @@ export class AudioService {
       try {
         this.previewSourceNode.onended = null;
         this.previewSourceNode.stop();
+        this.previewSourceNode.disconnect();
       } catch (e) {}
       this.previewSourceNode = null;
     }
@@ -782,7 +804,10 @@ export class AudioService {
       this.previewJungleNode.disconnect();
       this.previewJungleNode = null;
     }
-    this.previewGainNode = null;
+    if (this.previewGainNode) {
+      try { this.previewGainNode.disconnect(); } catch (e) {}
+      this.previewGainNode = null;
+    }
   }
 
   /**
@@ -790,11 +815,12 @@ export class AudioService {
    */
   playGameStart() {
     try {
+      const baseVol = this.muted() ? 0 : this.volume() * 0.22;
+      if (baseVol <= 0.001) return;
+
       const ctx = this.getAudioContext();
       const now = ctx.currentTime;
-      const baseVol = this.muted() ? 0 : this.volume() * 0.22;
 
-      // Soft ascending warm major chord leading to a rich, pleasant C-dur chord:
       const notes = [
         { freq: 196.00, time: 0.0, dur: 0.22 },   // G3
         { freq: 261.63, time: 0.08, dur: 0.22 },  // C4
@@ -803,7 +829,6 @@ export class AudioService {
         { freq: 523.25, time: 0.32, dur: 0.9 }    // C5 (final soft root tone)
       ];
 
-      // Soft harmonies to round out the final chord (no high-pitched piercing frequencies)
       const harmonies = [
         { freq: 261.63, time: 0.32, dur: 0.9 },   // C4
         { freq: 329.63, time: 0.32, dur: 0.9 },   // E4
@@ -813,23 +838,23 @@ export class AudioService {
       const playFanfareNote = (freq: number, startOffset: number, duration: number, isFinal = false) => {
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
+        const peakVol = Math.max(0.002, baseVol * (isFinal ? 0.75 : 1.0));
+        const attackEnd = Math.min(0.04, duration * 0.25);
+        const holdEnd = Math.max(attackEnd + 0.02, duration - 0.12);
 
-        // Use pure sine waves for all notes to keep the sound clean, smooth, and free of harsh harmonics
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now + startOffset);
 
-        gainNode.gain.setValueAtTime(0, now + startOffset);
-        gainNode.gain.linearRampToValueAtTime(baseVol * (isFinal ? 0.75 : 1.0), now + startOffset + 0.04);
-        
-        // Gentle fade-out curve
-        gainNode.gain.setValueAtTime(baseVol * (isFinal ? 0.75 : 1.0), now + startOffset + duration - 0.25);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration);
+        gainNode.gain.setValueAtTime(0.0001, now + startOffset);
+        gainNode.gain.linearRampToValueAtTime(peakVol, now + startOffset + attackEnd);
+        gainNode.gain.setValueAtTime(peakVol, now + startOffset + holdEnd);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
 
         osc.connect(gainNode);
         gainNode.connect(ctx.destination);
 
         osc.start(now + startOffset);
-        osc.stop(now + startOffset + duration);
+        osc.stop(now + startOffset + duration + 0.02);
       };
 
       notes.forEach((n, idx) => {
@@ -849,9 +874,11 @@ export class AudioService {
    */
   playGameEnd() {
     try {
+      const baseVol = this.muted() ? 0 : this.volume() * 0.18;
+      if (baseVol <= 0.001) return;
+
       const ctx = this.getAudioContext();
       const now = ctx.currentTime;
-      const baseVol = this.muted() ? 0 : this.volume() * 0.18;
 
       const playChord = (freqs: number[], timeOffset: number, duration: number) => {
         freqs.forEach((freq) => {
@@ -861,15 +888,15 @@ export class AudioService {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, now + timeOffset);
 
-          gainNode.gain.setValueAtTime(0, now + timeOffset);
+          gainNode.gain.setValueAtTime(0.0001, now + timeOffset);
           gainNode.gain.linearRampToValueAtTime(baseVol, now + timeOffset + 0.05);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + duration);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, now + timeOffset + duration);
 
           osc.connect(gainNode);
           gainNode.connect(ctx.destination);
 
           osc.start(now + timeOffset);
-          osc.stop(now + timeOffset + duration);
+          osc.stop(now + timeOffset + duration + 0.02);
         });
       };
 

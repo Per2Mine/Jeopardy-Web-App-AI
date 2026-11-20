@@ -2,8 +2,8 @@
   @if (label() || (maxLength() && showCounter())) {
     <div class="flex justify-between items-center mb-1.5">
       @if (label()) {
-        <label 
-          [for]="id()" 
+        <label
+          [for]="id()"
           class="block text-xs font-bold text-white/70 uppercase tracking-widest transition-colors duration-200">
           {{ label() }}
         </label>
@@ -12,17 +12,18 @@
       }
       @if (maxLength(); as max) {
         @if (showCounter()) {
+          @let ratio = max > 0 ? Math.min(1, value().length / max) : 0;
           <div class="flex items-center gap-1.5 text-[10px] font-mono font-bold text-white/40">
-            <span>{{ max - value().length }}</span>
-            <svg class="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 20 20">
+            <span>{{ Math.max(0, max - value().length) }}</span>
+            <svg class="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 20 20" aria-hidden="true">
               <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" class="text-white/10" stroke-width="2.5"/>
               <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor"
-                      [class.text-jeopardy-accent]="value().length / max < 0.75"
-                      [class.text-yellow-500]="value().length / max >= 0.75 && value().length / max < 0.9"
-                      [class.text-red-500]="value().length / max >= 0.9"
+                      [class.text-jeopardy-accent]="ratio < 0.75"
+                      [class.text-yellow-500]="ratio >= 0.75 && ratio < 0.9"
+                      [class.text-red-500]="ratio >= 0.9"
                       stroke-width="2.5"
                       [attr.stroke-dasharray]="50.26"
-                      [attr.stroke-dashoffset]="50.26 - (50.26 * value().length / max)"
+                      [attr.stroke-dashoffset]="50.26 - (50.26 * ratio)"
                       class="transition-all duration-150"
               />
             </svg>
@@ -32,7 +33,7 @@
     </div>
   }
 
-  <div class="relative rounded-lg shadow-sm">
+  <div class="relative rounded-xl shadow-sm">
     @if (type() === 'textarea') {
       <textarea
         [id]="id()"
@@ -41,9 +42,10 @@
         [disabled]="disabled()"
         [rows]="rows()"
         [maxLength]="maxLength()"
+        [attr.aria-invalid]="error() ? 'true' : null"
         (input)="onInput($event)"
-        [class]="'w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300 ' + 
-                 (error() ? 'border-red-500/50 focus:border-red-500 focus:ring-4 focus:ring-red-500/20' : 'border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20')">
+        [class]="'w-full px-4 py-3 bg-jeopardy-blue/25 hover:bg-jeopardy-blue/35 focus:bg-jeopardy-blue/45 border text-white placeholder-white/30 rounded-xl outline-none transition-all duration-200 ' +
+                 (error() ? 'border-red-500/60 focus:border-red-500 focus:ring-4 focus:ring-red-500/20' : 'border-white/10 hover:border-white/25 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/25')">
       </textarea>
     } @else {
       <input
@@ -53,20 +55,22 @@
         [value]="value()"
         [disabled]="disabled()"
         [maxLength]="maxLength()"
+        [attr.aria-invalid]="error() ? 'true' : null"
         (input)="onInput($event)"
-        (keyup.enter)="$event.preventDefault(); enterPressed.emit()"
-        [class]="'w-full px-4 py-3 bg-jeopardy-blue/20 hover:bg-jeopardy-blue/30 focus:bg-jeopardy-blue/40 border text-white placeholder-white/30 rounded-lg outline-none transition-all duration-300 ' + 
-                 (error() ? 'border-red-500/50 focus:border-red-500 focus:ring-4 focus:ring-red-500/20' : 'border-white/10 hover:border-white/20 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/20')">
+        (keydown.enter)="$event.preventDefault(); enterPressed.emit()"
+        [class]="'w-full px-4 py-3 bg-jeopardy-blue/25 hover:bg-jeopardy-blue/35 focus:bg-jeopardy-blue/45 border text-white placeholder-white/30 rounded-xl outline-none transition-all duration-200 ' +
+                 (error() ? 'border-red-500/60 focus:border-red-500 focus:ring-4 focus:ring-red-500/20' : 'border-white/10 hover:border-white/25 focus:border-jeopardy-accent focus:ring-4 focus:ring-jeopardy-accent/25')">
     }
 
     @if (maxLength(); as max) {
       @if (showCounter()) {
-        <div class="absolute bottom-[1px] left-[1px] right-[1px] h-[2px] bg-white/5 rounded-b-[7px] overflow-hidden pointer-events-none">
-          <div 
-            [style.width.%]="(value().length / max) * 100"
-            [class]="'h-full transition-all duration-150 ' + 
-                     (value().length / max < 0.75 ? 'bg-jeopardy-accent' : 
-                      value().length / max < 0.9 ? 'bg-yellow-500' : 'bg-red-500')">
+        @let ratio = max > 0 ? Math.min(1, value().length / max) : 0;
+        <div class="absolute bottom-[1px] left-[1px] right-[1px] h-[2px] bg-white/5 rounded-b-[11px] overflow-hidden pointer-events-none">
+          <div
+            [style.width.%]="ratio * 100"
+            [class]="'h-full transition-all duration-150 ' +
+                     (ratio < 0.75 ? 'bg-jeopardy-accent' :
+                      ratio < 0.9 ? 'bg-yellow-500' : 'bg-red-500')">
           </div>
         </div>
       }
@@ -74,7 +78,7 @@
   </div>
 
   @if (error()) {
-    <p class="text-xs text-red-500 mt-1.5 font-medium animate-fade-in">
+    <p role="alert" class="text-xs text-red-400 mt-1.5 font-medium animate-fade-in">
       {{ error() }}
     </p>
   }

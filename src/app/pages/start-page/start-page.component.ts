@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect, inject } from '@angular/core';
+import { Component, signal, computed, effect, inject, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ButtonComponent } from '../../shared/components/button/button.component';
@@ -10,6 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { QuizService } from '../../core/services/quiz.service';
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
 import { AudioSettingsComponent } from '../../shared/components/audio-settings/audio-settings.component';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../../core/utils/storage.util';
 
 @Component({
   selector: 'app-start-page',
@@ -18,11 +19,19 @@ import { AudioSettingsComponent } from '../../shared/components/audio-settings/a
   templateUrl: './start-page.component.html',
   styleUrl: './start-page.component.css'
 })
-export class StartPageComponent {
+export class StartPageComponent implements OnDestroy {
   p2pService = inject(P2pService);
   authService = inject(AuthService);
   quizService = inject(QuizService);
   private router = inject(Router);
+
+  private pendingTimers: any[] = [];
+  private communityReqSeq = 0;
+
+  // In-app toast notifications (replaces native alert())
+  toastMessage = signal<string>('');
+  toastType = signal<'error' | 'info'>('error');
+  avatarPop = signal(false);
 
   // Tab control: 'join' or 'host'
   activeTab = signal<'join' | 'host'>('join');
@@ -41,6 +50,53 @@ export class StartPageComponent {
   avatarAccessory = signal(0);
   selectedAvatar = computed(() => `b${this.avatarBase()}e${this.avatarEyes()}m${this.avatarMouth()}a${this.avatarAccessory()}`);
   selectedColorHue = computed(() => this.getHueFromHex(this.selectedColor()));
+
+  readonly accessoryLabels = ['Ohne', 'Krone', 'Partyhut', 'Fedora', 'Pirat', 'Schleife', 'Kochhut', 'Schnurrbart'];
+  currentAccessoryLabel = computed(() => this.accessoryLabels[this.avatarAccessory()] || 'Ohne');
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey() {
+    if (this.confirmModalOpen()) { this.onCancelDelete(); return; }
+    if (this.isCommunityPoolOpen()) { this.closeCommunityPool(); return; }
+    if (this.authModalOpen()) { this.authModalOpen.set(false); return; }
+    if (this.settingsModalOpen()) { this.settingsModalOpen.set(false); return; }
+    if (this.legalModalOpen()) { this.legalModalOpen.set(false); return; }
+    if (this.patchNotesModalOpen()) { this.patchNotesModalOpen.set(false); return; }
+  }
+
+  ngOnDestroy() {
+    this.pendingTimers.forEach(t => clearTimeout(t));
+    this.pendingTimers = [];
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
+  }
+
+  private scheduleTimer(fn: () => void, ms: number) {
+    const id = setTimeout(() => {
+      this.pendingTimers = this.pendingTimers.filter(t => t !== id);
+      fn();
+    }, ms);
+    this.pendingTimers.push(id);
+  }
+
+  showToast(message: string, type: 'error' | 'info' = 'error') {
+    this.toastMessage.set(message);
+    this.toastType.set(type);
+    this.scheduleTimer(() => {
+      if (this.toastMessage() === message) {
+        this.toastMessage.set('');
+      }
+    }, 4500);
+  }
+
+  private triggerAvatarPop() {
+    this.avatarPop.set(false);
+    requestAnimationFrame(() => {
+      this.avatarPop.set(true);
+      this.scheduleTimer(() => this.avatarPop.set(false), 260);
+    });
+  }
 
   // Auth form states
   authModalOpen = signal(false);
@@ -93,9 +149,9 @@ export class StartPageComponent {
 
   constructor() {
     // Load from localStorage if present
-    const savedName = localStorage.getItem('jeopardy_player_name');
-    const savedColor = localStorage.getItem('jeopardy_player_color');
-    const savedAvatar = localStorage.getItem('jeopardy_player_avatar');
+    const savedName = safeLocalStorageGet('jeopardy_player_name');
+    const savedColor = safeLocalStorageGet('jeopardy_player_color');
+    const savedAvatar = safeLocalStorageGet('jeopardy_player_avatar');
 
     if (savedName) {
       this.playerName.set(savedName);
@@ -188,7 +244,7 @@ export class StartPageComponent {
     if (this.selectedTemplates().length === 0) {
       return false;
     }
-    const guests = this.p2pService.players().filter(p => !p.isHost);
+    const guests = this.p2pService.players().filter(p => !p.isHost && !p.isOffline);
     if (this.p2pService.teamMode()) {
       const maxTeams = this.p2pService.maxTeamsLimit();
       for (let t = 1; t <= maxTeams; t++) {
@@ -207,7 +263,7 @@ export class StartPageComponent {
     if (this.selectedTemplates().length === 0) {
       return 'Bitte wähle mindestens eine Quiz-Vorlage aus.';
     }
-    const guests = this.p2pService.players().filter(p => !p.isHost);
+    const guests = this.p2pService.players().filter(p => !p.isHost && !p.isOffline);
     if (this.p2pService.teamMode()) {
       const maxTeams = this.p2pService.maxTeamsLimit();
       const emptyTeams: number[] = [];
@@ -223,7 +279,7 @@ export class StartPageComponent {
       return '';
     } else {
       if (guests.length < 2) {
-        return `Warte auf mindestens 2 Spieler (derzeit: ${guests.length}).`;
+        return `Warte auf mindestens 2 aktive Spieler (derzeit: ${guests.length}).`;
       }
       return '';
     }
@@ -272,7 +328,7 @@ export class StartPageComponent {
         },
         error: (err) => {
           console.error('Failed to delete quiz:', err);
-          alert('Fehler beim Löschen des Quizzes.');
+          this.showToast('Fehler beim Löschen des Quizzes.');
         }
       });
     } else if (this.confirmModalType() === 'account') {
@@ -281,7 +337,7 @@ export class StartPageComponent {
         this.playerName.set('');
         this.selectedTemplates.set([]);
       }).catch(err => {
-        alert(err.message || 'Fehler beim Löschen des Kontos.');
+        this.showToast(err.message || 'Fehler beim Löschen des Kontos.');
       });
     }
   }
@@ -301,7 +357,7 @@ export class StartPageComponent {
   }
 
   getHueFromHex(hex: string): number {
-    if (!hex || hex.charAt(0) !== '#') return 45; // default to yellow hue
+    if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex.trim())) return 45;
     let r = parseInt(hex.slice(1, 3), 16) / 255;
     let g = parseInt(hex.slice(3, 5), 16) / 255;
     let b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -318,7 +374,8 @@ export class StartPageComponent {
       }
       h /= 6;
     }
-    return Math.round(h * 360);
+    const result = Math.round(h * 360);
+    return Number.isFinite(result) ? result : 45;
   }
 
   hslToHex(h: number, s: number, l: number): string {
@@ -493,9 +550,9 @@ export class StartPageComponent {
     this.joinError.set('');
     
     try {
-      localStorage.setItem('jeopardy_player_name', name);
-      localStorage.setItem('jeopardy_player_color', this.selectedColor());
-      localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
+      safeLocalStorageSet('jeopardy_player_name', name);
+      safeLocalStorageSet('jeopardy_player_color', this.selectedColor());
+      safeLocalStorageSet('jeopardy_player_avatar', this.selectedAvatar());
 
       await this.p2pService.joinRoom(
         code.toUpperCase(),
@@ -533,17 +590,19 @@ export class StartPageComponent {
     this.showTemplateWarning.set(false);
     this.joinError.set('');
 
-    // Generate a unique 6-character room code (e.g. JEOP55 or random uppercase alphanumeric)
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    // Generate a cryptographically random 6-character room code
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const randomBytes = new Uint8Array(6);
+    crypto.getRandomValues(randomBytes);
     let randomCode = '';
     for (let i = 0; i < 6; i++) {
-      randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+      randomCode += chars.charAt(randomBytes[i] % chars.length);
     }
 
     try {
-      localStorage.setItem('jeopardy_player_name', name);
-      localStorage.setItem('jeopardy_player_color', this.selectedColor());
-      localStorage.setItem('jeopardy_player_avatar', this.selectedAvatar());
+      safeLocalStorageSet('jeopardy_player_name', name);
+      safeLocalStorageSet('jeopardy_player_color', this.selectedColor());
+      safeLocalStorageSet('jeopardy_player_avatar', this.selectedAvatar());
 
       const initialQuizzes = this.selectedTemplates().map(id => {
         const tmpl = this.quizTemplates().find(t => t.id === id);
@@ -583,18 +642,20 @@ export class StartPageComponent {
     if (code) {
       navigator.clipboard.writeText(code);
       this.codeCopied.set(true);
-      setTimeout(() => this.codeCopied.set(false), 2000);
+      this.scheduleTimer(() => this.codeCopied.set(false), 2000);
     }
   }
 
   onStartGame() {
-    const templates = this.selectedTemplates().map(id => 
+    const templates = this.selectedTemplates().map(id =>
       this.quizService.getTemplateById(id, this.authService.currentUser()?.email)
     ).filter((t): t is Exclude<typeof t, null> => !!t);
 
     if (templates.length > 0) {
       const boards = templates.map(t => t.categories);
       this.p2pService.startGame(boards);
+    } else {
+      this.showToast('Die ausgewählte Quiz-Vorlage konnte nicht geladen werden. Bitte wähle sie erneut aus.');
     }
   }
 
@@ -602,11 +663,11 @@ export class StartPageComponent {
     this.avatarBase.set(Math.floor(Math.random() * 8));
     this.avatarEyes.set(Math.floor(Math.random() * 12));
     this.avatarMouth.set(Math.floor(Math.random() * 10));
-    this.avatarAccessory.set(0); // Set to 0 to disable accessories in this layout
+    this.avatarAccessory.set(Math.floor(Math.random() * 8));
 
-    // Also pick a random color from predefined ones
     const randomColorObj = this.avatarColors[Math.floor(Math.random() * this.avatarColors.length)];
     this.selectedColor.set(randomColorObj.hex);
+    this.triggerAvatarPop();
   }
 
   openAuthModal(mode: 'login' | 'register' | 'forgot') {
@@ -674,7 +735,7 @@ export class StartPageComponent {
         this.forgotNewPassword()
       );
       this.forgotSuccess.set(true);
-      setTimeout(() => {
+      this.scheduleTimer(() => {
         this.authMode.set('login');
         this.forgotStep.set(1);
         this.forgotQuestion.set('');
@@ -707,7 +768,7 @@ export class StartPageComponent {
     try {
       await this.authService.updateUsername(this.newUsername());
       this.settingsSuccess.set('Benutzername erfolgreich aktualisiert!');
-      setTimeout(() => {
+      this.scheduleTimer(() => {
         this.settingsModalOpen.set(false);
       }, 1200);
     } catch (err: any) {
@@ -718,7 +779,7 @@ export class StartPageComponent {
   onCreateQuizClick() {
     if (!this.authService.currentUser()) {
       this.showCreateQuizWarning.set(true);
-      setTimeout(() => {
+      this.scheduleTimer(() => {
         this.showCreateQuizWarning.set(false);
       }, 5000);
       return;
@@ -739,14 +800,17 @@ export class StartPageComponent {
   }
 
   loadCommunityQuizzes() {
+    const seq = ++this.communityReqSeq;
     this.communityLoading.set(true);
     this.quizService.getCommunityQuizzes(this.communityPage(), 9, this.communitySearch(), this.communityFavoritesOnly()).subscribe({
       next: (res) => {
+        if (seq !== this.communityReqSeq) return;
         this.communityQuizzes.set(res.quizzes);
         this.communityTotalPages.set(res.totalPages || 1);
         this.communityLoading.set(false);
       },
       error: (err) => {
+        if (seq !== this.communityReqSeq) return;
         console.error('Failed to load community quizzes:', err);
         this.communityLoading.set(false);
       }
@@ -766,14 +830,12 @@ export class StartPageComponent {
           this.loadCommunityQuizzes();
         }
 
-        // If unfavorited, immediately remove from available templates and active selection
         if (!newFavStatus) {
           this.quizService.temporaryCommunityQuizzes.update(list => 
             list.filter(q => q.id !== quiz.id)
           );
           this.selectedTemplates.update(ids => ids.filter(id => id !== quiz.id));
 
-          // Sync changes with P2P game state if connected as host
           if (this.p2pService.isHost() && this.p2pService.connectionState() === 'connected') {
             const updatedQuizzes = this.selectedTemplates().map(tid => {
               const tmpl = this.quizTemplates().find(t => t.id === tid);
@@ -791,7 +853,7 @@ export class StartPageComponent {
       },
       error: (err) => {
         console.error('Failed to toggle favorite:', err);
-        alert('Fehler beim Aktualisieren des Favoritenstatus.');
+        this.showToast('Fehler beim Aktualisieren des Favoritenstatus.');
       }
     });
   }
@@ -836,10 +898,10 @@ export class StartPageComponent {
       next: (quiz) => {
         this.communityLoading.set(false);
         this.closeCommunityPool();
-        // Select it
         const current = this.selectedTemplates();
         if (!current.includes(quiz.id)) {
           if (current.length >= 3) {
+            this.showToast('Es können maximal 3 Quiz-Vorlagen gleichzeitig ausgewählt werden.', 'info');
             return;
           }
           this.selectedTemplates.set([...current, quiz.id]);
@@ -847,7 +909,6 @@ export class StartPageComponent {
             this.showTemplateWarning.set(false);
           }
 
-          // Sync changes with P2P game state if connected as host
           if (this.p2pService.isHost() && this.p2pService.connectionState() === 'connected') {
             const updatedQuizzes = this.selectedTemplates().map(tid => {
               const tmpl = this.quizTemplates().find(t => t.id === tid) || (tid === quiz.id ? quiz : null);
@@ -866,59 +927,61 @@ export class StartPageComponent {
       error: (err) => {
         console.error('Failed to load full community quiz:', err);
         this.communityLoading.set(false);
-        alert('Fehler beim Laden des Quizzes aus dem Community-Pool.');
+        this.showToast('Fehler beim Laden des Quizzes aus dem Community-Pool.');
       }
     });
   }
 
   toggleMyQuizPublic(tmpl: any, event: Event) {
-    event.stopPropagation(); // Prevent selection when clicking the toggle badge
+    event.stopPropagation();
     const newStatus = !tmpl.isPublic;
     if (newStatus && !this.quizService.isQuizComplete(tmpl)) {
-      alert('Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.');
+      this.showToast('Ein unvollständiges Quiz kann nicht öffentlich geschaltet werden.');
       return;
     }
     this.quizService.toggleQuizPublic(tmpl.id, newStatus).subscribe({
-      next: () => {
-        // Success: the quiz list will be automatically reloaded by the service
-      },
+      next: () => {},
       error: (err) => {
         console.error('Failed to toggle quiz visibility:', err);
-        alert(err.error?.error || 'Fehler beim Ändern der Sichtbarkeit.');
+        this.showToast(err.error?.error || 'Fehler beim Ändern der Sichtbarkeit.');
       }
     });
   }
 
   cycleBase(direction: number) {
-    const total = 8; // 0-7: Blob, Robot, Cat, Octopus, Star, Ghost, Mushroom, Penguin
+    const total = 8;
     let next = this.avatarBase() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
     this.avatarBase.set(next);
+    this.triggerAvatarPop();
   }
 
   cycleEyes(direction: number) {
-    const total = 12; // 0-11: Dots, Happy, Glasses, Wink, Sleepy, Stars, Anime, Angry, UwU, Hearts, X-Eyes, Spiral
+    const total = 12;
     let next = this.avatarEyes() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
     this.avatarEyes.set(next);
+    this.triggerAvatarPop();
   }
 
   cycleMouth(direction: number) {
-    const total = 10; // 0-9: Smile, Open, Sad, Straight, Tongue, Surprise, UwU, Fangs, Drool, Cat :3
+    const total = 10;
     let next = this.avatarMouth() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
     this.avatarMouth.set(next);
+    this.triggerAvatarPop();
   }
 
   cycleAccessory(direction: number) {
-    const total = 8; // 0 to 7
+    const total = 8;
     let next = this.avatarAccessory() + direction;
     if (next < 0) next = total - 1;
     if (next >= total) next = 0;
     this.avatarAccessory.set(next);
+    this.triggerAvatarPop();
   }
 
   openLegalModal(tab: 'impressum' | 'privacy' | 'terms') {

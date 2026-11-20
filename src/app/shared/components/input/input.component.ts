@@ -8,6 +8,7 @@ import { Component, input, model, output } from '@angular/core';
   styleUrl: './input.component.css'
 })
 export class InputComponent {
+  readonly Math = Math;
   label = input<string>('');
   placeholder = input<string>('');
   type = input<'text' | 'number' | 'password' | 'email' | 'textarea'>('text');

@@ -15,9 +15,10 @@ export const routes: Routes = [
     path: 'create-quiz',
     loadComponent: () => import('./pages/quiz-creator/quiz-creator.component').then(m => m.QuizCreatorComponent),
     canActivate: [
-      () => {
+      async () => {
         const authService = inject(AuthService);
         const router = inject(Router);
+        await authService.whenReady();
         if (authService.currentUser() !== null) {
           return true;
         }

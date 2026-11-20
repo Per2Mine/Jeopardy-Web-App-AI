@@ -1,22 +1,48 @@
-<div class="min-h-screen w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-jeopardy-blue/30 via-jeopardy-dark to-jeopardy-dark p-4 md:p-8 relative">
+<div class="studio-stage min-h-screen w-full flex flex-col justify-between p-4 md:p-6 relative overflow-x-hidden">
+  <!-- Ambient Studio Spotlights -->
+  <div class="studio-orb studio-orb-blue" aria-hidden="true"></div>
+  <div class="studio-orb studio-orb-gold" aria-hidden="true"></div>
+  <div class="studio-orb studio-orb-sapphire" aria-hidden="true"></div>
 
-  <div class="absolute top-4 right-4 z-40 flex items-center gap-3">
+  <!-- In-App Toast Banner (replaces native alert()) -->
+  @if (toastMessage(); as toast) {
+    <div
+      role="alert"
+      class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] max-w-md w-[calc(100vw-2rem)] px-4 py-3 rounded-2xl border backdrop-blur-xl shadow-2xl flex items-center justify-between gap-3 animate-slide-down"
+      [class]="toastType() === 'error' ? 'bg-red-950/90 border-red-500/40 text-red-200' : 'bg-jeopardy-blue/90 border-jeopardy-accent/40 text-blue-100'">
+      <span class="text-xs font-bold leading-snug">{{ toast }}</span>
+      <button
+        type="button"
+        (click)="toastMessage.set('')"
+        aria-label="Hinweis schließen"
+        class="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white cursor-pointer shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  }
+
+  <!-- Top Utility Bar (in flow so it never overlaps cards on mobile) -->
+  <header class="w-full max-w-5xl mx-auto flex justify-end items-center gap-3 z-40 pb-4">
     <app-audio-settings></app-audio-settings>
     @let user = authService.currentUser();
     @if (user) {
-      <div class="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full py-1.5 pl-3 pr-2 backdrop-blur-md">
-        <button 
+      <div class="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full py-1.5 pl-3 pr-2 backdrop-blur-md shadow-lg">
+        <button
+          type="button"
           (click)="openSettingsModal()"
           class="flex items-center gap-1.5 hover:text-jeopardy-gold text-white transition-colors cursor-pointer"
           title="Account-Einstellungen">
-          <span class="text-xs font-bold max-w-[100px] truncate">{{ user.username }}</span>
+          <span class="text-xs font-bold max-w-[110px] truncate">{{ user.username }}</span>
           <svg class="w-3.5 h-3.5 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
           </svg>
         </button>
         <div class="h-4 w-[1px] bg-white/20"></div>
-        <button 
+        <button
+          type="button"
           (click)="onLogout()"
           class="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-full px-2.5 py-1 font-bold uppercase tracking-wider transition-all cursor-pointer">
           Abmelden
@@ -24,121 +50,148 @@
       </div>
     } @else {
       <div class="flex items-center gap-2">
-        <button 
+        <button
+          type="button"
           (click)="openAuthModal('login')"
           class="text-xs bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-full px-3.5 py-1.5 font-bold transition-all cursor-pointer backdrop-blur-md shadow-md animate-fade-in">
           Anmelden
         </button>
-        <button 
+        <button
+          type="button"
           (click)="openAuthModal('register')"
-          class="text-xs bg-jeopardy-accent hover:bg-jeopardy-accent-hover text-white rounded-full px-3.5 py-1.5 font-bold transition-all cursor-pointer shadow-lg shadow-jeopardy-accent/20 animate-fade-in">
+          class="text-xs bg-jeopardy-accent hover:bg-jeopardy-accent-hover text-white rounded-full px-3.5 py-1.5 font-bold transition-all cursor-pointer shadow-lg shadow-jeopardy-accent/25 animate-fade-in">
           Registrieren
         </button>
       </div>
     }
-  </div>
+  </header>
+
+  <!-- Main Centered Content Wrapper -->
+  <div class="flex-1 w-full flex items-center justify-center relative z-10 py-2">
 
   <!-- 1. DISCONNECTED / SETUP STATE -->
   @if (p2pService.connectionState() === 'disconnected' || p2pService.connectionState() === 'error') {
-    <div class="max-w-2xl w-full backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-3xl shadow-2xl p-6 md:p-10 flex flex-col gap-8">
-      
+    <div class="max-w-2xl w-full glass-surface rounded-3xl p-6 md:p-10 flex flex-col gap-8 animate-scale-in">
+
       <!-- Logo Section -->
       <div class="flex flex-col items-center gap-2">
         <app-logo size="lg" [clickable]="false"></app-logo>
-        <p class="text-sm text-white/50 text-center max-w-sm mt-2">
+        <p class="text-sm text-white/55 text-center max-w-sm mt-2 leading-relaxed">
           Das ultimative Quizduell für deinen Spieleabend. Tritt einem Raum bei oder hoste dein eigenes Spiel.
         </p>
       </div>
 
       <!-- Mode Selector Tabs -->
-      <div class="flex p-1 bg-white/5 rounded-xl border border-white/5">
-        <button 
+      <div role="tablist" class="flex p-1.5 bg-black/25 rounded-2xl border border-white/8">
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="activeTab() === 'join'"
           (click)="selectTab('join')"
-          [class]="'flex-1 py-3 text-sm font-bold rounded-lg transition-all duration-300 ' + 
-                   (activeTab() === 'join' ? 'bg-jeopardy-accent text-white shadow-lg shadow-jeopardy-accent/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
+          [class]="'flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer ' +
+                   (activeTab() === 'join' ? 'bg-gradient-to-b from-blue-500 to-jeopardy-accent text-white shadow-lg shadow-jeopardy-accent/30 border border-blue-400/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
           Spiel beitreten
         </button>
-        <button 
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="activeTab() === 'host'"
           (click)="selectTab('host')"
-          [class]="'flex-1 py-3 text-sm font-bold rounded-lg transition-all duration-300 ' + 
-                   (activeTab() === 'host' ? 'bg-jeopardy-accent text-white shadow-lg shadow-jeopardy-accent/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
+          [class]="'flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer ' +
+                   (activeTab() === 'host' ? 'bg-gradient-to-b from-blue-500 to-jeopardy-accent text-white shadow-lg shadow-jeopardy-accent/30 border border-blue-400/25' : 'text-white/60 hover:text-white hover:bg-white/5')">
           Spiel hosten
         </button>
       </div>
 
-      <!-- Common Profile Setup (Avatar Name & Color) -->
-      <div class="flex flex-col gap-6 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
-        <h3 class="text-xs font-bold uppercase tracking-widest text-white/40">
-          1. Spieler-Profil einrichten
-        </h3>
+      <!-- Common Profile Setup (3D Avatar, Name & Color) -->
+      <div class="flex flex-col gap-5 p-5 bg-black/20 border border-white/8 rounded-2xl shadow-inner">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-widest text-white/45">
+            1. 3D-Avatar &amp; Profil einrichten
+          </h3>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-jeopardy-gold/80 bg-jeopardy-gold/10 border border-jeopardy-gold/20 px-2.5 py-0.5 rounded-full">
+            Accessoire: {{ currentAccessoryLabel() }}
+          </span>
+        </div>
 
-        <div class="flex flex-col sm:flex-row items-center gap-8">
-          <!-- Left side: Avatar Preview & Customizer controls (Equally Spaced, Symmetrical, No background frame, Compact Width) -->
-          <div class="relative w-[210px] h-[160px] flex items-center justify-between shrink-0 select-none"
+        <div class="flex flex-col sm:flex-row items-center gap-7">
+          <!-- Left side: 3D Avatar Showcase & 4-Row Symmetrical Customizer (Accessory, Eyes, Mouth, Body) -->
+          <div class="relative w-[224px] h-[182px] flex items-center justify-between shrink-0 select-none"
                [style.--selected-color]="selectedColor()"
                [style.--selected-color-glow]="selectedColor() + '66'">
-            <!-- Left Column: Back Arrow Buttons (Eyes, Mouth, Shape) -->
-            <div class="flex flex-col justify-between h-full py-2.5 z-10">
-              <button type="button" (click)="cycleEyes(-1)" class="arrow-nav-btn w-7 h-7" title="Augen ändern">
-                <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <!-- Left Column: Back Arrow Buttons (Accessory, Eyes, Mouth, Shape) -->
+            <div class="flex flex-col justify-between h-full py-1.5 z-10">
+              <button type="button" (click)="cycleAccessory(-1)" aria-label="Vorheriges Accessoire" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Accessoire / Hut ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <path d="M14 18l-6-6 6-6" />
                 </svg>
               </button>
-              <button type="button" (click)="cycleMouth(-1)" class="arrow-nav-btn w-7 h-7" title="Mund ändern">
-                <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <button type="button" (click)="cycleEyes(-1)" aria-label="Vorherige Augen" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Augen ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <path d="M14 18l-6-6 6-6" />
                 </svg>
               </button>
-              <button type="button" (click)="cycleBase(-1)" class="arrow-nav-btn w-7 h-7" title="Körperform ändern">
-                <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <button type="button" (click)="cycleMouth(-1)" aria-label="Vorheriger Mund" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Mund ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                  <path d="M14 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <button type="button" (click)="cycleBase(-1)" aria-label="Vorherige Körperform" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Körperform ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <path d="M14 18l-6-6 6-6" />
                 </svg>
               </button>
             </div>
 
-            <!-- Center Column: Glowing Hexagon inside Animated Wobbly Circle (Larger, Breathing, overlaps arrows slightly) -->
+            <!-- Center Column: Glowing 3D Pedestal Hexagon inside Wobbly Circle -->
             <div class="relative w-40 h-40 flex items-center justify-center shrink-0">
-              <!-- Wobbly Outer Circle (Contracts/Expands via keyframes) -->
               <div class="absolute inset-0 wobbly-circle border border-white/10 transition-all duration-500"></div>
-              
-              <!-- Glowing Hexagon container (Maximized size to reach arrow boundaries) -->
-              <div class="relative w-[158px] h-[158px] flex items-center justify-center filter drop-shadow-[0_0_12px_var(--selected-color-glow)]">
-                <svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full">
-                  <path 
-                    d="M 50 6 A 6 6 0 0 1 55 8.9 L 85 26.2 A 6 6 0 0 1 88 31.4 L 88 68.6 A 6 6 0 0 1 85 73.8 L 55 91.1 A 6 6 0 0 1 45 91.1 L 15 73.8 A 6 6 0 0 1 12 68.6 L 12 31.4 A 6 6 0 0 1 15 26.2 L 45 8.9 A 6 6 0 0 1 50 6 Z" 
-                    fill="#0b0f19" 
-                    [attr.stroke]="selectedColor()" 
-                    stroke-width="1.5" 
-                    stroke-opacity="0.2"
+
+              <div class="relative w-[160px] h-[160px] flex items-center justify-center filter drop-shadow-[0_0_16px_var(--selected-color-glow)]">
+                <svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full" aria-hidden="true">
+                  <path
+                    d="M 50 6 A 6 6 0 0 1 55 8.9 L 85 26.2 A 6 6 0 0 1 88 31.4 L 88 68.6 A 6 6 0 0 1 85 73.8 L 55 91.1 A 6 6 0 0 1 45 91.1 L 15 73.8 A 6 6 0 0 1 12 68.6 L 12 31.4 A 6 6 0 0 1 15 26.2 L 45 8.9 A 6 6 0 0 1 50 6 Z"
+                    fill="#070d24"
+                    [attr.stroke]="selectedColor()"
+                    stroke-width="1.6"
+                    stroke-opacity="0.35"
                   />
                 </svg>
-                
-                <!-- Avatar Preview (Centered, maximum representation) -->
-                <div class="relative z-10 flex items-center justify-center w-[106px] h-[106px]">
-                  <app-avatar 
-                    [color]="selectedColor()" 
-                    [avatar]="selectedAvatar()" 
-                    [name]="playerName()" 
-                    [size]="106"
+
+                <!-- Glowing 3D Stage Pedestal -->
+                <div class="avatar-pedestal absolute bottom-5 w-24 h-6 rounded-full blur-sm pointer-events-none"></div>
+
+                <!-- 3D Avatar Preview -->
+                <div class="relative z-10 flex items-center justify-center w-[112px] h-[112px]" [class.avatar-pop]="avatarPop()">
+                  <app-avatar
+                    [color]="selectedColor()"
+                    [avatar]="selectedAvatar()"
+                    [name]="playerName()"
+                    [size]="112"
                   ></app-avatar>
                 </div>
               </div>
             </div>
 
-            <!-- Right Column: Forward Arrow Buttons (Eyes, Mouth, Shape) -->
-            <div class="flex flex-col justify-between h-full py-2.5 z-10">
-              <button type="button" (click)="cycleEyes(1)" class="arrow-nav-btn w-7 h-7" title="Augen ändern">
-                <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <!-- Right Column: Forward Arrow Buttons (Accessory, Eyes, Mouth, Shape) -->
+            <div class="flex flex-col justify-between h-full py-1.5 z-10">
+              <button type="button" (click)="cycleAccessory(1)" aria-label="Nächstes Accessoire" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Accessoire / Hut ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <path d="M10 6l6 6-6 6" />
                 </svg>
               </button>
-              <button type="button" (click)="cycleMouth(1)" class="arrow-nav-btn w-7 h-7" title="Mund ändern">
-                <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <button type="button" (click)="cycleEyes(1)" aria-label="Nächste Augen" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Augen ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <path d="M10 6l6 6-6 6" />
                 </svg>
               </button>
-              <button type="button" (click)="cycleBase(1)" class="arrow-nav-btn w-7 h-7" title="Körperform ändern">
-                <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <button type="button" (click)="cycleMouth(1)" aria-label="Nächster Mund" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Mund ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                  <path d="M10 6l6 6-6 6" />
+                </svg>
+              </button>
+              <button type="button" (click)="cycleBase(1)" aria-label="Nächste Körperform" class="arrow-nav-btn w-7 h-7 cursor-pointer" title="Körperform ändern">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                   <path d="M10 6l6 6-6 6" />
                 </svg>
               </button>
@@ -147,10 +200,9 @@
 
           <!-- Right side: Name Input, Predefined Colors -->
           <div class="flex-1 w-full flex flex-col gap-3">
-            <!-- Name Input -->
-            <app-input 
-              label="Dein Name" 
-              placeholder="z.B. QuizMaster" 
+            <app-input
+              label="Dein Name"
+              placeholder="z.B. QuizMaster"
               [(value)]="playerName"
               [maxLength]="14"
               [disabled]="authService.currentUser() !== null">
@@ -159,30 +211,30 @@
             <!-- Predefined Colors Selection -->
             <div class="flex flex-col gap-1.5">
               <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold text-white/40 uppercase tracking-widest">Farbauswahl</span>
-                
-                <!-- Random Button (Zufall) styled like a dark pill next to label -->
-                <button 
-                  type="button" 
-                  (click)="randomizeAvatar()" 
-                  class="flex items-center gap-1.5 px-3 py-1 bg-white/[0.04] border border-white/10 rounded-full text-[10px] text-white/80 hover:text-white hover:bg-white/10 hover:border-white/20 font-semibold cursor-pointer transition-all duration-200 focus:outline-none shadow-sm"
-                  title="Zufälliges Aussehen"
+                <span class="text-[10px] font-bold text-white/45 uppercase tracking-widest">Farbauswahl</span>
+
+                <!-- Random Button (Zufall) with Sparkles Icon -->
+                <button
+                  type="button"
+                  (click)="randomizeAvatar()"
+                  class="group flex items-center gap-1.5 px-3 py-1 bg-white/[0.06] border border-white/12 rounded-full text-[10px] text-white/85 hover:text-jeopardy-gold hover:bg-jeopardy-gold/10 hover:border-jeopardy-gold/30 font-semibold cursor-pointer transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jeopardy-gold/60 shadow-sm active:scale-95"
+                  title="Zufälliges Aussehen würfeln"
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <svg class="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
                   </svg>
                   <span>Zufall</span>
                 </button>
               </div>
-              
+
               <!-- Custom linear-gradient range slider -->
               <div class="relative flex items-center h-4 w-full">
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="360" 
-                  [value]="selectedColorHue()" 
+                <input
+                  type="range"
+                  min="0"
+                  max="360"
+                  aria-label="Avatar-Farbton wählen"
+                  [value]="selectedColorHue()"
                   (input)="onSliderChange($event)"
                   class="color-picker-slider"
                   title="Farbe schieben"
@@ -409,7 +461,7 @@
                               (selectedIdx >= 0 ? 'bg-jeopardy-accent/15 border-jeopardy-accent shadow-md shadow-jeopardy-accent/10' : 'bg-white/[0.01] border-white/10 hover:border-white/20 hover:bg-white/[0.03]'))">
                     
                     @if (selectedIdx >= 0) {
-                      <div class="absolute -top-1.5 -left-1.5 flex items-center justify-center w-5 h-5 rounded-full bg-jeopardy-accent text-neutral-900 text-xs font-black shadow-md shadow-jeopardy-accent/40 animate-scale-in z-20">
+                      <div class="absolute -top-1.5 -left-1.5 flex items-center justify-center w-5 h-5 rounded-full bg-jeopardy-accent text-white text-xs font-black shadow-md shadow-jeopardy-accent/40 animate-pop-in z-20">
                         {{ selectedIdx + 1 }}
                       </div>
                     }
@@ -454,11 +506,11 @@
                         <span class="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 rounded-md">
                           🚧 Entwurf
                         </span>
-                      } @else if (tmpl.userEmail) {
+                      } @else if (isMyQuiz) {
                         <button
                           type="button"
                           (click)="toggleMyQuizPublic(tmpl, $event)"
-                          [class]="'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1.5 transition-all duration-300 ' + 
+                          [class]="'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1.5 transition-all duration-300 ' +
                                    (tmpl.isPublic ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20 hover:bg-emerald-500/25' : 'text-zinc-400 bg-zinc-500/15 border-zinc-500/20 hover:bg-zinc-500/25')"
                           [title]="tmpl.isPublic ? 'Klicke, um dieses Quiz privat zu schalten' : 'Klicke, um dieses Quiz im Community-Pool zu veröffentlichen'">
                           <span>{{ tmpl.isPublic ? '🌐 Öffentlich' : '🔒 Privat' }}</span>
@@ -483,7 +535,7 @@
                     <span class="truncate">„{{ warning.name }}" ist noch unvollständig und muss erst fertig bearbeitet werden.</span>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
-                    <button 
+                    <button
                       (click)="onEditIncompleteQuiz()"
                       class="px-3 py-1.5 text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -504,15 +556,20 @@
               }
             </div>
 
-            <app-button 
-              variant="primary" 
-              size="lg" 
-              [fullWidth]="true" 
+            <app-button
+              variant="primary"
+              size="lg"
+              [fullWidth]="true"
               (click)="onHostSubmit()">
               Spielraum erstellen
             </app-button>
-            @if (showTemplateWarning()) {
-              <p class="text-[12px] text-red-400 text-center font-bold mt-2 select-none flex items-center justify-center gap-1.5 animate-pulse">
+            @if (joinError()) {
+              <p role="alert" class="text-xs text-red-400 text-center font-bold mt-1 select-none flex items-center justify-center gap-1.5 animate-fade-in">
+                <span>⚠️</span>
+                <span>{{ joinError() }}</span>
+              </p>
+            } @else if (showTemplateWarning()) {
+              <p role="alert" class="text-[12px] text-red-400 text-center font-bold mt-2 select-none flex items-center justify-center gap-1.5 animate-pulse">
                 <span>⚠️</span>
                 <span>Wähle mindestens eine Quiz-Vorlage aus, bevor du einen Spielraum erstellst.</span>
               </p>
@@ -650,7 +707,7 @@
                             (selectedIdx >= 0 ? 'bg-jeopardy-accent/15 border-jeopardy-accent shadow-md shadow-jeopardy-accent/10' : 'bg-white/[0.01] border-white/10 hover:border-white/20 hover:bg-white/[0.03]'))">
                   
                   @if (selectedIdx >= 0) {
-                    <div class="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-jeopardy-accent text-neutral-900 text-[10px] font-black shadow-md shadow-jeopardy-accent/40 animate-scale-in z-20">
+                    <div class="absolute top-2 right-2 flex items-center justify-center w-4 h-4 rounded-full bg-jeopardy-accent text-white text-[10px] font-black shadow-md shadow-jeopardy-accent/40 animate-pop-in z-20">
                       {{ selectedIdx + 1 }}
                     </div>
                   }
@@ -1306,14 +1363,16 @@
     </div>
   }
 
-  <!-- FOOTER LEGAL LINKS -->
-  <div class="absolute bottom-4 left-0 right-0 flex justify-center gap-6 text-[10px] text-white/30 font-bold uppercase tracking-wider z-40 select-none">
-    <button (click)="openLegalModal('impressum')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus:outline-none">Impressum</button>
+  </div><!-- End Main Centered Content Wrapper -->
+
+  <!-- FOOTER LEGAL LINKS (in flex flow so it never collides with tall content) -->
+  <footer class="w-full pt-8 pb-2 flex justify-center items-center flex-wrap gap-4 sm:gap-6 text-[10px] text-white/35 font-bold uppercase tracking-wider z-30 select-none">
+    <button type="button" (click)="openLegalModal('impressum')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-jeopardy-gold">Impressum</button>
     <div class="h-3.5 w-[1px] bg-white/10"></div>
-    <button (click)="openLegalModal('privacy')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus:outline-none">Datenschutzerklärung</button>
+    <button type="button" (click)="openLegalModal('privacy')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-jeopardy-gold">Datenschutzerklärung</button>
     <div class="h-3.5 w-[1px] bg-white/10"></div>
-    <button (click)="openLegalModal('terms')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus:outline-none">Nutzungsbedingungen</button>
-  </div>
+    <button type="button" (click)="openLegalModal('terms')" class="hover:text-jeopardy-gold transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-jeopardy-gold">Nutzungsbedingungen</button>
+  </footer>
 
   <!-- 7. LEGAL MODAL OVERLAY -->
   @if (legalModalOpen()) {
@@ -1902,9 +1961,10 @@
                         </span>
                       </div>
                       
-                      <button 
+                      <button
+                        type="button"
                         (click)="onSelectCommunityQuiz(quiz.id)"
-                        class="px-4 py-2 bg-jeopardy-accent hover:bg-jeopardy-accent-hover text-neutral-900 text-xs font-black rounded-xl cursor-pointer transition-all duration-300 flex items-center gap-1.5 shadow-md shadow-jeopardy-accent/10 hover:shadow-jeopardy-accent/20">
+                        class="px-4 py-2 bg-jeopardy-accent hover:bg-jeopardy-accent-hover text-white text-xs font-black rounded-xl cursor-pointer transition-all duration-200 flex items-center gap-1.5 shadow-md shadow-jeopardy-accent/20 hover:shadow-jeopardy-accent/35 active:scale-95">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
                         </svg>

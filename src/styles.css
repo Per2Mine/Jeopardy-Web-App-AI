@@ -8,9 +8,10 @@
   --color-jeopardy-dark: #03081e;
   --color-jeopardy-blue: #0a194f;
   --color-jeopardy-accent: #0052cc;
+  --color-jeopardy-accent-hover: #1a6dff;
   --color-jeopardy-gold: #f1b814;
   --color-jeopardy-gold-light: #ffd256;
-  
+
   --font-sans: 'Inter', sans-serif;
 }
 
@@ -21,87 +22,140 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom modern scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-jeopardy-dark);
+  background: rgba(3, 8, 30, 0.7);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: rgba(148, 163, 184, 0.4);
 }
 
-/* Angular CDK Drag & Drop Global Styles */
-.cdk-drag-preview {
-  box-sizing: border-box !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  background: #03081e !important; /* matches jeopardy-dark */
-  opacity: 0.95 !important;
-  border-radius: 1rem !important;
-  padding: 1rem !important;
-  
-  /* Dynamic width and height matching the exact column size measured on drag start */
-  width: var(--dragged-width) !important;
-  height: var(--dragged-height) !important;
-  
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1rem !important;
-  pointer-events: none !important;
-  
-  /* CRITICAL: Disable transitions on the clone itself so it follows the mouse instantly without lag */
-  transition: none !important;
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
-/* Ensure child elements inside the preview style correctly */
-.cdk-drag-preview button,
-.cdk-drag-preview input,
-.cdk-drag-preview textarea {
-  pointer-events: none !important;
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-.cdk-drag-placeholder {
-  opacity: 0.15 !important;
-  border: 2px dashed rgba(255, 255, 255, 0.25) !important;
-  background: transparent !important;
-  border-radius: 1rem !important;
-  box-sizing: border-box !important;
-  
-  /* Disable transitions on the placeholder */
-  transition: none !important;
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.cdk-drag-animating {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
 }
 
-/* Allow the preview element to animate smoothly when released and flying back */
-.cdk-drag-preview.cdk-drag-animating {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
-/* CRITICAL: Disable transitions on the card that is currently active and being dragged */
-.cdk-drag-dragging {
-  transition: none !important;
+/* =========================================================
+   STUDIO ATMOSPHERE & DEPTH SURFACES
+   ========================================================= */
+.studio-stage {
+  position: relative;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -10%, rgba(0, 82, 204, 0.28), transparent 65%),
+    radial-gradient(ellipse 60% 45% at 85% 95%, rgba(241, 184, 20, 0.10), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 10% 80%, rgba(10, 25, 79, 0.55), transparent 65%),
+    #03081e;
 }
 
-.cdk-drop-list-dragging .cdk-drag {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+.studio-orb {
+  position: fixed;
+  border-radius: 9999px;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, opacity;
 }
 
-/* Global scale-in animation utility */
+.studio-orb-blue {
+  width: 480px;
+  height: 480px;
+  top: -160px;
+  left: -120px;
+  background: radial-gradient(circle, rgba(0, 82, 204, 0.26) 0%, rgba(10, 25, 79, 0) 70%);
+  animation: orbDriftA 18s ease-in-out infinite alternate;
+}
+
+.studio-orb-gold {
+  width: 420px;
+  height: 420px;
+  bottom: -160px;
+  right: -100px;
+  background: radial-gradient(circle, rgba(241, 184, 20, 0.14) 0%, rgba(241, 184, 20, 0) 70%);
+  animation: orbDriftB 22s ease-in-out infinite alternate;
+}
+
+.studio-orb-sapphire {
+  width: 360px;
+  height: 360px;
+  top: 40%;
+  left: 55%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.10) 0%, rgba(14, 165, 233, 0) 70%);
+  animation: orbDriftA 26s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes orbDriftA {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.75; }
+  50% { transform: translate3d(40px, 28px, 0) scale(1.08); opacity: 1; }
+  100% { transform: translate3d(-24px, 46px, 0) scale(0.96); opacity: 0.8; }
+}
+
+@keyframes orbDriftB {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate3d(-38px, -24px, 0) scale(1.1); opacity: 0.95; }
+  100% { transform: translate3d(20px, -40px, 0) scale(0.95); opacity: 0.75; }
+}
+
+/* Tactile glass card with subtle top specular rim */
+.glass-surface {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(10, 25, 79, 0.24) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 20px 50px -15px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+/* =========================================================
+   GLOBAL MOTION & MICRO-ANIMATIONS
+   ========================================================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes scaleIn {
   from {
     opacity: 0;
@@ -114,5 +168,166 @@ body {
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes scaleUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.86) translateY(14px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.015) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: popIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float-gentle {
+  animation: floatGentle 3.6s ease-in-out infinite;
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+/* Shimmer highlight sweep on hover for primary/gold buttons and board tiles */
+.shimmer-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: translateX(-140%) skewX(-18deg);
+  pointer-events: none;
+}
+
+.shimmer-hover:hover::after {
+  animation: shimmerSweep 0.75s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+/* =========================================================
+   ANGULAR CDK DRAG & DROP GLOBAL STYLES
+   ========================================================= */
+.cdk-drag-preview {
+  box-sizing: border-box !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: #03081e !important;
+  opacity: 0.95 !important;
+  border-radius: 1rem !important;
+  padding: 1rem !important;
+  width: var(--dragged-width) !important;
+  height: var(--dragged-height) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+.cdk-drag-preview button,
+.cdk-drag-preview input,
+.cdk-drag-preview textarea {
+  pointer-events: none !important;
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.15 !important;
+  border: 2px dashed rgba(255, 255, 255, 0.25) !important;
+  background: transparent !important;
+  border-radius: 1rem !important;
+  box-sizing: border-box !important;
+  transition: none !important;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+.cdk-drag-preview.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+.cdk-drag-dragging {
+  transition: none !important;
+}
+
+.cdk-drop-list-dragging .cdk-drag {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+/* Respect user reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .studio-orb,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-scale-up,
+  .animate-slide-down,
+  .animate-pop-in,
+  .animate-float-gentle,
+  .shimmer-hover::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }

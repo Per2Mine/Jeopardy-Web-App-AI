@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -8,9 +8,9 @@ import { CommonModule } from '@angular/common';
   template: `
     <div class="overflow-hidden flex items-center justify-center relative" [class]="customClass" style="display: inline-flex;">
       @if (pixelate && src) {
-        <canvas #canvas [style.transform]="transformStyle"></canvas>
+        <canvas #canvas role="img" aria-label="Verpixeltes Fragebild" [style.transform]="transformStyle"></canvas>
       } @else if (src) {
-        <img [src]="src" [style.transform]="transformStyle" alt="Bild" />
+        <img [src]="src" [style.transform]="transformStyle" alt="Fragebild" />
       }
     </div>
   `,
@@ -24,11 +24,11 @@ import { CommonModule } from '@angular/common';
       height: auto;
       object-fit: contain;
       display: block;
-      transition: transform 0.3s ease-out;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
     }
   `]
 })
-export class PixelatedImageComponent implements OnChanges, AfterViewInit {
+export class PixelatedImageComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input() src?: string | null;
   @Input() pixelate = false;
   @Input() strength = 80; // strength slider value (1 to 100)
@@ -37,6 +37,10 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
   @Input() customClass = '';
 
   @ViewChild('canvas') canvasRef?: ElementRef<HTMLCanvasElement>;
+
+  private drawTimer: any = null;
+  private drawToken = 0;
+  private destroyed = false;
 
   get transformStyle(): string {
     return `rotate(${this.rotation}deg) scale(${this.zoom})`;
@@ -52,33 +56,45 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
     this.triggerDraw();
   }
 
+  ngOnDestroy() {
+    this.destroyed = true;
+    this.drawToken++;
+    if (this.drawTimer) {
+      clearTimeout(this.drawTimer);
+      this.drawTimer = null;
+    }
+  }
+
   private triggerDraw() {
-    // Schedule in next microtask / setTimeout to make sure canvas element is created and rendered in DOM
-    setTimeout(() => {
+    if (this.drawTimer) {
+      clearTimeout(this.drawTimer);
+    }
+    this.drawTimer = setTimeout(() => {
+      this.drawTimer = null;
       this.drawPixelated();
     }, 0);
   }
 
   private drawPixelated() {
-    if (!this.pixelate || !this.src || !this.canvasRef) return;
+    if (this.destroyed || !this.pixelate || !this.src || !this.canvasRef) return;
 
     const canvas = this.canvasRef.nativeElement;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const token = ++this.drawToken;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Map strength (range 1 to 100) to targetWidth (range 300px down to 4px) using a power curve.
-      // This gives fine-grained control over the highly-pixelated guessing range (4px - 50px)
-      // and ensures even high-res 2K images become completely unrecognizable at high settings.
+      if (this.destroyed || token !== this.drawToken || img.width <= 0 || img.height <= 0) {
+        return;
+      }
+
       const strengthClamped = Math.max(1, Math.min(100, this.strength));
-      
       const targetWidth = Math.max(4, Math.min(img.width, Math.round(4 + 296 * Math.pow(1 - (strengthClamped / 100), 2.5))));
       const aspectRatio = img.height / img.width;
       const targetHeight = Math.max(1, Math.round(targetWidth * aspectRatio));
 
-      // 1. Draw image small to an offscreen canvas
       const offscreen = document.createElement('canvas');
       offscreen.width = targetWidth;
       offscreen.height = targetHeight;
@@ -86,12 +102,10 @@ export class PixelatedImageComponent implements OnChanges, AfterViewInit {
       if (!offscreenCtx) return;
       offscreenCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-      // 2. Draw scaled up back to the main canvas (matching original dimensions)
       canvas.width = img.width;
       canvas.height = img.height;
-      
+
       ctx.imageSmoothingEnabled = false;
-      // Some browsers require vendor prefixes for imageSmoothingEnabled
       (ctx as any).mozImageSmoothingEnabled = false;
       (ctx as any).webkitImageSmoothingEnabled = false;
       (ctx as any).msImageSmoothingEnabled = false;

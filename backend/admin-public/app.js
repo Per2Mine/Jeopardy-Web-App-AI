@@ -14,6 +14,8 @@ let refreshIntervalId = null;
 // Confirm Modal Callback
 let confirmCallback = null;
 
+let isFetchingData = false;
+
 // Initialize Dashboard
 document.addEventListener('DOMContentLoaded', () => {
   // Init Lucide Icons
@@ -22,20 +24,45 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup Auto-Refresh Listeners
   const autoRefreshToggle = document.getElementById('autoRefreshToggle');
   autoRefreshToggle.addEventListener('change', toggleAutoRefresh);
+
+  // Delegated click handler for dynamic table buttons (prevents inline onclick XSS)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.action;
+    if (action === 'reset-password') {
+      triggerResetPassword(btn.dataset.email);
+    } else if (action === 'delete-user') {
+      triggerDeleteUser(btn.dataset.email);
+    } else if (action === 'quiz-detail') {
+      showQuizDetail(btn.dataset.id);
+    } else if (action === 'toggle-public') {
+      togglePublicQuiz(btn.dataset.id);
+    } else if (action === 'delete-quiz') {
+      triggerDeleteQuiz(btn.dataset.id, btn.dataset.name);
+    } else if (action === 'switch-branch') {
+      switchBranch(btn.dataset.branch);
+    } else if (action === 'revert-commit') {
+      revertToCommit(btn.dataset.hash, btn.dataset.label);
+    }
+  });
   
   // Check access requirement first
   checkAccess();
 });
 
 // Switch Tab logic
-function switchTab(tabId) {
+function switchTab(tabId, triggerEl) {
   activeTab = tabId;
   
   // Update nav buttons
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.remove('active');
+    const onclickAttr = btn.getAttribute('onclick') || '';
+    if (triggerEl ? btn === triggerEl : onclickAttr.includes(`'${tabId}'`)) {
+      btn.classList.add('active');
+    }
   });
-  event.currentTarget.classList.add('active');
 
   // Update sections
   document.querySelectorAll('.tab-panel').forEach(panel => {
@@ -237,6 +264,8 @@ function hideLoginModal() {
 
 // Fetch all resources
 async function fetchData() {
+  if (isFetchingData) return;
+  isFetchingData = true;
   const refreshIcon = document.getElementById('refreshIcon');
   if (refreshIcon) refreshIcon.classList.add('spinning');
 
@@ -244,19 +273,15 @@ async function fetchData() {
     // 1. Stats
     if (activeTab === 'dashboard' || activeTab === 'system') {
       const range = document.getElementById('statRange')?.value || 'days';
-      const statsData = await adminFetch(`/api/admin/stats?range=${range}`);
+      const statsData = await adminFetch(`/api/admin/stats?range=${encodeURIComponent(range)}`);
       stats = statsData;
       renderDashboardStats();
     }
 
     // 2. Users
-    if (activeTab === 'users' || activeTab === 'dashboard') {
+    if (activeTab === 'users') {
       users = await adminFetch('/api/admin/users');
-      if (activeTab === 'users') {
-        filterUsers();
-      } else {
-        renderUsersTable();
-      }
+      filterUsers();
     }
 
     // 3. Quizzes
@@ -272,6 +297,7 @@ async function fetchData() {
   } catch (err) {
     console.error('Fetch error:', err);
   } finally {
+    isFetchingData = false;
     setTimeout(() => {
       const icon = document.getElementById('refreshIcon');
       if (icon) icon.classList.remove('spinning');
@@ -555,10 +581,10 @@ function renderUsersTable(filteredList = users) {
       <td>${formatDate(user.created_at)}</td>
       <td class="text-right">
         <div class="actions-cell">
-          <button class="btn btn-secondary btn-sm" onclick="triggerResetPassword('${user.email}')" title="Passwort zurücksetzen">
+          <button class="btn btn-secondary btn-sm" data-action="reset-password" data-email="${escapeHtml(user.email)}" title="Passwort zurücksetzen">
             <i data-lucide="key" class="btn-icon-sz"></i> Passwort zurücksetzen
           </button>
-          <button class="btn btn-danger btn-sm" onclick="triggerDeleteUser('${user.email}')" title="Konto löschen">
+          <button class="btn btn-danger btn-sm" data-action="delete-user" data-email="${escapeHtml(user.email)}" title="Konto löschen">
             <i data-lucide="trash-2" class="btn-icon-sz"></i> Löschen
           </button>
         </div>
@@ -605,13 +631,13 @@ function renderQuizzesTable(filteredList = quizzes) {
         <td>${formatDate(quiz.createdAt)}</td>
         <td class="text-right">
           <div class="actions-cell">
-            <button class="btn btn-secondary btn-sm" onclick="showQuizDetail('${quiz.id}')" title="Details ansehen">
+            <button class="btn btn-secondary btn-sm" data-action="quiz-detail" data-id="${escapeHtml(quiz.id)}" title="Details ansehen">
               <i data-lucide="eye" class="btn-icon-sz"></i> Details
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="togglePublicQuiz('${quiz.id}')" title="Sichtbarkeit umschalten">
+            <button class="btn btn-secondary btn-sm" data-action="toggle-public" data-id="${escapeHtml(quiz.id)}" title="Sichtbarkeit umschalten">
               <i data-lucide="shuffle" class="btn-icon-sz"></i> Freigabe
             </button>
-            <button class="btn btn-danger btn-sm" onclick="triggerDeleteQuiz('${quiz.id}', '${quiz.name}')" title="Quiz löschen">
+            <button class="btn btn-danger btn-sm" data-action="delete-quiz" data-id="${escapeHtml(quiz.id)}" data-name="${escapeHtml(quiz.name)}" title="Quiz löschen">
               <i data-lucide="trash-2" class="btn-icon-sz"></i>
             </button>
           </div>
@@ -639,10 +665,10 @@ function filterUsers() {
 
   if (filterVal === 'today') {
     const today = new Date().toDateString();
-    filtered = filtered.filter(u => new Date(u.created_at).toDateString() === today);
+    filtered = filtered.filter(u => parseSqliteUtc(u.created_at).toDateString() === today);
   } else if (filterVal === 'week') {
     const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    filtered = filtered.filter(u => new Date(u.created_at).getTime() >= oneWeekAgo);
+    filtered = filtered.filter(u => parseSqliteUtc(u.created_at).getTime() >= oneWeekAgo);
   }
 
   // Sort users
@@ -767,11 +793,11 @@ function triggerDeleteUser(email) {
   });
 }
 
-// Action: Delete quiz
+// // Action: Delete quiz
 function triggerDeleteQuiz(id, name) {
   showConfirmModal(`Möchtest du das Quiz <strong>${escapeHtml(name)}</strong> wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`, async () => {
     try {
-      const data = await adminFetch(`/api/admin/quizzes/${id}`, {
+      await adminFetch(`/api/admin/quizzes/${encodeURIComponent(id)}`, {
         method: 'DELETE'
       });
       fetchData();
@@ -784,7 +810,7 @@ function triggerDeleteQuiz(id, name) {
 // Action: Toggle visibility
 async function togglePublicQuiz(id) {
   try {
-    const data = await adminFetch(`/api/admin/quizzes/toggle-public/${id}`, {
+    await adminFetch(`/api/admin/quizzes/toggle-public/${encodeURIComponent(id)}`, {
       method: 'POST'
     });
     fetchData();
@@ -813,7 +839,7 @@ function showQuizDetail(id) {
             
             return `
               <div class="q-item">
-                <div class="q-label">Frage ${idx + 1} (${(idx + 1) * 100} Pkt): ${escapeHtml(q.text || 'Kein Text')}</div>
+                <div class="q-label">Frage ${idx + 1} (${Number(q.value) || (idx + 1) * 100} Pkt): ${escapeHtml(q.text || 'Kein Text')}</div>
                 <div class="q-answer">Antwort: ${escapeHtml(q.answer || 'Keine Antwort')}</div>
                 ${mediaBadges.length > 0 ? `<div class="media-badges">${mediaBadges.join(' ')}</div>` : ''}
               </div>
@@ -850,6 +876,8 @@ function closeQuizDetailModal() {
 function showConfirmModal(text, callback) {
   document.getElementById('confirmText').innerHTML = text;
   confirmCallback = callback;
+  const submitBtn = document.getElementById('confirmSubmitBtn');
+  if (submitBtn) submitBtn.disabled = false;
   
   document.getElementById('confirmModal').classList.add('active');
   document.getElementById('confirmModal').style.display = 'flex';
@@ -861,17 +889,24 @@ function closeConfirmModal() {
   confirmCallback = null;
   const submitBtn = document.getElementById('confirmSubmitBtn');
   if (submitBtn) {
+    submitBtn.disabled = false;
     submitBtn.textContent = 'Ja, löschen';
     submitBtn.className = 'btn btn-danger';
   }
 }
 
-// Bind the confirm button
+// Bind the confirm button (guarded against double-clicks)
 document.getElementById('confirmSubmitBtn').addEventListener('click', async () => {
-  if (confirmCallback) {
-    await confirmCallback();
+  const submitBtn = document.getElementById('confirmSubmitBtn');
+  if (!confirmCallback || (submitBtn && submitBtn.disabled)) return;
+  const fn = confirmCallback;
+  confirmCallback = null;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    await fn();
+  } finally {
+    closeConfirmModal();
   }
-  closeConfirmModal();
 });
 
 // Auto-Refresh polling control
@@ -898,10 +933,20 @@ function toggleAutoRefresh() {
   }
 }
 
+// Parse SQLite CURRENT_TIMESTAMP (UTC without 'Z') cleanly
+function parseSqliteUtc(dateStr) {
+  if (!dateStr) return new Date(NaN);
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+    return new Date(dateStr.replace(' ', 'T') + 'Z');
+  }
+  return new Date(dateStr);
+}
+
 // Utility formatting functions
 function formatDate(dateStr) {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
+  const date = parseSqliteUtc(dateStr);
+  if (isNaN(date.getTime())) return escapeHtml(String(dateStr));
   return date.toLocaleString('de-DE', { 
     day: '2-digit', 
     month: '2-digit', 
@@ -916,7 +961,8 @@ function formatDateShort(dateStr) {
   if (dateStr.includes('-W') || dateStr.length === 4) {
     return dateStr;
   }
-  const date = new Date(dateStr);
+  const date = parseSqliteUtc(dateStr);
+  if (isNaN(date.getTime())) return escapeHtml(String(dateStr));
   return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 }
 
@@ -964,7 +1010,7 @@ async function fetchGitData() {
     } else {
       statusText.innerHTML = '<span class="badge badge-warning">Geändert</span>';
       if (statusBg) {
-        statusBg.className = 'stat-icon orange-bg';
+        statusBg.className = 'stat-icon amber-bg';
       }
       if (statusIcon) {
         statusIcon.setAttribute('data-lucide', 'alert-circle');
@@ -988,7 +1034,7 @@ async function fetchGitData() {
 
           const actionBtn = branch.isCurrent
             ? '<button class="btn btn-secondary btn-sm" disabled>Aktiv</button>'
-            : `<button class="btn btn-primary btn-sm" onclick="switchBranch('${escapeJs(branch.name)}')">Wechseln</button>`;
+            : `<button class="btn btn-primary btn-sm" data-action="switch-branch" data-branch="${escapeHtml(branch.name)}">Wechseln</button>`;
 
           return `
             <tr>
@@ -1012,7 +1058,6 @@ async function fetchGitData() {
         tagsBody.innerHTML = '<tr><td colspan="3" class="text-center">Keine veröffentlichten Versionen (Tags) gefunden.</td></tr>';
       } else {
         tagsBody.innerHTML = tags.map(tag => {
-          // Check if active commit matches the tag commit
           const isActive = status.activeCommit.startsWith(tag.shortHash);
           const currentBadge = isActive
             ? '<span class="badge badge-success" style="margin-left: 8px;">Aktuell</span>'
@@ -1020,7 +1065,7 @@ async function fetchGitData() {
 
           const actionBtn = isActive
             ? '<button class="btn btn-secondary btn-sm" disabled>Aktiv</button>'
-            : `<button class="btn btn-primary btn-sm" onclick="revertToCommit('${escapeJs(tag.hash)}', '${escapeJs(tag.name)}')">Wechseln</button>`;
+            : `<button class="btn btn-primary btn-sm" data-action="revert-commit" data-hash="${escapeHtml(tag.hash)}" data-label="${escapeHtml(tag.name)}">Wechseln</button>`;
 
           return `
             <tr>
@@ -1056,7 +1101,7 @@ async function fetchGitData() {
               </td>
               <td style="max-width: 220px; word-break: break-word;">${escapeHtml(commit.message)}</td>
               <td class="text-right">
-                <button class="btn btn-secondary btn-sm" onclick="revertToCommit('${escapeJs(commit.hash)}', '${escapeJs(commit.shortHash)}')">
+                <button class="btn btn-secondary btn-sm" data-action="revert-commit" data-hash="${escapeHtml(commit.hash)}" data-label="${escapeHtml(commit.shortHash)}">
                   <i data-lucide="history" class="btn-icon-sz"></i> Wechseln
                 </button>
               </td>
@@ -1089,7 +1134,6 @@ async function switchBranch(branchName, force = false) {
       fetchData();
     } catch (err) {
       if (err.message.includes('ungespeicherte') || err.message.includes('uncommitted') || err.message.includes('Arbeitsverzeichnis nicht sauber') || err.message.includes('Dirty')) {
-        // Offer forced checkout
         setTimeout(() => {
           showConfirmModal(`Wechsel fehlgeschlagen wegen ungespeicherter Änderungen.<br/><br/>Möchtest du den Wechsel zum Branch <strong>${escapeHtml(branchName)}</strong> erzwingen? (Achtung: Lokale Änderungen werden überschrieben!)`, () => {
             switchBranch(branchName, true);
@@ -1103,9 +1147,10 @@ async function switchBranch(branchName, force = false) {
 }
 
 async function revertToCommit(commitHash, shortHash, force = false) {
+  const safeLabel = escapeHtml(shortHash);
   const confirmMsg = force
-    ? `Achtung: Du hast ungespeicherte Änderungen! Möchtest du das Zurücksetzen auf Version <strong>${shortHash}</strong> wirklich ERZWINGEN? Lokale Änderungen gehen verloren.`
-    : `Möchtest du wirklich auf die Version <strong>${shortHash}</strong> zurücksetzen? (Detached HEAD)`;
+    ? `Achtung: Du hast ungespeicherte Änderungen! Möchtest du das Zurücksetzen auf Version <strong>${safeLabel}</strong> wirklich ERZWINGEN? Lokale Änderungen gehen verloren.`
+    : `Möchtest du wirklich auf die Version <strong>${safeLabel}</strong> zurücksetzen? (Detached HEAD)`;
 
   showConfirmModal(confirmMsg, async () => {
     try {
@@ -1117,9 +1162,8 @@ async function revertToCommit(commitHash, shortHash, force = false) {
       fetchData();
     } catch (err) {
       if (err.message.includes('ungespeicherte') || err.message.includes('uncommitted') || err.message.includes('Arbeitsverzeichnis nicht sauber') || err.message.includes('Dirty')) {
-        // Offer forced checkout
         setTimeout(() => {
-          showConfirmModal(`Zurücksetzen fehlgeschlagen wegen ungespeicherter Änderungen.<br/><br/>Möchtest du das Zurücksetzen auf Version <strong>${shortHash}</strong> erzwingen? (Achtung: Lokale Änderungen werden überschrieben!)`, () => {
+          showConfirmModal(`Zurücksetzen fehlgeschlagen wegen ungespeicherter Änderungen.<br/><br/>Möchtest du das Zurücksetzen auf Version <strong>${safeLabel}</strong> erzwingen? (Achtung: Lokale Änderungen werden überschrieben!)`, () => {
             revertToCommit(commitHash, shortHash, true);
           });
         }, 300);
@@ -1128,11 +1172,6 @@ async function revertToCommit(commitHash, shortHash, force = false) {
       }
     }
   });
-}
-
-// Simple JS escaping helper
-function escapeJs(str) {
-  return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
 
 async function controlSystem(action) {

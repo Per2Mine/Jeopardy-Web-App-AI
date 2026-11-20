@@ -1,4 +1,4 @@
-import { Component, inject, computed, OnInit, effect, signal, HostListener } from '@angular/core';
+import { Component, inject, computed, OnInit, OnDestroy, effect, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { P2pService, Player, GameState, GameEvent } from '../../core/services/p2p.service';
@@ -26,15 +26,32 @@ import { PixelatedImageComponent } from '../../shared/components/pixelated-image
   templateUrl: './game-page.component.html',
   styleUrl: './game-page.component.css'
 })
-export class GamePageComponent implements OnInit {
+export class GamePageComponent implements OnInit, OnDestroy {
   p2pService = inject(P2pService);
   audioService = inject(AudioService);
   private router = inject(Router);
+  private turnOverlayTimer: ReturnType<typeof setTimeout> | null = null;
 
   showTurnOverlay = signal(false);
   turnOverlayName = signal('');
   turnOverlayColor = signal('#f1b814');
   turnOverlayAvatar = signal('');
+  showCancelGameModal = signal(false);
+
+  // Decorative confetti particles for the summary podium screen
+  readonly confettiPieces = [
+    { left: 6, delay: 0, duration: 4.2, color: '#f1b814', size: 8 },
+    { left: 14, delay: 0.6, duration: 4.8, color: '#38bdf8', size: 7 },
+    { left: 22, delay: 1.2, duration: 4.1, color: '#fbbf24', size: 9 },
+    { left: 31, delay: 0.3, duration: 5.0, color: '#34d399', size: 7 },
+    { left: 40, delay: 1.5, duration: 4.4, color: '#f472b6', size: 8 },
+    { left: 49, delay: 0.2, duration: 4.6, color: '#f1b814', size: 9 },
+    { left: 58, delay: 1.0, duration: 4.3, color: '#60a5fa', size: 7 },
+    { left: 67, delay: 0.5, duration: 4.9, color: '#fcd34d', size: 8 },
+    { left: 76, delay: 1.4, duration: 4.2, color: '#34d399', size: 7 },
+    { left: 84, delay: 0.8, duration: 4.7, color: '#fb7185', size: 8 },
+    { left: 92, delay: 0.1, duration: 4.5, color: '#f1b814', size: 9 }
+  ];
 
   constructor() {
     effect(() => {
@@ -66,20 +83,37 @@ export class GamePageComponent implements OnInit {
     });
   }
 
+  ngOnDestroy() {
+    if (this.turnOverlayTimer !== null) {
+      clearTimeout(this.turnOverlayTimer);
+      this.turnOverlayTimer = null;
+    }
+  }
+
   // Jeopardy Categories loaded dynamically from game state
   get categories(): Category[] {
     return this.p2pService.gameState().categories || [];
   }
 
+  getActiveCategoryName(): string {
+    const idx = this.p2pService.gameState().activeQuestion?.categoryIndex ?? 0;
+    return this.categories[idx]?.name || 'Kategorie';
+  }
+
   // Row indices (for rendering dynamic number of question cards per category column)
   get rows(): number[] {
-    const length = this.categories[0]?.questions?.length || 0;
+    const length = this.categories.reduce((max, cat) => Math.max(max, cat.questions?.length || 0), 0);
     return Array.from({ length }, (_, i) => i);
   }
 
   // Leaderboard sorted by score descending
   sortedPlayers = computed(() => {
     return this.p2pService.players().filter(p => !p.isHost).sort((a, b) => b.score - a.score);
+  });
+
+  topPlayerScore = computed(() => {
+    const list = this.sortedPlayers();
+    return list.length > 0 ? list[0].score : null;
   });
 
   // Team-grouped leaderboard sorted by score descending
@@ -115,8 +149,24 @@ export class GamePageComponent implements OnInit {
     return list.sort((a, b) => b.score - a.score);
   });
 
+  topTeamScore = computed(() => {
+    const list = this.sortedTeams();
+    return list.length > 0 ? list[0].score : null;
+  });
+
   summaryTab = signal<'leaderboard' | 'stats' | 'chart'>('leaderboard');
   activeTooltip = signal<{ x: number; y: number; text: string } | null>(null);
+
+  getTooltipBoxX(x: number, chartWidth: number): number {
+    const halfWidth = 110;
+    const minCenter = halfWidth + 8;
+    const maxCenter = chartWidth - halfWidth - 8;
+    return Math.max(minCenter, Math.min(maxCenter, x));
+  }
+
+  getTooltipBoxY(y: number): number {
+    return y < 48 ? y + 14 : y - 36;
+  }
 
   buzzerKing = computed(() => {
     const history = this.p2pService.gameState().history || [];
@@ -155,7 +205,7 @@ export class GamePageComponent implements OnInit {
         name: `Team ${teamId}`,
         value: `${Math.round(bestAvg)} ms`,
         avatar: '',
-        color: teamId === 1 ? '#3b82f6' : teamId === 2 ? '#ef4444' : teamId === 3 ? '#10b981' : '#8b5cf6'
+        color: this.getTeamColor(teamId)
       };
     } else {
       const p = players.find(player => player.id === bestKey);
@@ -202,7 +252,7 @@ export class GamePageComponent implements OnInit {
         name: `Team ${teamId}`,
         value: `-${maxLoss} $`,
         avatar: '',
-        color: teamId === 1 ? '#3b82f6' : teamId === 2 ? '#ef4444' : teamId === 3 ? '#10b981' : '#8b5cf6'
+        color: this.getTeamColor(teamId)
       };
     } else {
       const p = players.find(player => player.id === worstKey);
@@ -257,7 +307,7 @@ export class GamePageComponent implements OnInit {
             category,
             name: `Team ${teamId}`,
             score: maxScore,
-            color: teamId === 1 ? '#3b82f6' : teamId === 2 ? '#ef4444' : teamId === 3 ? '#10b981' : '#8b5cf6'
+            color: this.getTeamColor(teamId)
           });
         } else {
           const p = players.find(player => player.id === bestKey);
@@ -302,7 +352,7 @@ export class GamePageComponent implements OnInit {
           seriesList.push({
             id: t.toString(),
             name: `Team ${t}`,
-            color: t === 1 ? '#3b82f6' : t === 2 ? '#ef4444' : t === 3 ? '#10b981' : '#8b5cf6',
+            color: this.getTeamColor(t),
             scores: [0] // start at 0
           });
         }
@@ -397,6 +447,7 @@ export class GamePageComponent implements OnInit {
       }
 
       return {
+        id: s.id,
         name: s.name,
         color: s.color,
         path: d,
@@ -777,7 +828,21 @@ export class GamePageComponent implements OnInit {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
-    // 1. Ignore if typing in input fields
+    // 0. Handle cancel-game modal first
+    if (this.showCancelGameModal()) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.closeCancelGameModal();
+      }
+      return;
+    }
+
+    // 1. Ignore when audio settings popover is open or user is rebinding buzzer key
+    if (this.audioService.isPopoverOpen() || this.audioService.isRebindingKey()) {
+      return;
+    }
+
+    // 2. Ignore if typing in input fields
     const target = event.target as HTMLElement;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
       return;
@@ -828,7 +893,7 @@ export class GamePageComponent implements OnInit {
       }
     } else {
       // Player Buzzing Hotkey
-      if (state.phase === 'QUESTION' && !isBuzzed && !this.isBuzzerDisabled()) {
+      if (!event.repeat && state.phase === 'QUESTION' && !isBuzzed && !this.isBuzzerDisabled()) {
         const configuredKey = this.audioService.buzzerKey();
         if (event.code === configuredKey) {
           event.preventDefault();
@@ -844,10 +909,17 @@ export class GamePageComponent implements OnInit {
 
   onLogoClick() {
     if (this.p2pService.isHost()) {
-      if (confirm('Möchtest du das aktuelle Spiel wirklich abbrechen und alle Spieler zurück in die Lobby bringen?')) {
-        this.p2pService.cancelGame();
-      }
+      this.showCancelGameModal.set(true);
     }
+  }
+
+  closeCancelGameModal() {
+    this.showCancelGameModal.set(false);
+  }
+
+  confirmCancelGame() {
+    this.showCancelGameModal.set(false);
+    this.p2pService.cancelGame();
   }
 
   onLeaveLobby() {
@@ -859,7 +931,7 @@ export class GamePageComponent implements OnInit {
     const state = this.p2pService.gameState();
     if (!state || !state.categories) return false;
     const totalQuestions = state.categories.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0);
-    return state.answeredQuestions.length === totalQuestions;
+    return totalQuestions > 0 && state.answeredQuestions.length >= totalQuestions;
   }
 
   hasNextBoard(): boolean {
@@ -910,11 +982,7 @@ export class GamePageComponent implements OnInit {
     if (activeSelectorId.startsWith('team-')) {
       const teamId = parseInt(activeSelectorId.replace('team-', ''), 10);
       name = `Team ${teamId}`;
-      color = teamId === 1 ? '#3b82f6' : 
-              teamId === 2 ? '#ef4444' : 
-              teamId === 3 ? '#22c55e' : 
-              teamId === 4 ? '#a855f7' : 
-              teamId === 5 ? '#ec4899' : '#eab308';
+      color = this.getTeamColor(teamId);
     } else {
       const player = this.p2pService.players().find(p => p.id === activeSelectorId);
       if (player) {
@@ -930,11 +998,16 @@ export class GamePageComponent implements OnInit {
     this.turnOverlayColor.set(color);
     this.turnOverlayAvatar.set(avatar);
 
+    if (this.turnOverlayTimer !== null) {
+      clearTimeout(this.turnOverlayTimer);
+    }
+
     this.showTurnOverlay.set(true);
     this.audioService.playTransition();
 
-    setTimeout(() => {
+    this.turnOverlayTimer = setTimeout(() => {
       this.showTurnOverlay.set(false);
+      this.turnOverlayTimer = null;
     }, 2800);
   }
 }

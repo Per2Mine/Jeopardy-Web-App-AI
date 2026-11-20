@@ -13,7 +13,11 @@ yarn-error.log
 
 # Databases
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *.db
+*.db-wal
+*.db-shm
 
 # IDEs and editors
 .idea/

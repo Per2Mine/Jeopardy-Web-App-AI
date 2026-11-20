@@ -3,4 +3,10 @@ import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 
 bootstrapApplication(AppComponent, appConfig)
-  .catch((err) => console.error(err));
+  .catch((err) => {
+    console.error(err);
+    const root = document.querySelector('app-root');
+    if (root) {
+      root.textContent = `App-Startfehler: ${err?.message || err}`;
+    }
+  });

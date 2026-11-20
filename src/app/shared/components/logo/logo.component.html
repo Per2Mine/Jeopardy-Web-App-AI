@@ -1,21 +1,47 @@
-<div [routerLink]="clickable() ? '/' : null" [class.cursor-pointer]="clickable()" class="flex flex-col items-center select-none">
-  <div 
-    [class]="'font-black uppercase italic text-center select-none font-inika ' + logoClass()">
-    <span class="bg-gradient-to-r from-jeopardy-gold via-yellow-400 to-jeopardy-goldLight bg-clip-text text-transparent filter drop-shadow-[0_4px_12px_rgba(241,184,20,0.4)]">
-      Jeopardy
-    </span>
-    <span class="text-jeopardy-gold font-extrabold animate-pulse ml-0.5 filter drop-shadow-[0_0_8px_rgba(241,184,20,0.8)]">
-      !
-    </span>
-  </div>
-  
-  @if (size() === 'lg' || size() === 'md') {
-    <div class="mt-1 flex items-center gap-1.5">
-      <div class="h-[1px] w-8 bg-gradient-to-r from-transparent to-jeopardy-accent"></div>
-      <span class="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase text-jeopardy-accent">
-        Party Edition
+@if (clickable()) {
+  <a
+    [routerLink]="'/'"
+    aria-label="Zur Startseite"
+    class="group flex flex-col items-center select-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jeopardy-gold/70 rounded-xl px-2 py-0.5 transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
+  >
+    <div [class]="'font-black uppercase italic text-center select-none font-inika ' + logoClass()">
+      <span class="bg-gradient-to-r from-jeopardy-gold via-yellow-300 to-jeopardy-gold-light bg-clip-text text-transparent filter drop-shadow-[0_4px_14px_rgba(241,184,20,0.45)] group-hover:drop-shadow-[0_4px_20px_rgba(241,184,20,0.7)] transition-all">
+        Jeopardy
       </span>
-      <div class="h-[1px] w-8 bg-gradient-to-l from-transparent to-jeopardy-accent"></div>
+      <span class="text-jeopardy-gold-light font-extrabold inline-block ml-0.5 filter drop-shadow-[0_0_10px_rgba(241,184,20,0.85)] group-hover:rotate-6 transition-transform">
+        !
+      </span>
     </div>
-  }
-</div>
+
+    @if (size() === 'lg' || size() === 'md') {
+      <div class="mt-1 flex items-center gap-2">
+        <div class="h-[1px] w-9 bg-gradient-to-r from-transparent to-sky-400/70"></div>
+        <span class="text-[10px] md:text-xs font-bold tracking-[0.32em] uppercase text-sky-400/90">
+          Party Edition
+        </span>
+        <div class="h-[1px] w-9 bg-gradient-to-l from-transparent to-sky-400/70"></div>
+      </div>
+    }
+  </a>
+} @else {
+  <div class="flex flex-col items-center select-none">
+    <div [class]="'font-black uppercase italic text-center select-none font-inika ' + logoClass()">
+      <span class="bg-gradient-to-r from-jeopardy-gold via-yellow-300 to-jeopardy-gold-light bg-clip-text text-transparent filter drop-shadow-[0_4px_14px_rgba(241,184,20,0.45)]">
+        Jeopardy
+      </span>
+      <span class="text-jeopardy-gold-light font-extrabold inline-block ml-0.5 filter drop-shadow-[0_0_10px_rgba(241,184,20,0.85)]">
+        !
+      </span>
+    </div>
+
+    @if (size() === 'lg' || size() === 'md') {
+      <div class="mt-1 flex items-center gap-2">
+        <div class="h-[1px] w-9 bg-gradient-to-r from-transparent to-sky-400/70"></div>
+        <span class="text-[10px] md:text-xs font-bold tracking-[0.32em] uppercase text-sky-400/90">
+          Party Edition
+        </span>
+        <div class="h-[1px] w-9 bg-gradient-to-l from-transparent to-sky-400/70"></div>
+      </div>
+    }
+  </div>
+}

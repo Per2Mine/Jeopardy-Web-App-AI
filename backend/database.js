@@ -2,23 +2,23 @@ const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
 
-let db = null;
+let dbPromise = null;
 
-async function getDatabase() {
-  if (db) return db;
-
+async function initDatabaseInstance() {
   const dbDir = process.env.DATABASE_DIR || __dirname;
   const dbPath = path.join(dbDir, 'database.sqlite');
-  db = await open({
+  const instance = await open({
     filename: dbPath,
     driver: sqlite3.Database
   });
 
-  // Enable foreign key support
-  await db.run('PRAGMA foreign_keys = ON');
+  // Enable WAL mode, busy timeout, and foreign key support
+  await instance.run('PRAGMA journal_mode = WAL');
+  await instance.run('PRAGMA busy_timeout = 5000');
+  await instance.run('PRAGMA foreign_keys = ON');
 
   // Create tables
-  await db.exec(`
+  await instance.exec(`
     CREATE TABLE IF NOT EXISTS users (
       email TEXT PRIMARY KEY,
       username TEXT NOT NULL,
@@ -65,73 +65,69 @@ async function getDatabase() {
   `);
 
   // Migrations for existing databases
-  try {
-    await db.run('ALTER TABLE users ADD COLUMN security_question TEXT');
-  } catch (e) {
-    // Column already exists, ignore
+  const migrations = [
+    'ALTER TABLE users ADD COLUMN security_question TEXT',
+    'ALTER TABLE users ADD COLUMN security_answer_hash TEXT',
+    'ALTER TABLE quizzes ADD COLUMN is_complete INTEGER DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN last_login_at DATETIME',
+    'ALTER TABLE quizzes ADD COLUMN updated_at DATETIME',
+    'ALTER TABLE quizzes ADD COLUMN is_public INTEGER DEFAULT 0',
+    "ALTER TABLE quizzes ADD COLUMN icon TEXT DEFAULT '📝'"
+  ];
+
+  for (const sql of migrations) {
+    try {
+      await instance.run(sql);
+    } catch (e) {
+      // Ignore duplicate column error on already-migrated databases
+      if (!String(e.message || '').includes('duplicate column')) {
+        console.warn('Migration warning:', e.message);
+      }
+    }
   }
 
-  try {
-    await db.run('ALTER TABLE users ADD COLUMN security_answer_hash TEXT');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-
-  try {
-    await db.run('ALTER TABLE quizzes ADD COLUMN is_complete INTEGER DEFAULT 0');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-
-  try {
-    await db.run('ALTER TABLE users ADD COLUMN last_login_at DATETIME');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-
-  try {
-    await db.run('ALTER TABLE quizzes ADD COLUMN updated_at DATETIME');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-
-  try {
-    await db.run('ALTER TABLE quizzes ADD COLUMN is_public INTEGER DEFAULT 0');
-  } catch (e) {
-    // Column already exists, ignore
-  }
-
-  try {
-    await db.run('ALTER TABLE quizzes ADD COLUMN icon TEXT DEFAULT "📝"');
-  } catch (e) {
-    // Column already exists, ignore
-  }
+  // Create indexes for fast queries & admin dashboards
+  await instance.exec(`
+    CREATE INDEX IF NOT EXISTS idx_quizzes_user_email ON quizzes(user_email);
+    CREATE INDEX IF NOT EXISTS idx_quizzes_community ON quizzes(is_public, is_complete, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_lobby_creations_created_at ON lobby_creations(created_at);
+    CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+  `);
 
   // Seed default AI quizzes for community pool
   try {
-    await seedDefaultQuizzes(db);
+    await seedDefaultQuizzes(instance);
     console.log('Default AI quizzes successfully verified/seeded.');
   } catch (err) {
     console.error('Error seeding default AI quizzes:', err);
   }
 
-  return db;
+  return instance;
+}
+
+async function getDatabase() {
+  if (!dbPromise) {
+    dbPromise = initDatabaseInstance().catch((err) => {
+      dbPromise = null;
+      throw err;
+    });
+  }
+  return dbPromise;
 }
 
 async function seedDefaultQuizzes(db) {
   const aiEmail = 'ai-assistant@jeopardy.app';
   
-  // Ensure AI User exists
+  // Ensure AI User exists (system account — cannot be logged into or reset)
   await db.run(`
     INSERT INTO users (email, username, password_hash, security_question, security_answer_hash)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(email) DO UPDATE SET username=excluded.username
+    VALUES (?, ?, ?, NULL, NULL)
+    ON CONFLICT(email) DO UPDATE SET username=excluded.username, security_question=NULL, security_answer_hash=NULL
   `, [
     aiEmail,
     'AI-Quizzer 🤖',
-    '$2b$10$aiDummyHashPlaceholderNotUsedForLoginAnywayKeepItLong',
-    'Lieblings-Zahl?',
-    '42'
+    '!LOCKED_SYSTEM_ACCOUNT!'
   ]);
 
   const quizzes = [

@@ -6,40 +6,68 @@
 
 /* Card depth and subtle glow on hover */
 .quiz-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 .quiz-card-hover:hover {
-  border-color: rgba(0, 82, 204, 0.3) !important;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 82, 204, 0.15) !important;
+  border-color: rgba(10, 114, 239, 0.35) !important;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.65), 0 0 24px rgba(10, 114, 239, 0.14) !important;
 }
 
 /* Glowing inputs on focus */
 .glow-input-focus {
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 .glow-input-focus:focus-within {
-  border-color: rgba(0, 82, 204, 0.6) !important;
-  box-shadow: 0 0 12px rgba(0, 82, 204, 0.25) !important;
-  background: rgba(0, 82, 204, 0.08) !important;
+  border-color: rgba(10, 114, 239, 0.65) !important;
+  box-shadow: 0 0 14px rgba(10, 114, 239, 0.28) !important;
+  background: rgba(10, 114, 239, 0.1) !important;
 }
 
 /* Glowing cell buttons */
 .cell-glow-filled {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .cell-glow-filled:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 18px rgba(0, 82, 204, 0.4) !important;
-  border-color: rgba(0, 82, 204, 0.8) !important;
+  box-shadow: 0 10px 22px -6px rgba(0, 0, 0, 0.45), 0 0 18px rgba(10, 114, 239, 0.38) !important;
+  border-color: rgba(10, 114, 239, 0.85) !important;
 }
 
 .cell-glow-empty {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 .cell-glow-empty:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3), 0 0 12px rgba(255, 255, 255, 0.05) !important;
-  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.35) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Tactile range sliders inside the question editor */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #f1b814;
+  border: 2px solid #040c2a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.18);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #f1b814;
+  border: 2px solid #040c2a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
 }
 
